@@ -1,8 +1,8 @@
-# Учёт складского LED-оборудования (Genesis)
+# LED-склад (учёт складского LED-оборудования)
 
 Система учёта для компании проката LED-экранов: склад по количеству, заказы проката, soft-резервы с сигналом внешней аренды, далее — scan-события, mapper, hours/trips.
 
-Репозиторий: [`GIN1104/genesis`](https://github.com/GIN1104/genesis) (public, под GitHub Pages).
+Репозиторий: [`GIN1104/led-sklad`](https://github.com/GIN1104/led-sklad) (public, под GitHub Pages).
 
 ## Текущий статус
 
@@ -37,11 +37,13 @@
 
 ## GitHub Pages
 
-Репозиторий **public**, чтобы публиковать документацию через GitHub Pages.
+Репозиторий **public**. После включения Pages документация будет доступна по адресу:
 
-Пока Pages ещё не включён (нужна настройка в Settings → Pages). Варианты:
+`https://GIN1104.github.io/led-sklad/`
 
-1. **Из ветки `main`, папка `/docs`** — уже лежит план; в Settings → Pages выберите Source: Deploy from a branch → `main` / `/docs`. Для красивой статики позже добавим `docs/index.html` или генератор.
+Пока Pages ещё не включён (Settings → Pages). Варианты:
+
+1. **Из ветки `main`, папка `/docs`** — уже лежит план; Source: Deploy from a branch → `main` / `/docs`. Для красивой статики позже добавим `docs/index.html` или генератор.
 2. **GitHub Actions / ветка `gh-pages`** — отдельный пайплайн, когда появится сайт документации.
 
 Пока достаточно открыть Markdown в репозитории; Pages подключаем по готовности UI.
@@ -53,5 +55,5 @@
 ## Клонирование (Windows / WSL)
 
 ```bash
-gh repo clone GIN1104/genesis
+gh repo clone GIN1104/led-sklad
 ```
