@@ -21,8 +21,9 @@ function RoleSwitch({ users, currentId }: { users: Person[]; currentId: string }
                 : "w-full rounded-md px-3 py-2 text-left text-sm text-white/80 hover:bg-white/10"
             }
           >
-            {user.name}
-            <span className="mt-0.5 block text-xs opacity-80">{roleLabel[user.role]}</span>
+            <span className="block truncate">
+              {user.name} · {roleLabel[user.role]}
+            </span>
           </button>
         </form>
       ))}
@@ -41,8 +42,8 @@ export function Shell({
 }) {
   return (
     <div className="min-h-screen md:grid md:grid-cols-[250px_1fr]">
-      <aside className="hidden min-h-screen flex-col bg-ink text-paper md:flex">
-        <div className="px-5 pt-6 pb-4">
+      <aside className="sticky top-0 hidden h-screen flex-col overflow-y-auto bg-ink text-paper md:flex">
+        <div className="px-5 pt-5 pb-3">
           <div className="mb-3 grid w-8 grid-cols-2 gap-0.5" aria-hidden>
             <span className="h-3.5 w-3.5 bg-[#e7a06a]" />
             <span className="h-3.5 w-3.5 bg-copper" />
@@ -55,7 +56,7 @@ export function Shell({
         <div className="px-3">
           <Nav />
         </div>
-        <div className="mt-auto px-4 py-5">
+        <div className="mt-auto px-4 pt-4 pb-4">
           <RoleSwitch users={users} currentId={session.id} />
         </div>
       </aside>
