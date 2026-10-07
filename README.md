@@ -1,8 +1,8 @@
-# LED-склад (учёт складского LED-оборудования)
+# LED Warehouse (учёт складского LED-оборудования)
 
 Система учёта для компании проката LED-экранов: склад по количеству, заказы проката, soft-резервы с сигналом внешней аренды, далее — scan-события, mapper, hours/trips.
 
-Репозиторий: [`GIN1104/led-sklad`](https://github.com/GIN1104/led-sklad) (public, под GitHub Pages).
+Репозиторий: [`GIN1104/led-warehouse`](https://github.com/GIN1104/led-warehouse) (public, под GitHub Pages).
 
 ## Текущий статус
 
@@ -39,7 +39,7 @@
 
 Репозиторий **public**. После включения Pages документация будет доступна по адресу:
 
-`https://GIN1104.github.io/led-sklad/`
+`https://GIN1104.github.io/led-warehouse/`
 
 Пока Pages ещё не включён (Settings → Pages). Варианты:
 
@@ -55,5 +55,5 @@
 ## Клонирование (Windows / WSL)
 
 ```bash
-gh repo clone GIN1104/led-sklad
+gh repo clone GIN1104/led-warehouse
 ```
