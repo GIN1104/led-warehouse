@@ -1,11 +1,16 @@
+"use client";
+
 import Link from "next/link";
+import { useWarehouse } from "@/components/warehouse";
 import { Badge, PageHeader, Panel } from "@/components/ui";
-import { getDb } from "@/lib/db";
 import { formatDate } from "@/lib/dates";
+import { orderHref } from "@/lib/paths";
 import { getDashboard } from "@/lib/services/queries";
 
 export default function HomePage() {
-  const data = getDashboard(getDb());
+  const { db, revision } = useWarehouse();
+  const data = getDashboard(db);
+  void revision;
 
   const cards = [
     { label: "Позиций", value: data.skuCount, hint: "номенклатура" },
@@ -19,7 +24,7 @@ export default function HomePage() {
       <PageHeader
         eyebrow="Склад проката"
         title="Обзор"
-        description="Остатки по количеству, заказы и мягкие резервы. Нехватка не блокирует заказ: система поднимает сигнал и предлагает арендовать снаружи."
+        description="Остатки по количеству, заказы и мягкие резервы. Нехватка не блокирует заказ: система поднимает сигнал и предлагает арендовать снаружи. База этого браузера общая для вкладок и сохраняется локально."
       />
       <div className="mb-6 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
         {cards.map((card) => (
@@ -65,7 +70,7 @@ export default function HomePage() {
               {data.orders.map((order) => (
                 <li key={order.id} className="flex items-start justify-between gap-3 border-b border-line pb-3 last:border-0">
                   <div>
-                    <Link href={`/orders/${order.id}`} className="font-medium hover:text-copper">
+                    <Link href={orderHref(order.id)} className="font-medium hover:text-copper">
                       {order.customerName}
                     </Link>
                     <p className="text-sm text-ink/60">

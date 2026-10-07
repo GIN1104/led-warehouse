@@ -1,28 +1,41 @@
+"use client";
+
 import Link from "next/link";
-import { notFound } from "next/navigation";
-import { orderStatusAction } from "@/app/actions";
-import { can, getSession } from "@/lib/auth";
+import { useSearchParams } from "next/navigation";
+import { useState } from "react";
+import { useWarehouse } from "@/components/warehouse";
 import { Badge, Flash, PageHeader, Panel, buttonClass } from "@/components/ui";
-import { getDb } from "@/lib/db";
+import { assertCan, can, errorText } from "@/lib/auth";
 import { formatDate } from "@/lib/dates";
 import { hireStatusLabel, orderStatusLabel } from "@/lib/labels";
+import { setOrderStatus } from "@/lib/services/ledger";
 import { getOrderDetail } from "@/lib/services/queries";
 
-export default async function OrderPage({
-  params,
-  searchParams,
-}: {
-  params: Promise<{ id: string }>;
-  searchParams: Promise<{ error?: string; ok?: string }>;
-}) {
-  const { id } = await params;
-  const flash = await searchParams;
-  const session = await getSession();
+export function OrderView() {
+  const params = useSearchParams();
+  const id = params.get("id") ?? "";
+  const { db, session, refresh, revision } = useWarehouse();
   const allowed = can(session.role, "order.write");
-  const detail = getOrderDetail(getDb(), id);
-  if (!detail) notFound();
+  const detail = id ? getOrderDetail(db, id) : null;
+  const [flash, setFlash] = useState<{ error?: string; ok?: string }>({});
+  void revision;
+
+  if (!detail) {
+    return <p className="text-sm">Заказ не найден.</p>;
+  }
   const { order, lines, hires } = detail;
   const shortage = lines.reduce((sumQty, line) => sumQty + line.qtyShortage, 0);
+
+  function changeStatus(status: "cancelled" | "closed") {
+    try {
+      assertCan(session.role, "order.write");
+      setOrderStatus(db, order.id, status, session.id);
+      refresh();
+      setFlash({ ok: "Статус заказа обновлён" });
+    } catch (error) {
+      setFlash({ error: errorText(error) });
+    }
+  }
 
   return (
     <div>
@@ -85,20 +98,12 @@ export default async function OrderPage({
       ) : null}
       {allowed && order.status === "confirmed" ? (
         <div className="flex flex-wrap gap-2">
-          <form action={orderStatusAction}>
-            <input type="hidden" name="orderId" value={order.id} />
-            <input type="hidden" name="status" value="closed" />
-            <button type="submit" className={buttonClass("ghost")}>
-              Закрыть заказ
-            </button>
-          </form>
-          <form action={orderStatusAction}>
-            <input type="hidden" name="orderId" value={order.id} />
-            <input type="hidden" name="status" value="cancelled" />
-            <button type="submit" className={buttonClass("danger")}>
-              Отменить заказ
-            </button>
-          </form>
+          <button type="button" className={buttonClass("ghost")} onClick={() => changeStatus("closed")}>
+            Закрыть заказ
+          </button>
+          <button type="button" className={buttonClass("danger")} onClick={() => changeStatus("cancelled")}>
+            Отменить заказ
+          </button>
         </div>
       ) : null}
     </div>

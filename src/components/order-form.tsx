@@ -1,9 +1,12 @@
 "use client";
 
-import { useState } from "react";
-import { useActionState } from "react";
-import { createOrderAction } from "@/app/actions";
+import { useState, type FormEvent } from "react";
+import { useRouter } from "next/navigation";
+import { useWarehouse } from "@/components/warehouse";
 import { Field, buttonClass, controlClass } from "@/components/ui";
+import { assertCan, errorText } from "@/lib/auth";
+import { orderHref } from "@/lib/paths";
+import { createOrder } from "@/lib/services/ledger";
 
 type SkuOption = { id: string; code: string; name: string; availableToday: number; unit: string };
 
@@ -16,11 +19,39 @@ export function OrderForm({
   startDate: string;
   endDate: string;
 }) {
+  const { db, session, refresh } = useWarehouse();
+  const router = useRouter();
   const [lines, setLines] = useState([{ skuId: skus[0]?.id ?? "", qty: 1 }]);
-  const [state, action, pending] = useActionState(createOrderAction, null);
+  const [error, setError] = useState<string | null>(null);
+  const [pending, setPending] = useState(false);
+
+  function onSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const form = new FormData(event.currentTarget);
+    setPending(true);
+    try {
+      assertCan(session.role, "order.write");
+      const result = createOrder(
+        db,
+        {
+          customerName: String(form.get("customerName") ?? ""),
+          startDate: String(form.get("startDate") ?? ""),
+          endDate: String(form.get("endDate") ?? ""),
+          notes: String(form.get("notes") ?? ""),
+          lines,
+        },
+        session.id,
+      );
+      refresh();
+      router.push(orderHref(result.orderId));
+    } catch (caught) {
+      setError(errorText(caught));
+      setPending(false);
+    }
+  }
 
   return (
-    <form action={action} className="flex flex-col gap-4">
+    <form onSubmit={onSubmit} className="flex flex-col gap-4">
       <div className="grid gap-3 md:grid-cols-2">
         <Field label="Заказчик">
           <input name="customerName" required className={controlClass} placeholder="ООО «Сцена Про»" />
@@ -35,7 +66,6 @@ export function OrderForm({
           <input name="endDate" type="date" required defaultValue={endDate} className={controlClass} />
         </Field>
       </div>
-
       <div className="flex flex-col gap-2">
         <div className="flex items-center justify-between">
           <p className="text-sm font-medium">Состав</p>
@@ -69,9 +99,7 @@ export function OrderForm({
               value={line.qty}
               onChange={(event) =>
                 setLines((current) =>
-                  current.map((item, itemIndex) =>
-                    itemIndex === index ? { ...item, qty: Number(event.target.value) } : item,
-                  ),
+                  current.map((item, itemIndex) => (itemIndex === index ? { ...item, qty: Number(event.target.value) } : item)),
                 )
               }
             />
@@ -89,8 +117,7 @@ export function OrderForm({
           </div>
         ))}
       </div>
-      <input type="hidden" name="lines" value={JSON.stringify(lines)} />
-      {state?.error ? <p className="text-sm text-alert">{state.error}</p> : null}
+      {error ? <p className="text-sm text-alert">{error}</p> : null}
       <p className="text-sm text-ink/60">
         Заказ сохранится даже при нехватке. Система посчитает мягкий резерв и, если остатка не хватит, создаст заявку на
         внешнюю аренду.

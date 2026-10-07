@@ -1,9 +1,13 @@
+"use client";
+
 import Link from "next/link";
-import { hireStatusAction } from "@/app/actions";
-import { can, getSession } from "@/lib/auth";
+import { useState, type FormEvent } from "react";
+import { useWarehouse } from "@/components/warehouse";
 import { Badge, Flash, PageHeader, controlClass } from "@/components/ui";
-import { getDb } from "@/lib/db";
+import { assertCan, can, errorText } from "@/lib/auth";
 import { hireStatusLabel } from "@/lib/labels";
+import { orderHref } from "@/lib/paths";
+import { setHireStatus } from "@/lib/services/ledger";
 import { listExternalHires } from "@/lib/services/queries";
 
 const tone = {
@@ -13,15 +17,30 @@ const tone = {
   closed: "neutral",
 } as const;
 
-export default async function ExternalHiresPage({
-  searchParams,
-}: {
-  searchParams: Promise<{ error?: string; ok?: string }>;
-}) {
-  const flash = await searchParams;
-  const session = await getSession();
+export default function ExternalHiresPage() {
+  const { db, session, refresh, revision } = useWarehouse();
   const allowed = can(session.role, "hire.write");
-  const rows = listExternalHires(getDb());
+  const rows = listExternalHires(db);
+  const [flash, setFlash] = useState<{ error?: string; ok?: string }>({});
+  void revision;
+
+  function onSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const form = new FormData(event.currentTarget);
+    const submitter = (event.nativeEvent as SubmitEvent).submitter;
+    const status = submitter instanceof HTMLButtonElement ? submitter.value : "";
+    try {
+      assertCan(session.role, "hire.write");
+      if (status !== "needed" && status !== "ordered" && status !== "received" && status !== "closed") {
+        throw new Error("Неизвестный статус аренды");
+      }
+      setHireStatus(db, String(form.get("id") ?? ""), status, String(form.get("supplierNote") ?? ""), session.id);
+      refresh();
+      setFlash({ ok: "Внешняя аренда обновлена" });
+    } catch (error) {
+      setFlash({ error: errorText(error) });
+    }
+  }
 
   return (
     <div>
@@ -41,14 +60,14 @@ export default async function ExternalHiresPage({
                   {hire.skuCode} · {hire.qty} {hire.unit}
                 </p>
                 <p className="text-sm text-ink/70">{hire.skuName}</p>
-                <Link href={`/orders/${hire.orderId}`} className="text-sm text-copper">
+                <Link href={orderHref(hire.orderId)} className="text-sm text-copper">
                   {hire.customerName}
                 </Link>
               </div>
               <Badge tone={tone[hire.status]}>{hireStatusLabel[hire.status]}</Badge>
             </div>
             {allowed && hire.status !== "closed" ? (
-              <form action={hireStatusAction} className="mt-3 flex flex-col gap-2 md:flex-row md:items-center">
+              <form onSubmit={onSubmit} className="mt-3 flex flex-col gap-2 md:flex-row md:items-center">
                 <input type="hidden" name="id" value={hire.id} />
                 <input
                   name="supplierNote"

@@ -1,25 +1,76 @@
-import { randomUUID } from "node:crypto";
-import { and, eq, gt, sum } from "drizzle-orm";
 import { assertDateRange, todayIso } from "@/lib/dates";
 import { allocateForSku } from "@/lib/domain/allocation";
 import { DomainError } from "@/lib/domain/errors";
-import type { AppDb } from "@/lib/db/types";
-import {
-  alerts,
-  auditLog,
-  externalHires,
-  locations,
-  rentalLines,
-  rentalOrders,
-  scanEvents,
-  shortageSignals,
-  skus,
-  stockBalances,
-  stockMovements,
-} from "@/lib/db/schema";
+import { newId, type Sql } from "@/lib/db/sql";
 
-type SkuRecord = typeof skus.$inferSelect;
-type OrderRecord = typeof rentalOrders.$inferSelect;
+type SkuRecord = {
+  id: string;
+  code: string;
+  name: string;
+  category: string;
+  unit: string;
+  trackMode: string;
+  description: string;
+};
+
+type OrderRecord = {
+  id: string;
+  customerName: string;
+  startDate: string;
+  endDate: string;
+  status: "confirmed" | "cancelled" | "closed";
+  notes: string;
+  createdAt: number;
+  createdBy: string;
+};
+
+type LineRecord = {
+  id: string;
+  orderId: string;
+  skuId: string;
+  qtyRequested: number;
+  qtySoftReserved: number;
+  qtyShortage: number;
+};
+
+type SignalRecord = {
+  id: string;
+  skuId: string;
+  orderId: string;
+  startDate: string;
+  endDate: string;
+  qtyShort: number;
+  status: "open" | "closed";
+};
+
+type HireRecord = {
+  id: string;
+  skuId: string;
+  qty: number;
+  orderId: string;
+  alertId: string | null;
+  status: "needed" | "ordered" | "received" | "closed";
+  supplierNote: string;
+  createdAt: number;
+};
+
+type AlertRecord = {
+  id: string;
+  type: string;
+  status: "open" | "ack" | "closed";
+  skuId: string | null;
+  orderId: string | null;
+  externalHireId: string | null;
+  message: string;
+  createdAt: number;
+};
+
+const SKU_SQL = `SELECT id, code, name, category, unit, track_mode AS trackMode, description FROM skus`;
+const ORDER_SQL = `SELECT id, customer_name AS customerName, start_date AS startDate, end_date AS endDate, status, notes, created_at AS createdAt, created_by AS createdBy FROM rental_orders`;
+const LINE_SQL = `SELECT id, order_id AS orderId, sku_id AS skuId, qty_requested AS qtyRequested, qty_soft_reserved AS qtySoftReserved, qty_shortage AS qtyShortage FROM rental_lines`;
+const SIGNAL_SQL = `SELECT id, sku_id AS skuId, order_id AS orderId, start_date AS startDate, end_date AS endDate, qty_short AS qtyShort, status FROM shortage_signals`;
+const HIRE_SQL = `SELECT id, sku_id AS skuId, qty, order_id AS orderId, alert_id AS alertId, status, supplier_note AS supplierNote, created_at AS createdAt FROM external_hires`;
+const ALERT_SQL = `SELECT id, type, status, sku_id AS skuId, order_id AS orderId, external_hire_id AS externalHireId, message, created_at AS createdAt FROM alerts`;
 
 export type MovementType = "in" | "out" | "adjust" | "move";
 
@@ -65,37 +116,27 @@ export type IncomingScan = {
   at?: string;
 };
 
-function inTx<T>(db: AppDb, fn: (tx: AppDb) => T): T {
-  return db.transaction((tx) => fn(tx as unknown as AppDb));
+function inTx<T>(db: Sql, fn: (tx: Sql) => T): T {
+  return db.transaction(() => fn(db));
 }
 
-function audit(
-  tx: AppDb,
-  actor: string,
-  action: string,
-  entity: string,
-  entityId: string,
-  payload: unknown,
-): void {
-  tx.insert(auditLog)
-    .values({
-      id: randomUUID(),
-      actor,
-      action,
-      entity,
-      entityId,
-      payload: JSON.stringify(payload),
-      createdAt: Date.now(),
-    })
-    .run();
+function audit(tx: Sql, actor: string, action: string, entity: string, entityId: string, payload: unknown): void {
+  tx.run(
+    `INSERT INTO audit_log (id, actor, action, entity, entity_id, payload, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)`,
+    [newId(), actor, action, entity, entityId, JSON.stringify(payload), Date.now()],
+  );
 }
 
 function isUniqueError(error: unknown): boolean {
-  return typeof error === "object" && error !== null && "code" in error && (error as { code?: string }).code === "SQLITE_CONSTRAINT_UNIQUE";
+  if (typeof error === "object" && error !== null && "code" in error && (error as { code?: string }).code === "SQLITE_CONSTRAINT_UNIQUE") {
+    return true;
+  }
+  const message = error instanceof Error ? error.message : String(error);
+  return /UNIQUE constraint failed/i.test(message);
 }
 
 export function createSku(
-  db: AppDb,
+  db: Sql,
   input: { code: string; name: string; category: string; unit?: string; description?: string },
   actor: string,
 ): string {
@@ -107,20 +148,13 @@ export function createSku(
   }
   if (name.length < 2) throw new DomainError("Укажите название");
   if (category.length < 2) throw new DomainError("Укажите категорию");
-  const id = randomUUID();
+  const id = newId();
   try {
     inTx(db, (tx) => {
-      tx.insert(skus)
-        .values({
-          id,
-          code,
-          name,
-          category,
-          unit: input.unit?.trim() || "шт",
-          trackMode: "quantity",
-          description: input.description?.trim() ?? "",
-        })
-        .run();
+      tx.run(
+        `INSERT INTO skus (id, code, name, category, unit, track_mode, description) VALUES (?, ?, ?, ?, ?, 'quantity', ?)`,
+        [id, code, name, category, input.unit?.trim() || "шт", input.description?.trim() ?? ""],
+      );
       audit(tx, actor, "sku.create", "sku", id, { code, name });
     });
   } catch (error) {
@@ -131,50 +165,47 @@ export function createSku(
 }
 
 export function createLocation(
-  db: AppDb,
+  db: Sql,
   input: { name: string; kind: "warehouse" | "zone" | "bin"; parentId?: string },
   actor: string,
 ): string {
   const name = input.name.trim();
   if (name.length < 2) throw new DomainError("Укажите название локации");
   if (input.parentId) {
-    const parent = db.select().from(locations).where(eq(locations.id, input.parentId)).get();
+    const parent = db.get(`SELECT id FROM locations WHERE id = ?`, [input.parentId]);
     if (!parent) throw new DomainError("Родительская локация не найдена");
   }
-  const id = randomUUID();
+  const id = newId();
   inTx(db, (tx) => {
-    tx.insert(locations)
-      .values({ id, name, kind: input.kind, parentId: input.parentId || null })
-      .run();
+    tx.run(`INSERT INTO locations (id, name, kind, parent_id) VALUES (?, ?, ?, ?)`, [
+      id,
+      name,
+      input.kind,
+      input.parentId || null,
+    ]);
     audit(tx, actor, "location.create", "location", id, { name, kind: input.kind });
   });
   return id;
 }
 
-function balanceOf(tx: AppDb, skuId: string, locationId: string): number {
-  return (
-    tx
-      .select()
-      .from(stockBalances)
-      .where(and(eq(stockBalances.skuId, skuId), eq(stockBalances.locationId, locationId)))
-      .get()?.qtyOnHand ?? 0
-  );
+function balanceOf(tx: Sql, skuId: string, locationId: string): number {
+  return tx.get<{ qty: number }>(
+    `SELECT qty_on_hand AS qty FROM stock_balances WHERE sku_id = ? AND location_id = ?`,
+    [skuId, locationId],
+  )?.qty ?? 0;
 }
 
-function setBalance(tx: AppDb, skuId: string, locationId: string, qtyOnHand: number): void {
-  const existing = tx
-    .select()
-    .from(stockBalances)
-    .where(and(eq(stockBalances.skuId, skuId), eq(stockBalances.locationId, locationId)))
-    .get();
+function setBalance(tx: Sql, skuId: string, locationId: string, qtyOnHand: number): void {
+  const existing = tx.get(`SELECT 1 AS ok FROM stock_balances WHERE sku_id = ? AND location_id = ?`, [skuId, locationId]);
   if (!existing) {
-    tx.insert(stockBalances).values({ skuId, locationId, qtyOnHand, qtyReserved: 0 }).run();
+    tx.run(`INSERT INTO stock_balances (sku_id, location_id, qty_on_hand, qty_reserved) VALUES (?, ?, ?, 0)`, [
+      skuId,
+      locationId,
+      qtyOnHand,
+    ]);
     return;
   }
-  tx.update(stockBalances)
-    .set({ qtyOnHand })
-    .where(and(eq(stockBalances.skuId, skuId), eq(stockBalances.locationId, locationId)))
-    .run();
+  tx.run(`UPDATE stock_balances SET qty_on_hand = ? WHERE sku_id = ? AND location_id = ?`, [qtyOnHand, skuId, locationId]);
 }
 
 /**
@@ -182,215 +213,182 @@ function setBalance(tx: AppDb, skuId: string, locationId: string, qtyOnHand: num
  * Закрытая вручную внешняя аренда не открывается заново, пока нехватка не падала до нуля.
  * Пока заявка в статусе needed, количество следует за текущей нехваткой.
  */
-export function recalcSku(tx: AppDb, skuId: string): void {
-  const sku = tx.select().from(skus).where(eq(skus.id, skuId)).get();
+export function recalcSku(tx: Sql, skuId: string): void {
+  const sku = tx.get<SkuRecord>(`${SKU_SQL} WHERE id = ?`, [skuId]);
   if (!sku) return;
 
-  const total = tx
-    .select({ total: sum(stockBalances.qtyOnHand) })
-    .from(stockBalances)
-    .where(eq(stockBalances.skuId, skuId))
-    .get()?.total;
-  const onHand = Number(total ?? 0);
+  const onHand = Number(
+    tx.get<{ total: number | null }>(`SELECT SUM(qty_on_hand) AS total FROM stock_balances WHERE sku_id = ?`, [skuId])?.total ?? 0,
+  );
 
-  const rows = tx
-    .select({ line: rentalLines, order: rentalOrders })
-    .from(rentalLines)
-    .innerJoin(rentalOrders, eq(rentalLines.orderId, rentalOrders.id))
-    .where(and(eq(rentalLines.skuId, skuId), eq(rentalOrders.status, "confirmed")))
-    .all();
+  const rows = tx.all<{
+    id: string;
+    qtyRequested: number;
+    qtySoftReserved: number;
+    qtyShortage: number;
+    startDate: string;
+    endDate: string;
+    createdAt: number;
+    customerName: string;
+    orderId: string;
+    status: OrderRecord["status"];
+    notes: string;
+    createdBy: string;
+  }>(
+    `SELECT l.id AS id, l.qty_requested AS qtyRequested, l.qty_soft_reserved AS qtySoftReserved, l.qty_shortage AS qtyShortage,
+            o.start_date AS startDate, o.end_date AS endDate, o.created_at AS createdAt, o.customer_name AS customerName,
+            o.id AS orderId, o.status AS status, o.notes AS notes, o.created_by AS createdBy
+     FROM rental_lines l
+     INNER JOIN rental_orders o ON o.id = l.order_id
+     WHERE l.sku_id = ? AND o.status = 'confirmed'`,
+    [skuId],
+  );
 
   const allocations = allocateForSku(
     onHand,
     rows.map((row) => ({
-      id: row.line.id,
-      qtyRequested: row.line.qtyRequested,
-      startDate: row.order.startDate,
-      endDate: row.order.endDate,
-      createdAt: row.order.createdAt,
+      id: row.id,
+      qtyRequested: row.qtyRequested,
+      startDate: row.startDate,
+      endDate: row.endDate,
+      createdAt: row.createdAt,
     })),
   );
   const byId = new Map(allocations.map((item) => [item.id, item]));
 
   for (const row of rows) {
-    const allocation = byId.get(row.line.id);
+    const allocation = byId.get(row.id);
     if (!allocation) continue;
-    if (row.line.qtySoftReserved !== allocation.qtySoftReserved || row.line.qtyShortage !== allocation.qtyShortage) {
-      tx.update(rentalLines)
-        .set({
-          qtySoftReserved: allocation.qtySoftReserved,
-          qtyShortage: allocation.qtyShortage,
-        })
-        .where(eq(rentalLines.id, row.line.id))
-        .run();
+    if (row.qtySoftReserved !== allocation.qtySoftReserved || row.qtyShortage !== allocation.qtyShortage) {
+      tx.run(`UPDATE rental_lines SET qty_soft_reserved = ?, qty_shortage = ? WHERE id = ?`, [
+        allocation.qtySoftReserved,
+        allocation.qtyShortage,
+        row.id,
+      ]);
     }
-    syncShortage(tx, sku, row.order, allocation.qtyShortage);
+    syncShortage(tx, sku, {
+      id: row.orderId,
+      customerName: row.customerName,
+      startDate: row.startDate,
+      endDate: row.endDate,
+      status: row.status,
+      notes: row.notes,
+      createdAt: row.createdAt,
+      createdBy: row.createdBy,
+    }, allocation.qtyShortage);
   }
 
   syncReservedSnapshot(tx, skuId);
 }
 
-function syncShortage(tx: AppDb, sku: SkuRecord, order: OrderRecord, qtyShortage: number): void {
-  const signal = tx
-    .select()
-    .from(shortageSignals)
-    .where(and(eq(shortageSignals.orderId, order.id), eq(shortageSignals.skuId, sku.id)))
-    .get();
-  const hire = tx
-    .select()
-    .from(externalHires)
-    .where(and(eq(externalHires.orderId, order.id), eq(externalHires.skuId, sku.id)))
-    .get();
+function syncShortage(tx: Sql, sku: SkuRecord, order: OrderRecord, qtyShortage: number): void {
+  const signal = tx.get<SignalRecord>(`${SIGNAL_SQL} WHERE order_id = ? AND sku_id = ?`, [order.id, sku.id]);
+  const hire = tx.get<HireRecord>(`${HIRE_SQL} WHERE order_id = ? AND sku_id = ?`, [order.id, sku.id]);
   const prevShort = signal?.status === "open" ? signal.qtyShort : 0;
   const now = Date.now();
 
   if (qtyShortage > 0) {
     if (!signal) {
-      tx.insert(shortageSignals)
-        .values({
-          id: randomUUID(),
-          skuId: sku.id,
-          orderId: order.id,
-          startDate: order.startDate,
-          endDate: order.endDate,
-          qtyShort: qtyShortage,
-          status: "open",
-        })
-        .run();
+      tx.run(
+        `INSERT INTO shortage_signals (id, sku_id, order_id, start_date, end_date, qty_short, status) VALUES (?, ?, ?, ?, ?, ?, 'open')`,
+        [newId(), sku.id, order.id, order.startDate, order.endDate, qtyShortage],
+      );
     } else {
-      tx.update(shortageSignals)
-        .set({
-          qtyShort: qtyShortage,
-          status: "open",
-          startDate: order.startDate,
-          endDate: order.endDate,
-        })
-        .where(eq(shortageSignals.id, signal.id))
-        .run();
+      tx.run(
+        `UPDATE shortage_signals SET qty_short = ?, status = 'open', start_date = ?, end_date = ? WHERE id = ?`,
+        [qtyShortage, order.startDate, order.endDate, signal.id],
+      );
     }
 
     let hireId = hire?.id ?? null;
     if (!hire) {
-      hireId = randomUUID();
-      tx.insert(externalHires)
-        .values({
-          id: hireId,
-          skuId: sku.id,
-          qty: qtyShortage,
-          orderId: order.id,
-          alertId: null,
-          status: "needed",
-          supplierNote: "",
-          createdAt: now,
-        })
-        .run();
+      hireId = newId();
+      tx.run(
+        `INSERT INTO external_hires (id, sku_id, qty, order_id, alert_id, status, supplier_note, created_at) VALUES (?, ?, ?, ?, NULL, 'needed', '', ?)`,
+        [hireId, sku.id, qtyShortage, order.id, now],
+      );
     } else if (hire.status === "needed") {
-      tx.update(externalHires).set({ qty: qtyShortage }).where(eq(externalHires.id, hire.id)).run();
+      tx.run(`UPDATE external_hires SET qty = ? WHERE id = ?`, [qtyShortage, hire.id]);
     } else if (hire.status === "closed" && prevShort === 0) {
-      tx.update(externalHires)
-        .set({ qty: qtyShortage, status: "needed" })
-        .where(eq(externalHires.id, hire.id))
-        .run();
+      tx.run(`UPDATE external_hires SET qty = ?, status = 'needed' WHERE id = ?`, [qtyShortage, hire.id]);
     }
 
     const message = `Нехватка ${sku.code}: ${qtyShortage} ${sku.unit} по заказу «${order.customerName}». Можно арендовать снаружи.`;
-    const existingAlerts = tx
-      .select()
-      .from(alerts)
-      .where(and(eq(alerts.orderId, order.id), eq(alerts.skuId, sku.id), eq(alerts.type, "shortage")))
-      .all();
+    const existingAlerts = tx.all<AlertRecord>(`${ALERT_SQL} WHERE order_id = ? AND sku_id = ? AND type = 'shortage'`, [
+      order.id,
+      sku.id,
+    ]);
 
     if (existingAlerts.length === 0) {
-      const alertId = randomUUID();
-      tx.insert(alerts)
-        .values({
-          id: alertId,
-          type: "shortage",
-          status: "open",
-          skuId: sku.id,
-          orderId: order.id,
-          externalHireId: hireId,
-          message,
-          createdAt: now,
-        })
-        .run();
-      if (hireId) {
-        tx.update(externalHires).set({ alertId }).where(eq(externalHires.id, hireId)).run();
-      }
+      const alertId = newId();
+      tx.run(
+        `INSERT INTO alerts (id, type, status, sku_id, order_id, external_hire_id, message, created_at) VALUES (?, 'shortage', 'open', ?, ?, ?, ?, ?)`,
+        [alertId, sku.id, order.id, hireId, message, now],
+      );
+      if (hireId) tx.run(`UPDATE external_hires SET alert_id = ? WHERE id = ?`, [alertId, hireId]);
     } else {
       const [first, ...rest] = existingAlerts;
       if (!first) return;
-      tx.update(alerts)
-        .set({
-          status: first.status === "ack" ? "ack" : "open",
-          message,
-          externalHireId: hireId,
-        })
-        .where(eq(alerts.id, first.id))
-        .run();
-      for (const extra of rest) {
-        tx.update(alerts).set({ status: "closed" }).where(eq(alerts.id, extra.id)).run();
-      }
-      if (hireId) {
-        tx.update(externalHires).set({ alertId: first.id }).where(eq(externalHires.id, hireId)).run();
-      }
+      tx.run(`UPDATE alerts SET status = ?, message = ?, external_hire_id = ? WHERE id = ?`, [
+        first.status === "ack" ? "ack" : "open",
+        message,
+        hireId,
+        first.id,
+      ]);
+      for (const extra of rest) tx.run(`UPDATE alerts SET status = 'closed' WHERE id = ?`, [extra.id]);
+      if (hireId) tx.run(`UPDATE external_hires SET alert_id = ? WHERE id = ?`, [first.id, hireId]);
     }
     return;
   }
 
   if (signal && signal.status !== "closed") {
-    tx.update(shortageSignals)
-      .set({ qtyShort: 0, status: "closed" })
-      .where(eq(shortageSignals.id, signal.id))
-      .run();
+    tx.run(`UPDATE shortage_signals SET qty_short = 0, status = 'closed' WHERE id = ?`, [signal.id]);
   }
   if (hire?.status === "needed") {
-    tx.update(externalHires).set({ status: "closed", qty: 0 }).where(eq(externalHires.id, hire.id)).run();
+    tx.run(`UPDATE external_hires SET status = 'closed', qty = 0 WHERE id = ?`, [hire.id]);
   }
-  const openAlerts = tx
-    .select()
-    .from(alerts)
-    .where(and(eq(alerts.orderId, order.id), eq(alerts.skuId, sku.id), eq(alerts.type, "shortage")))
-    .all();
+  const openAlerts = tx.all<AlertRecord>(`${ALERT_SQL} WHERE order_id = ? AND sku_id = ? AND type = 'shortage'`, [
+    order.id,
+    sku.id,
+  ]);
   for (const alert of openAlerts) {
-    if (alert.status !== "closed") {
-      tx.update(alerts).set({ status: "closed" }).where(eq(alerts.id, alert.id)).run();
-    }
+    if (alert.status !== "closed") tx.run(`UPDATE alerts SET status = 'closed' WHERE id = ?`, [alert.id]);
   }
 }
 
 /** Снимок резерва на сегодня: целиком на локации с наибольшим остатком. Истина по строкам заказа. */
-function syncReservedSnapshot(tx: AppDb, skuId: string): void {
+function syncReservedSnapshot(tx: Sql, skuId: string): void {
   const today = todayIso();
-  const lines = tx
-    .select({ line: rentalLines, order: rentalOrders })
-    .from(rentalLines)
-    .innerJoin(rentalOrders, eq(rentalLines.orderId, rentalOrders.id))
-    .where(and(eq(rentalLines.skuId, skuId), eq(rentalOrders.status, "confirmed")))
-    .all();
+  const lines = tx.all<{ qtySoftReserved: number; startDate: string; endDate: string }>(
+    `SELECT l.qty_soft_reserved AS qtySoftReserved, o.start_date AS startDate, o.end_date AS endDate
+     FROM rental_lines l INNER JOIN rental_orders o ON o.id = l.order_id
+     WHERE l.sku_id = ? AND o.status = 'confirmed'`,
+    [skuId],
+  );
   const reservedToday = lines
-    .filter((row) => row.order.startDate <= today && today <= row.order.endDate)
-    .reduce((sumQty, row) => sumQty + row.line.qtySoftReserved, 0);
+    .filter((row) => row.startDate <= today && today <= row.endDate)
+    .reduce((sumQty, row) => sumQty + row.qtySoftReserved, 0);
 
   const balances = tx
-    .select()
-    .from(stockBalances)
-    .where(eq(stockBalances.skuId, skuId))
-    .all()
+    .all<{ locationId: string; qtyOnHand: number }>(
+      `SELECT location_id AS locationId, qty_on_hand AS qtyOnHand FROM stock_balances WHERE sku_id = ?`,
+      [skuId],
+    )
     .sort((a, b) => b.qtyOnHand - a.qtyOnHand);
 
   balances.forEach((row, index) => {
-    tx.update(stockBalances)
-      .set({ qtyReserved: index === 0 ? reservedToday : 0 })
-      .where(and(eq(stockBalances.skuId, skuId), eq(stockBalances.locationId, row.locationId)))
-      .run();
+    tx.run(`UPDATE stock_balances SET qty_reserved = ? WHERE sku_id = ? AND location_id = ?`, [
+      index === 0 ? reservedToday : 0,
+      skuId,
+      row.locationId,
+    ]);
   });
 }
 
-function applyMovementTx(tx: AppDb, input: MovementInput, actor: string): string {
-  const sku = tx.select().from(skus).where(eq(skus.id, input.skuId)).get();
+function applyMovementTx(tx: Sql, input: MovementInput, actor: string): string {
+  const sku = tx.get(`${SKU_SQL} WHERE id = ?`, [input.skuId]);
   if (!sku) throw new DomainError("Номенклатура не найдена");
-  const location = tx.select().from(locations).where(eq(locations.id, input.locationId)).get();
+  const location = tx.get(`SELECT id FROM locations WHERE id = ?`, [input.locationId]);
   if (!location) throw new DomainError("Локация не найдена");
   if (!Number.isInteger(input.qty)) throw new DomainError("Количество должно быть целым");
 
@@ -405,7 +403,7 @@ function applyMovementTx(tx: AppDb, input: MovementInput, actor: string): string
     if (input.qty <= 0) throw new DomainError("Количество должно быть больше нуля");
     if (!input.fromLocationId) throw new DomainError("Для перемещения нужна исходная локация");
     if (input.fromLocationId === input.locationId) throw new DomainError("Локации перемещения должны различаться");
-    const source = tx.select().from(locations).where(eq(locations.id, input.fromLocationId)).get();
+    const source = tx.get(`SELECT id FROM locations WHERE id = ?`, [input.fromLocationId]);
     if (!source) throw new DomainError("Исходная локация не найдена");
     effects.push({ locationId: input.fromLocationId, delta: -input.qty });
     effects.push({ locationId: input.locationId, delta: input.qty });
@@ -422,41 +420,37 @@ function applyMovementTx(tx: AppDb, input: MovementInput, actor: string): string
     nextQty.set(locationId, next);
   }
 
-  const movementId = randomUUID();
-  tx.insert(stockMovements)
-    .values({
-      id: movementId,
-      skuId: input.skuId,
-      locationId: input.locationId,
-      fromLocationId: input.fromLocationId ?? null,
-      type: input.type,
-      qty: input.qty,
-      reason: input.reason?.trim() ?? "",
-      orderId: input.orderId ?? null,
-      scanEventId: input.scanEventId ?? null,
-      createdAt: Date.now(),
-      createdBy: actor,
-    })
-    .run();
+  const movementId = newId();
+  tx.run(
+    `INSERT INTO stock_movements (id, sku_id, location_id, from_location_id, type, qty, reason, order_id, scan_event_id, created_at, created_by)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    [
+      movementId,
+      input.skuId,
+      input.locationId,
+      input.fromLocationId ?? null,
+      input.type,
+      input.qty,
+      input.reason?.trim() ?? "",
+      input.orderId ?? null,
+      input.scanEventId ?? null,
+      Date.now(),
+      actor,
+    ],
+  );
 
-  for (const [locationId, qty] of nextQty) {
-    setBalance(tx, input.skuId, locationId, qty);
-  }
+  for (const [locationId, qty] of nextQty) setBalance(tx, input.skuId, locationId, qty);
   recalcSku(tx, input.skuId);
-  audit(tx, actor, "stock.move", "stock_movement", movementId, {
-    type: input.type,
-    qty: input.qty,
-    skuId: input.skuId,
-  });
+  audit(tx, actor, "stock.move", "stock_movement", movementId, { type: input.type, qty: input.qty, skuId: input.skuId });
   return movementId;
 }
 
-export function applyMovement(db: AppDb, input: MovementInput, actor: string): string {
+export function applyMovement(db: Sql, input: MovementInput, actor: string): string {
   return inTx(db, (tx) => applyMovementTx(tx, input, actor));
 }
 
 export function createOrder(
-  db: AppDb,
+  db: Sql,
   input: CreateOrderInput,
   actor: string,
 ): { orderId: string; shortages: { skuId: string; qty: number }[] } {
@@ -475,106 +469,80 @@ export function createOrder(
   if (merged.size === 0) throw new DomainError("Добавьте хотя бы одну строку");
 
   for (const skuId of merged.keys()) {
-    const sku = db.select().from(skus).where(eq(skus.id, skuId)).get();
+    const sku = db.get(`SELECT id FROM skus WHERE id = ?`, [skuId]);
     if (!sku) throw new DomainError("В строке неизвестная номенклатура");
   }
 
-  const orderId = randomUUID();
+  const orderId = newId();
   return inTx(db, (tx) => {
-    tx.insert(rentalOrders)
-      .values({
-        id: orderId,
-        customerName,
-        startDate: input.startDate,
-        endDate: input.endDate,
-        status: "confirmed",
-        notes: input.notes?.trim() ?? "",
-        createdAt: input.createdAt ?? Date.now(),
-        createdBy: actor,
-      })
-      .run();
+    tx.run(
+      `INSERT INTO rental_orders (id, customer_name, start_date, end_date, status, notes, created_at, created_by) VALUES (?, ?, ?, ?, 'confirmed', ?, ?, ?)`,
+      [orderId, customerName, input.startDate, input.endDate, input.notes?.trim() ?? "", input.createdAt ?? Date.now(), actor],
+    );
     for (const [skuId, qty] of merged) {
-      tx.insert(rentalLines)
-        .values({
-          id: randomUUID(),
-          orderId,
-          skuId,
-          qtyRequested: qty,
-          qtySoftReserved: 0,
-          qtyShortage: 0,
-        })
-        .run();
+      tx.run(
+        `INSERT INTO rental_lines (id, order_id, sku_id, qty_requested, qty_soft_reserved, qty_shortage) VALUES (?, ?, ?, ?, 0, 0)`,
+        [newId(), orderId, skuId, qty],
+      );
     }
     for (const skuId of merged.keys()) recalcSku(tx, skuId);
-    const lines = tx.select().from(rentalLines).where(eq(rentalLines.orderId, orderId)).all();
+    const lines = tx.all<LineRecord>(`${LINE_SQL} WHERE order_id = ?`, [orderId]);
     audit(tx, actor, "order.create", "rental_order", orderId, { customerName });
     return {
       orderId,
-      shortages: lines
-        .filter((line) => line.qtyShortage > 0)
-        .map((line) => ({ skuId: line.skuId, qty: line.qtyShortage })),
+      shortages: lines.filter((line) => line.qtyShortage > 0).map((line) => ({ skuId: line.skuId, qty: line.qtyShortage })),
     };
   });
 }
 
-export function setOrderStatus(db: AppDb, orderId: string, status: "cancelled" | "closed", actor: string): void {
-  const order = db.select().from(rentalOrders).where(eq(rentalOrders.id, orderId)).get();
+export function setOrderStatus(db: Sql, orderId: string, status: "cancelled" | "closed", actor: string): void {
+  const order = db.get<OrderRecord>(`${ORDER_SQL} WHERE id = ?`, [orderId]);
   if (!order) throw new DomainError("Заказ не найден");
   if (order.status !== "confirmed") throw new DomainError("Заказ уже завершён");
 
   inTx(db, (tx) => {
-    tx.update(rentalOrders).set({ status }).where(eq(rentalOrders.id, orderId)).run();
-    const lines = tx.select().from(rentalLines).where(eq(rentalLines.orderId, orderId)).all();
-    tx.update(rentalLines)
-      .set({ qtySoftReserved: 0, qtyShortage: 0 })
-      .where(eq(rentalLines.orderId, orderId))
-      .run();
-    tx.update(shortageSignals)
-      .set({ status: "closed", qtyShort: 0 })
-      .where(eq(shortageSignals.orderId, orderId))
-      .run();
-    tx.update(alerts).set({ status: "closed" }).where(eq(alerts.orderId, orderId)).run();
-    const hires = tx.select().from(externalHires).where(eq(externalHires.orderId, orderId)).all();
+    tx.run(`UPDATE rental_orders SET status = ? WHERE id = ?`, [status, orderId]);
+    const lines = tx.all<LineRecord>(`${LINE_SQL} WHERE order_id = ?`, [orderId]);
+    tx.run(`UPDATE rental_lines SET qty_soft_reserved = 0, qty_shortage = 0 WHERE order_id = ?`, [orderId]);
+    tx.run(`UPDATE shortage_signals SET status = 'closed', qty_short = 0 WHERE order_id = ?`, [orderId]);
+    tx.run(`UPDATE alerts SET status = 'closed' WHERE order_id = ?`, [orderId]);
+    const hires = tx.all<HireRecord>(`${HIRE_SQL} WHERE order_id = ?`, [orderId]);
     for (const hire of hires) {
-      if (hire.status === "needed") {
-        tx.update(externalHires).set({ status: "closed" }).where(eq(externalHires.id, hire.id)).run();
-      }
+      if (hire.status === "needed") tx.run(`UPDATE external_hires SET status = 'closed' WHERE id = ?`, [hire.id]);
     }
-    for (const skuId of new Set(lines.map((line) => line.skuId))) {
-      recalcSku(tx, skuId);
-    }
+    for (const skuId of new Set(lines.map((line) => line.skuId))) recalcSku(tx, skuId);
     audit(tx, actor, "order.status", "rental_order", orderId, { status });
   });
 }
 
 export function setHireStatus(
-  db: AppDb,
+  db: Sql,
   hireId: string,
   status: "needed" | "ordered" | "received" | "closed",
   supplierNote: string,
   actor: string,
 ): void {
-  const hire = db.select().from(externalHires).where(eq(externalHires.id, hireId)).get();
+  const hire = db.get(`SELECT id FROM external_hires WHERE id = ?`, [hireId]);
   if (!hire) throw new DomainError("Заявка на внешнюю аренду не найдена");
   const note = supplierNote.trim().slice(0, 500);
   inTx(db, (tx) => {
-    tx.update(externalHires).set({ status, supplierNote: note }).where(eq(externalHires.id, hireId)).run();
+    tx.run(`UPDATE external_hires SET status = ?, supplier_note = ? WHERE id = ?`, [status, note, hireId]);
     audit(tx, actor, "hire.status", "external_hire", hireId, { status, supplierNote: note });
   });
 }
 
-export function ackAlert(db: AppDb, alertId: string, actor: string): void {
-  const alert = db.select().from(alerts).where(eq(alerts.id, alertId)).get();
+export function ackAlert(db: Sql, alertId: string, actor: string): void {
+  const alert = db.get<AlertRecord>(`${ALERT_SQL} WHERE id = ?`, [alertId]);
   if (!alert) throw new DomainError("Сигнал не найден");
   if (alert.status === "closed") throw new DomainError("Сигнал уже закрыт");
   inTx(db, (tx) => {
-    tx.update(alerts).set({ status: "ack" }).where(eq(alerts.id, alertId)).run();
+    tx.run(`UPDATE alerts SET status = 'ack' WHERE id = ?`, [alertId]);
     audit(tx, actor, "alert.ack", "alert", alertId, {});
   });
 }
 
 export function saveExternalHire(
-  db: AppDb,
+  db: Sql,
   input: {
     orderId: string;
     skuId: string;
@@ -584,61 +552,43 @@ export function saveExternalHire(
   },
   actor: string,
 ): string {
-  const order = db.select().from(rentalOrders).where(eq(rentalOrders.id, input.orderId)).get();
+  const order = db.get(`SELECT id FROM rental_orders WHERE id = ?`, [input.orderId]);
   if (!order) throw new DomainError("Заказ не найден");
-  const sku = db.select().from(skus).where(eq(skus.id, input.skuId)).get();
+  const sku = db.get(`SELECT id FROM skus WHERE id = ?`, [input.skuId]);
   if (!sku) throw new DomainError("Номенклатура не найдена");
   if (!Number.isInteger(input.qty) || input.qty <= 0) throw new DomainError("Количество должно быть больше нуля");
   const note = input.supplierNote?.trim().slice(0, 500) ?? "";
   const status = input.status ?? "needed";
 
   return inTx(db, (tx) => {
-    const existing = tx
-      .select()
-      .from(externalHires)
-      .where(and(eq(externalHires.orderId, input.orderId), eq(externalHires.skuId, input.skuId)))
-      .get();
+    const existing = tx.get<HireRecord>(`${HIRE_SQL} WHERE order_id = ? AND sku_id = ?`, [input.orderId, input.skuId]);
     if (!existing) {
-      const id = randomUUID();
-      tx.insert(externalHires)
-        .values({
-          id,
-          skuId: input.skuId,
-          qty: input.qty,
-          orderId: input.orderId,
-          alertId: null,
-          status,
-          supplierNote: note,
-          createdAt: Date.now(),
-        })
-        .run();
+      const id = newId();
+      tx.run(
+        `INSERT INTO external_hires (id, sku_id, qty, order_id, alert_id, status, supplier_note, created_at) VALUES (?, ?, ?, ?, NULL, ?, ?, ?)`,
+        [id, input.skuId, input.qty, input.orderId, status, note, Date.now()],
+      );
       audit(tx, actor, "hire.create", "external_hire", id, { status, qty: input.qty });
       return id;
     }
-    tx.update(externalHires)
-      .set({ qty: input.qty, status, supplierNote: note || existing.supplierNote })
-      .where(eq(externalHires.id, existing.id))
-      .run();
+    tx.run(`UPDATE external_hires SET qty = ?, status = ?, supplier_note = ? WHERE id = ?`, [
+      input.qty,
+      status,
+      note || existing.supplierNote,
+      existing.id,
+    ]);
     audit(tx, actor, "hire.update", "external_hire", existing.id, { status, qty: input.qty });
     return existing.id;
   });
 }
 
-function findSkuByCode(db: AppDb, code: string): SkuRecord | undefined {
+function findSkuByCode(db: Sql, code: string): SkuRecord | undefined {
   const normalized = code.trim().toLowerCase();
   if (!normalized) return undefined;
-  return db
-    .select()
-    .from(skus)
-    .all()
-    .find((sku) => sku.code.toLowerCase() === normalized || sku.id.toLowerCase() === normalized);
+  return db.all<SkuRecord>(SKU_SQL).find((sku) => sku.code.toLowerCase() === normalized || sku.id.toLowerCase() === normalized);
 }
 
-function resolveScanLocations(
-  tx: AppDb,
-  skuId: string,
-  event: IncomingScan,
-): { locationId: string; fromLocationId?: string } {
+function resolveScanLocations(tx: Sql, skuId: string, event: IncomingScan): { locationId: string; fromLocationId?: string } {
   if (event.direction === "move") {
     if (!event.locationId || !event.fromLocationId) {
       throw new DomainError("Для перемещения нужны location_id и from_location_id");
@@ -647,30 +597,28 @@ function resolveScanLocations(
   }
   if (event.locationId) return { locationId: event.locationId };
   if (event.direction === "out") {
-    const row = tx
-      .select()
-      .from(stockBalances)
-      .where(and(eq(stockBalances.skuId, skuId), gt(stockBalances.qtyOnHand, 0)))
-      .all()
-      .sort((a, b) => b.qtyOnHand - a.qtyOnHand)[0];
+    const row = tx.get<{ locationId: string }>(
+      `SELECT location_id AS locationId FROM stock_balances WHERE sku_id = ? AND qty_on_hand > 0 ORDER BY qty_on_hand DESC LIMIT 1`,
+      [skuId],
+    );
     if (!row) throw new DomainError("Нет остатка для расхода");
     return { locationId: row.locationId };
   }
   const warehouse =
-    tx.select().from(locations).where(eq(locations.kind, "warehouse")).get() ??
-    tx.select().from(locations).get();
+    tx.get<{ id: string }>(`SELECT id FROM locations WHERE kind = 'warehouse' LIMIT 1`) ??
+    tx.get<{ id: string }>(`SELECT id FROM locations LIMIT 1`);
   if (!warehouse) throw new DomainError("Нет локации для прихода");
   return { locationId: warehouse.id };
 }
 
-function replay(db: AppDb, eventId: string): ScanResult {
-  const existing = db.select().from(scanEvents).where(eq(scanEvents.eventId, eventId)).get();
+function replay(db: Sql, eventId: string): ScanResult {
+  const existing = db.get<{ result: string }>(`SELECT result FROM scan_events WHERE event_id = ?`, [eventId]);
   if (!existing) throw new DomainError("Событие скана не сохранилось");
   return { ...(JSON.parse(existing.result) as ScanResult), idempotent: true };
 }
 
 function storeScan(
-  tx: AppDb,
+  tx: Sql,
   event: IncomingScan,
   result: ScanResult,
   skuId: string | null,
@@ -678,30 +626,32 @@ function storeScan(
   fromLocationId: string | null,
   createdAt: number,
 ): void {
-  tx.insert(scanEvents)
-    .values({
-      id: randomUUID(),
-      eventId: event.eventId,
-      source: event.source,
-      code: event.code,
+  tx.run(
+    `INSERT INTO scan_events (id, event_id, source, code, sku_id, direction, qty, device_id, location_id, from_location_id, meta, created_at, result)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    [
+      newId(),
+      event.eventId,
+      event.source,
+      event.code,
       skuId,
-      direction: event.direction,
-      qty: event.qty,
-      deviceId: event.deviceId ?? null,
+      event.direction,
+      event.qty,
+      event.deviceId ?? null,
       locationId,
       fromLocationId,
-      meta: JSON.stringify(event.meta ?? {}),
+      JSON.stringify(event.meta ?? {}),
       createdAt,
-      result: JSON.stringify(result),
-    })
-    .run();
+      JSON.stringify(result),
+    ],
+  );
 }
 
 /** Каноническое событие скана. Повтор того же event_id не двигает остаток второй раз. */
-export function ingestScan(db: AppDb, event: IncomingScan, actor: string): ScanResult {
+export function ingestScan(db: Sql, event: IncomingScan, actor: string): ScanResult {
   if (!event.eventId.trim()) throw new DomainError("Нужен event_id");
   if (!Number.isInteger(event.qty) || event.qty <= 0) throw new DomainError("Количество скана должно быть больше нуля");
-  const existing = db.select().from(scanEvents).where(eq(scanEvents.eventId, event.eventId)).get();
+  const existing = db.get<{ result: string }>(`SELECT result FROM scan_events WHERE event_id = ?`, [event.eventId]);
   if (existing) return { ...(JSON.parse(existing.result) as ScanResult), idempotent: true };
 
   const parsedAt = event.at ? Date.parse(event.at) : Date.now();
@@ -721,7 +671,7 @@ export function ingestScan(db: AppDb, event: IncomingScan, actor: string): ScanR
 
   try {
     return inTx(db, (tx) => {
-      const again = tx.select().from(scanEvents).where(eq(scanEvents.eventId, event.eventId)).get();
+      const again = tx.get<{ result: string }>(`SELECT result FROM scan_events WHERE event_id = ?`, [event.eventId]);
       if (again) return { ...(JSON.parse(again.result) as ScanResult), idempotent: true };
       const place = resolveScanLocations(tx, sku.id, event);
       const movementId = applyMovementTx(
@@ -738,10 +688,7 @@ export function ingestScan(db: AppDb, event: IncomingScan, actor: string): ScanR
         actor,
       );
       const alertIds = tx
-        .select()
-        .from(alerts)
-        .where(and(eq(alerts.skuId, sku.id), eq(alerts.status, "open")))
-        .all()
+        .all<{ id: string }>(`SELECT id FROM alerts WHERE sku_id = ? AND status = 'open'`, [sku.id])
         .map((alert) => alert.id);
       const result: ScanResult = {
         event_id: event.eventId,
@@ -757,9 +704,7 @@ export function ingestScan(db: AppDb, event: IncomingScan, actor: string): ScanR
     if (error instanceof DomainError) {
       const result: ScanResult = { event_id: event.eventId, status: "rejected", reason: error.message };
       try {
-        inTx(db, (tx) =>
-          storeScan(tx, event, result, sku.id, event.locationId ?? null, event.fromLocationId ?? null, createdAt),
-        );
+        inTx(db, (tx) => storeScan(tx, event, result, sku.id, event.locationId ?? null, event.fromLocationId ?? null, createdAt));
       } catch (inner) {
         if (isUniqueError(inner)) return replay(db, event.eventId);
         throw inner;

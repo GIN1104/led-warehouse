@@ -1,4 +1,4 @@
-import type { Database } from "better-sqlite3";
+import type { Sql } from "@/lib/db/sql";
 
 const SQL = `
 CREATE TABLE IF NOT EXISTS users (
@@ -131,6 +131,6 @@ CREATE INDEX IF NOT EXISTS idx_lines_sku ON rental_lines(sku_id);
 CREATE INDEX IF NOT EXISTS idx_alerts_status ON alerts(status);
 `;
 
-export function migrate(sqlite: Database): void {
-  sqlite.exec(SQL);
+export function migrate(db: Sql): void {
+  db.exec(SQL);
 }

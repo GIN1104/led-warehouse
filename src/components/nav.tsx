@@ -21,7 +21,8 @@ export function Nav({ compact = false }: { compact?: boolean }) {
   return (
     <nav className={cn(compact ? "flex gap-2 overflow-x-auto px-4 py-3" : "flex flex-col gap-1")}>
       {links.map((link) => {
-        const active = link.href === "/" ? pathname === "/" : pathname.startsWith(link.href);
+        const path = pathname.length > 1 && pathname.endsWith("/") ? pathname.slice(0, -1) : pathname;
+        const active = link.href === "/" ? path === "/" : path.startsWith(link.href);
         const Icon = link.icon;
         return (
           <Link

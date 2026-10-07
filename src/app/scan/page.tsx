@@ -1,37 +1,68 @@
-import { randomUUID } from "node:crypto";
-import { scanAction } from "@/app/actions";
-import { can, getSession } from "@/lib/auth";
+"use client";
+
+import { useState, type FormEvent } from "react";
+import { useWarehouse } from "@/components/warehouse";
 import { Badge, Field, Flash, PageHeader, Panel, buttonClass, controlClass } from "@/components/ui";
-import { getDb } from "@/lib/db";
+import { assertCan, can, errorText } from "@/lib/auth";
 import { formatDateTime } from "@/lib/dates";
+import { newId } from "@/lib/db/sql";
+import { ingestScan } from "@/lib/services/ledger";
 import { listLocations, listScanEvents } from "@/lib/services/queries";
 
-export default async function ScanPage({
-  searchParams,
-}: {
-  searchParams: Promise<{ error?: string; ok?: string }>;
-}) {
-  const flash = await searchParams;
-  const session = await getSession();
+export default function ScanPage() {
+  const { db, session, refresh, revision } = useWarehouse();
   const allowed = can(session.role, "scan.write");
-  const db = getDb();
   const locations = listLocations(db);
   const events = listScanEvents(db);
+  const [flash, setFlash] = useState<{ error?: string; ok?: string }>({});
+  void revision;
+
+  function onSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const form = new FormData(event.currentTarget);
+    const direction = String(form.get("direction") ?? "in");
+    try {
+      assertCan(session.role, "scan.write");
+      if (direction !== "in" && direction !== "out" && direction !== "move") {
+        throw new Error("Неизвестное направление скана");
+      }
+      const result = ingestScan(
+        db,
+        {
+          eventId: newId(),
+          source: "ui",
+          code: String(form.get("code") ?? ""),
+          direction,
+          qty: Number(form.get("qty") ?? 1),
+          locationId: String(form.get("locationId") ?? "") || undefined,
+          fromLocationId: String(form.get("fromLocationId") ?? "") || undefined,
+        },
+        session.id,
+      );
+      refresh();
+      if (result.status === "rejected") {
+        setFlash({ error: result.reason ?? "Скан отклонён" });
+        return;
+      }
+      setFlash({ ok: "Скан принят, остаток обновлён" });
+    } catch (error) {
+      setFlash({ error: errorText(error) });
+    }
+  }
 
   return (
     <div>
       <PageHeader
         eyebrow="Scan Events"
         title="Сканирование"
-        description="Сейчас событие создаёт интерфейс. Тот же контракт примет рамку или гейт через POST /api/v1/integrations/scan/events. Повтор event_id остаток не удваивает."
+        description="Событие создаётся в браузере и сразу меняет локальный остаток. Повтор одного и того же event_id остаток не удваивает. Вебхук рамки на GitHub Pages не принимается: для него нужен сервер."
       />
       <Flash error={flash.error} ok={flash.ok} />
       <div className="grid gap-4 lg:grid-cols-[320px_1fr]">
         <Panel>
           <h2 className="mb-3 font-medium">Ручной скан</h2>
           {allowed ? (
-            <form action={scanAction} className="flex flex-col gap-3">
-              <input type="hidden" name="eventId" value={randomUUID()} />
+            <form onSubmit={onSubmit} className="flex flex-col gap-3">
               <Field label="Код SKU">
                 <input name="code" required className={controlClass} placeholder="CAB-P25" />
               </Field>

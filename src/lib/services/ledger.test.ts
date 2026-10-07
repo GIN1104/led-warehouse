@@ -1,39 +1,31 @@
-import { eq } from "drizzle-orm";
 import { describe, expect, it } from "vitest";
-import { createDb } from "@/lib/db";
-import { locations, skus, stockBalances, users } from "@/lib/db/schema";
+import { createDb } from "@/lib/db/memory";
 import { applyMovement, createOrder, ingestScan, setOrderStatus } from "@/lib/services/ledger";
 import { getOrderDetail, listAlerts, listExternalHires } from "@/lib/services/queries";
 
 function setup() {
-  const db = createDb(":memory:");
-  db.insert(users).values({ id: "manager", name: "Мария", role: "manager" }).run();
-  db.insert(locations).values({ id: "loc", name: "Склад", kind: "warehouse", parentId: null }).run();
-  db.insert(skus)
-    .values({
-      id: "CAB-P25",
-      code: "CAB-P25",
-      name: "Кабинет",
-      category: "Кабинеты",
-      unit: "шт",
-      trackMode: "quantity",
-      description: "",
-    })
-    .run();
+  const db = createDb();
+  db.run(`INSERT INTO users (id, name, role) VALUES ('manager', 'Мария', 'manager')`);
+  db.run(`INSERT INTO locations (id, name, kind, parent_id) VALUES ('loc', 'Склад', 'warehouse', NULL)`);
+  db.run(
+    `INSERT INTO skus (id, code, name, category, unit, track_mode, description) VALUES ('CAB-P25', 'CAB-P25', 'Кабинет', 'Кабинеты', 'шт', 'quantity', '')`,
+  );
   return db;
+}
+
+function onHand(db: ReturnType<typeof setup>) {
+  return db.get<{ qtyOnHand: number }>(`SELECT qty_on_hand AS qtyOnHand FROM stock_balances WHERE sku_id = 'CAB-P25'`)?.qtyOnHand;
 }
 
 describe("склад и заказы", () => {
   it("приход увеличивает остаток и не даёт уйти в минус", () => {
     const db = setup();
     applyMovement(db, { skuId: "CAB-P25", locationId: "loc", type: "in", qty: 10, reason: "тест" }, "manager");
-    const balance = db.select().from(stockBalances).where(eq(stockBalances.skuId, "CAB-P25")).get();
-    expect(balance?.qtyOnHand).toBe(10);
+    expect(onHand(db)).toBe(10);
     expect(() =>
       applyMovement(db, { skuId: "CAB-P25", locationId: "loc", type: "out", qty: 11, reason: "тест" }, "manager"),
     ).toThrow(/Недостаточно остатка/);
-    const after = db.select().from(stockBalances).where(eq(stockBalances.skuId, "CAB-P25")).get();
-    expect(after?.qtyOnHand).toBe(10);
+    expect(onHand(db)).toBe(10);
   });
 
   it("сохраняет заказ при нехватке и создаёт внешнюю аренду", () => {
@@ -151,7 +143,7 @@ describe("склад и заказы", () => {
     expect(first.status).toBe("accepted");
     expect(second.idempotent).toBe(true);
     expect(second.movement_id).toBe(first.movement_id);
-    expect(db.select().from(stockBalances).where(eq(stockBalances.skuId, "CAB-P25")).get()?.qtyOnHand).toBe(3);
+    expect(onHand(db)).toBe(3);
   });
 
   it("неизвестный код скана отклоняется и запоминается", () => {

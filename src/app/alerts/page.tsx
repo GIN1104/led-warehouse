@@ -1,21 +1,33 @@
+"use client";
+
 import Link from "next/link";
-import { ackAlertAction } from "@/app/actions";
-import { can, getSession } from "@/lib/auth";
+import { useState } from "react";
+import { useWarehouse } from "@/components/warehouse";
 import { Badge, Flash, PageHeader, buttonClass } from "@/components/ui";
-import { getDb } from "@/lib/db";
+import { assertCan, can, errorText } from "@/lib/auth";
 import { formatDateTime } from "@/lib/dates";
 import { alertStatusLabel } from "@/lib/labels";
+import { orderHref } from "@/lib/paths";
+import { ackAlert } from "@/lib/services/ledger";
 import { listAlerts } from "@/lib/services/queries";
 
-export default async function AlertsPage({
-  searchParams,
-}: {
-  searchParams: Promise<{ error?: string; ok?: string }>;
-}) {
-  const flash = await searchParams;
-  const session = await getSession();
+export default function AlertsPage() {
+  const { db, session, refresh, revision } = useWarehouse();
   const allowed = can(session.role, "alert.write");
-  const rows = listAlerts(getDb());
+  const rows = listAlerts(db);
+  const [flash, setFlash] = useState<{ error?: string; ok?: string }>({});
+  void revision;
+
+  function accept(id: string) {
+    try {
+      assertCan(session.role, "alert.write");
+      ackAlert(db, id, session.id);
+      refresh();
+      setFlash({ ok: "Сигнал принят" });
+    } catch (error) {
+      setFlash({ error: errorText(error) });
+    }
+  }
 
   return (
     <div>
@@ -38,17 +50,14 @@ export default async function AlertsPage({
             <p className="text-sm leading-6">{alert.message}</p>
             <div className="mt-3 flex flex-wrap gap-2">
               {alert.orderId ? (
-                <Link href={`/orders/${alert.orderId}`} className={buttonClass("ghost")}>
+                <Link href={orderHref(alert.orderId)} className={buttonClass("ghost")}>
                   Открыть заказ
                 </Link>
               ) : null}
               {allowed && alert.status === "open" ? (
-                <form action={ackAlertAction}>
-                  <input type="hidden" name="id" value={alert.id} />
-                  <button type="submit" className={buttonClass("primary")}>
-                    Принять сигнал
-                  </button>
-                </form>
+                <button type="button" className={buttonClass("primary")} onClick={() => accept(alert.id)}>
+                  Принять сигнал
+                </button>
               ) : null}
             </div>
           </article>

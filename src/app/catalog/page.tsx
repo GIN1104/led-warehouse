@@ -1,18 +1,42 @@
-import { createSkuAction } from "@/app/actions";
-import { can, getSession } from "@/lib/auth";
+"use client";
+
+import { useState, type FormEvent } from "react";
+import { useWarehouse } from "@/components/warehouse";
 import { Badge, Field, Flash, PageHeader, Panel, buttonClass, controlClass } from "@/components/ui";
-import { getDb } from "@/lib/db";
+import { assertCan, can, errorText } from "@/lib/auth";
+import { createSku } from "@/lib/services/ledger";
 import { listSkuSummaries } from "@/lib/services/queries";
 
-export default async function CatalogPage({
-  searchParams,
-}: {
-  searchParams: Promise<{ error?: string; ok?: string }>;
-}) {
-  const flash = await searchParams;
-  const session = await getSession();
+export default function CatalogPage() {
+  const { db, session, refresh, revision } = useWarehouse();
   const allowed = can(session.role, "catalog.write");
-  const rows = listSkuSummaries(getDb());
+  const rows = listSkuSummaries(db);
+  const [flash, setFlash] = useState<{ error?: string; ok?: string }>({});
+  void revision;
+
+  function onSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const form = new FormData(event.currentTarget);
+    try {
+      assertCan(session.role, "catalog.write");
+      createSku(
+        db,
+        {
+          code: String(form.get("code") ?? ""),
+          name: String(form.get("name") ?? ""),
+          category: String(form.get("category") ?? ""),
+          unit: String(form.get("unit") ?? ""),
+          description: String(form.get("description") ?? ""),
+        },
+        session.id,
+      );
+      refresh();
+      event.currentTarget.reset();
+      setFlash({ ok: "Позиция добавлена" });
+    } catch (error) {
+      setFlash({ error: errorText(error) });
+    }
+  }
 
   return (
     <div>
@@ -59,7 +83,7 @@ export default async function CatalogPage({
         <Panel>
           <h2 className="mb-3 font-medium">Новая позиция</h2>
           {allowed ? (
-            <form action={createSkuAction} className="flex flex-col gap-3">
+            <form onSubmit={onSubmit} className="flex flex-col gap-3">
               <Field label="Код">
                 <input name="code" required className={controlClass} placeholder="CAB-P19" />
               </Field>

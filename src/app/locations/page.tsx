@@ -1,19 +1,35 @@
-import { createLocationAction } from "@/app/actions";
-import { can, getSession } from "@/lib/auth";
+"use client";
+
+import { useState, type FormEvent } from "react";
+import { useWarehouse } from "@/components/warehouse";
 import { Field, Flash, PageHeader, Panel, buttonClass, controlClass } from "@/components/ui";
-import { getDb } from "@/lib/db";
+import { assertCan, can, errorText } from "@/lib/auth";
 import { locationKindLabel } from "@/lib/labels";
+import { createLocation } from "@/lib/services/ledger";
 import { listLocations } from "@/lib/services/queries";
 
-export default async function LocationsPage({
-  searchParams,
-}: {
-  searchParams: Promise<{ error?: string; ok?: string }>;
-}) {
-  const flash = await searchParams;
-  const session = await getSession();
+export default function LocationsPage() {
+  const { db, session, refresh, revision } = useWarehouse();
   const allowed = can(session.role, "location.write");
-  const rows = listLocations(getDb());
+  const rows = listLocations(db);
+  const [flash, setFlash] = useState<{ error?: string; ok?: string }>({});
+  void revision;
+
+  function onSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const form = new FormData(event.currentTarget);
+    const kind = String(form.get("kind") ?? "zone");
+    try {
+      assertCan(session.role, "location.write");
+      if (kind !== "warehouse" && kind !== "zone" && kind !== "bin") throw new Error("Неизвестный тип локации");
+      createLocation(db, { name: String(form.get("name") ?? ""), kind, parentId: String(form.get("parentId") ?? "") || undefined }, session.id);
+      refresh();
+      event.currentTarget.reset();
+      setFlash({ ok: "Локация добавлена" });
+    } catch (error) {
+      setFlash({ error: errorText(error) });
+    }
+  }
 
   return (
     <div>
@@ -47,7 +63,7 @@ export default async function LocationsPage({
         <Panel>
           <h2 className="mb-3 font-medium">Новая локация</h2>
           {allowed ? (
-            <form action={createLocationAction} className="flex flex-col gap-3">
+            <form onSubmit={onSubmit} className="flex flex-col gap-3">
               <Field label="Название">
                 <input name="name" required className={controlClass} placeholder="Зона D — запас" />
               </Field>

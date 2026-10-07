@@ -5,26 +5,24 @@
   "type": "module",
   "description": "Учёт складского LED-оборудования и заказов проката",
   "scripts": {
+    "predev": "node scripts/copy-sql-wasm.mjs",
+    "prebuild": "node scripts/copy-sql-wasm.mjs",
     "dev": "next dev",
     "build": "next build",
-    "start": "next start",
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
-    "test": "vitest run",
-    "db:reset": "rm -f data/warehouse.sqlite data/warehouse.sqlite-wal data/warehouse.sqlite-shm && tsx src/lib/db/cli.ts"
+    "test": "vitest run"
   },
   "dependencies": {
     "better-sqlite3": "^12.8.0",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
-    "drizzle-orm": "^0.45.3",
     "lucide-react": "^1.52.0",
     "next": "^16.4.0",
     "react": "^19.3.0",
     "react-dom": "^19.3.0",
-    "server-only": "^0.0.1",
-    "tailwind-merge": "^3.7.0",
-    "zod": "^4.6.5"
+    "sql.js": "^1.13.0",
+    "tailwind-merge": "^3.7.0"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4.3.3",
@@ -32,11 +30,11 @@
     "@types/node": "^26.6.4",
     "@types/react": "^19.3.0",
     "@types/react-dom": "^19.3.0",
+    "@types/sql.js": "^1.4.11",
     "eslint": "^9.39.5",
     "eslint-config-next": "^16.4.0",
     "postcss": "^8.5.29",
     "tailwindcss": "^4.3.3",
-    "tsx": "^4.23.15",
     "typescript": "^6.0.3",
     "vitest": "^5.0.3"
   }

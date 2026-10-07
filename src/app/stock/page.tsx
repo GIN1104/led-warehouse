@@ -1,24 +1,51 @@
-import { movementAction } from "@/app/actions";
-import { can, getSession } from "@/lib/auth";
+"use client";
+
+import { useState, type FormEvent } from "react";
+import { useWarehouse } from "@/components/warehouse";
 import { Field, Flash, PageHeader, Panel, buttonClass, controlClass } from "@/components/ui";
-import { getDb } from "@/lib/db";
+import { assertCan, can, errorText } from "@/lib/auth";
 import { formatDateTime } from "@/lib/dates";
 import { movementLabel } from "@/lib/labels";
+import { applyMovement, type MovementType } from "@/lib/services/ledger";
 import { listLocationBalances, listLocations, listMovements, listSkuSummaries } from "@/lib/services/queries";
 
-export default async function StockPage({
-  searchParams,
-}: {
-  searchParams: Promise<{ error?: string; ok?: string }>;
-}) {
-  const flash = await searchParams;
-  const session = await getSession();
+export default function StockPage() {
+  const { db, session, refresh, revision } = useWarehouse();
   const allowed = can(session.role, "stock.write");
-  const db = getDb();
   const summary = listSkuSummaries(db);
   const balances = listLocationBalances(db);
   const locations = listLocations(db);
   const movements = listMovements(db);
+  const [flash, setFlash] = useState<{ error?: string; ok?: string }>({});
+  void revision;
+
+  function onSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const form = new FormData(event.currentTarget);
+    const type = String(form.get("type") ?? "in");
+    try {
+      assertCan(session.role, "stock.write");
+      if (type !== "in" && type !== "out" && type !== "adjust" && type !== "move") {
+        throw new Error("Неизвестный тип движения");
+      }
+      applyMovement(
+        db,
+        {
+          skuId: String(form.get("skuId") ?? ""),
+          type: type as MovementType,
+          qty: Number(form.get("qty")),
+          locationId: String(form.get("locationId") ?? ""),
+          fromLocationId: String(form.get("fromLocationId") ?? "") || undefined,
+          reason: String(form.get("reason") ?? ""),
+        },
+        session.id,
+      );
+      refresh();
+      setFlash({ ok: "Движение проведено" });
+    } catch (error) {
+      setFlash({ error: errorText(error) });
+    }
+  }
 
   return (
     <div>
@@ -56,7 +83,7 @@ export default async function StockPage({
         <Panel>
           <h2 className="mb-3 font-medium">Провести движение</h2>
           {allowed ? (
-            <form action={movementAction} className="flex flex-col gap-3">
+            <form onSubmit={onSubmit} className="flex flex-col gap-3">
               <Field label="Тип">
                 <select name="type" className={controlClass} defaultValue="in">
                   <option value="in">Приход</option>

@@ -11,3 +11,4 @@ data
 *.log
 .env
 .env.local
+public/sql-wasm.wasm

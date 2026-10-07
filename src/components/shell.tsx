@@ -1,45 +1,41 @@
+"use client";
+
 import type { ReactNode } from "react";
-import { switchUser } from "@/app/actions";
 import { Nav } from "@/components/nav";
-import type { Role } from "@/lib/auth";
+import { useWarehouse } from "@/components/warehouse";
 import { roleLabel } from "@/lib/labels";
 
-type Person = { id: string; name: string; role: Role };
-
-function RoleSwitch({ users, currentId }: { users: Person[]; currentId: string }) {
+function RoleSwitch({ compact = false }: { compact?: boolean }) {
+  const { users, session, switchUser } = useWarehouse();
   return (
-    <div className="flex flex-col gap-2">
-      <p className="text-xs tracking-wide text-white/50 uppercase">Кто работает</p>
+    <div className={compact ? "flex gap-2" : "flex flex-col gap-2"}>
+      {compact ? null : <p className="text-xs tracking-wide text-white/50 uppercase">Кто работает</p>}
       {users.map((user) => (
-        <form key={user.id} action={switchUser}>
-          <input type="hidden" name="userId" value={user.id} />
-          <button
-            type="submit"
-            className={
-              user.id === currentId
+        <button
+          key={user.id}
+          type="button"
+          onClick={() => switchUser(user.id)}
+          className={
+            compact
+              ? user.id === session.id
+                ? "rounded-full bg-ink px-3 py-1 text-xs text-paper"
+                : "rounded-full border border-line px-3 py-1 text-xs"
+              : user.id === session.id
                 ? "w-full rounded-md bg-copper px-3 py-2 text-left text-sm text-white"
                 : "w-full rounded-md px-3 py-2 text-left text-sm text-white/80 hover:bg-white/10"
-            }
-          >
+          }
+        >
             <span className="block truncate">
-              {user.name} · {roleLabel[user.role]}
+              {compact ? user.name : `${user.name} · ${roleLabel[user.role]}`}
             </span>
           </button>
-        </form>
       ))}
     </div>
   );
 }
 
-export function Shell({
-  session,
-  users,
-  children,
-}: {
-  session: Person;
-  users: Person[];
-  children: ReactNode;
-}) {
+export function Shell({ children }: { children: ReactNode }) {
+  const { session } = useWarehouse();
   return (
     <div className="min-h-screen md:grid md:grid-cols-[250px_1fr]">
       <aside className="sticky top-0 hidden h-screen flex-col overflow-y-auto bg-ink text-paper md:flex">
@@ -57,7 +53,8 @@ export function Shell({
           <Nav />
         </div>
         <div className="mt-auto px-4 pt-4 pb-4">
-          <RoleSwitch users={users} currentId={session.id} />
+          <RoleSwitch />
+          <p className="mt-3 text-[11px] leading-4 text-white/45">Данные хранятся в этом браузере.</p>
         </div>
       </aside>
       <div className="border-b border-line bg-sand md:hidden">
@@ -68,22 +65,8 @@ export function Shell({
           </p>
         </div>
         <Nav compact />
-        <div className="flex gap-2 px-4 pb-3">
-          {users.map((user) => (
-            <form key={user.id} action={switchUser}>
-              <input type="hidden" name="userId" value={user.id} />
-              <button
-                type="submit"
-                className={
-                  user.id === session.id
-                    ? "rounded-full bg-ink px-3 py-1 text-xs text-paper"
-                    : "rounded-full border border-line px-3 py-1 text-xs"
-                }
-              >
-                {user.name}
-              </button>
-            </form>
-          ))}
+        <div className="px-4 pb-3">
+          <RoleSwitch compact />
         </div>
       </div>
       <main className="px-4 py-6 md:px-8 md:py-8">{children}</main>

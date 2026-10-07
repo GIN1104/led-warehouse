@@ -1,15 +1,19 @@
+"use client";
+
 import Link from "next/link";
-import { can, getSession } from "@/lib/auth";
+import { useWarehouse } from "@/components/warehouse";
 import { Badge, PageHeader, buttonClass } from "@/components/ui";
-import { getDb } from "@/lib/db";
+import { can } from "@/lib/auth";
 import { formatDate } from "@/lib/dates";
 import { orderStatusLabel } from "@/lib/labels";
+import { orderHref } from "@/lib/paths";
 import { listOrders } from "@/lib/services/queries";
 
-export default async function OrdersPage() {
-  const session = await getSession();
+export default function OrdersPage() {
+  const { db, session, revision } = useWarehouse();
   const allowed = can(session.role, "order.write");
-  const orders = listOrders(getDb());
+  const orders = listOrders(db);
+  void revision;
 
   return (
     <div>
@@ -40,7 +44,7 @@ export default async function OrdersPage() {
             {orders.map((order) => (
               <tr key={order.id} className="border-t border-line">
                 <td className="px-3 py-2">
-                  <Link href={`/orders/${order.id}`} className="font-medium hover:text-copper">
+                  <Link href={orderHref(order.id)} className="font-medium hover:text-copper">
                     {order.customerName}
                   </Link>
                   {order.notes ? <p className="text-ink/50">{order.notes}</p> : null}
