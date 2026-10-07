@@ -1,0 +1,27 @@
+@import "tailwindcss";
+
+@theme inline {
+  --font-sans: var(--font-manrope), "Segoe UI", sans-serif;
+  --font-mono: var(--font-ibm), ui-monospace, monospace;
+  --color-ink: #1c1915;
+  --color-paper: #f3efe6;
+  --color-copper: #b4532a;
+  --color-copper-dark: #8a3e1c;
+  --color-line: #e4dccf;
+  --color-moss: #3f6212;
+  --color-alert: #9f1239;
+  --color-sand: #fffdf8;
+}
+
+body {
+  background:
+    radial-gradient(900px 320px at 100% -10%, rgb(180 83 42 / 0.1), transparent 55%),
+    var(--color-paper);
+  color: var(--color-ink);
+  font-family: var(--font-sans);
+}
+
+:focus-visible {
+  outline: 2px solid var(--color-copper);
+  outline-offset: 2px;
+}
