@@ -2,7 +2,7 @@ name: GitHub Pages
 
 on:
   push:
-    branches: [main, cursor/mvp-phase-1-cc23]
+    branches: [main, cursor/mvp-phase-1-cc23, cursor/i18n-shared-mapper-cc23]
   workflow_dispatch:
 
 permissions:
