@@ -18,7 +18,7 @@ const links: { href: string; label: MessageKey; icon: typeof LayoutDashboard }[]
   { href: "/external-hires", label: "nav.hires", icon: Truck },
 ];
 
-export function Nav({ compact = false }: { compact?: boolean }) {
+export function Nav({ compact = false, onNavigate }: { compact?: boolean; onNavigate?: () => void }) {
   const pathname = usePathname();
   const { t } = useI18n();
   return (
@@ -31,6 +31,7 @@ export function Nav({ compact = false }: { compact?: boolean }) {
           <Link
             key={link.href}
             href={link.href}
+            onClick={onNavigate}
             className={cn(
               "flex items-center gap-2 rounded-md px-3 py-2 text-sm whitespace-nowrap [@media(max-height:520px)]:py-1.5",
               compact
