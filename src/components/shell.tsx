@@ -68,30 +68,30 @@ export function Shell({ children }: { children: ReactNode }) {
   const { session, shared, notice } = useWarehouse();
   const { t } = useI18n();
   return (
-    <div className="min-h-screen md:grid md:grid-cols-[250px_1fr]">
-      <aside className="sticky top-0 hidden h-screen flex-col overflow-y-auto bg-ink text-paper md:flex">
-        <div className="px-5 pt-5 pb-3">
-          <div className="mb-3 grid w-8 grid-cols-2 gap-0.5" aria-hidden>
+    <div className="min-h-dvh sm:grid sm:grid-cols-[13.75rem_1fr] lg:grid-cols-[250px_1fr]">
+      <aside className="sticky top-0 hidden h-dvh max-h-dvh flex-col overflow-hidden bg-ink text-paper sm:flex">
+        <div className="shrink-0 px-4 pt-4 pb-2 [@media(max-height:520px)]:py-2">
+          <div className="mb-2 grid w-8 grid-cols-2 gap-0.5 [@media(max-height:520px)]:hidden" aria-hidden>
             <span className="h-3.5 w-3.5 bg-[#e7a06a]" />
             <span className="h-3.5 w-3.5 bg-copper" />
             <span className="h-3.5 w-3.5 bg-copper" />
             <span className="h-3.5 w-3.5 bg-paper" />
           </div>
-          <p className="text-lg font-semibold tracking-tight">LED Warehouse</p>
-          <p className="text-xs text-white/55">{t("brand.tagline")}</p>
+          <p className="text-lg font-semibold tracking-tight [@media(max-height:520px)]:text-base">LED Warehouse</p>
+          <p className="text-xs text-white/55 [@media(max-height:520px)]:hidden">{t("brand.tagline")}</p>
         </div>
-        <div className="px-3">
+        <div className="min-h-0 flex-1 overflow-y-auto overscroll-y-contain px-3">
           <Nav />
         </div>
-        <div className="mt-auto px-4 pt-4 pb-4">
+        <div className="shrink-0 border-t border-white/10 px-4 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
           <LanguageSwitch />
           <div className="mt-3">
             <RoleSwitch />
           </div>
-          <p className="mt-3 text-[11px] leading-4 text-white/45">{shared ? t("shell.shared") : t("shell.browser")}</p>
+          <p className="mt-3 text-[11px] leading-4 text-white/45 [@media(max-height:520px)]:hidden">{shared ? t("shell.shared") : t("shell.browser")}</p>
         </div>
       </aside>
-      <div className="border-b border-line bg-sand md:hidden">
+      <div className="border-b border-line bg-sand sm:hidden">
         <div className="flex items-center justify-between gap-3 px-4 pt-4">
           <p className="font-semibold">LED Warehouse</p>
           <p className="text-xs text-ink/60">
@@ -106,7 +106,7 @@ export function Shell({ children }: { children: ReactNode }) {
           <RoleSwitch compact />
         </div>
       </div>
-      <main className="px-4 py-6 md:px-8 md:py-8">
+      <main className="px-4 py-6 sm:px-6 sm:py-6 lg:px-8 lg:py-8">
         {notice === "conflict" ? <p className="mb-4 rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-sm">{t("shell.conflict")}</p> : null}
         {children}
       </main>

@@ -32,7 +32,7 @@ export function Nav({ compact = false }: { compact?: boolean }) {
             key={link.href}
             href={link.href}
             className={cn(
-              "flex items-center gap-2 rounded-md px-3 py-2 text-sm whitespace-nowrap",
+              "flex items-center gap-2 rounded-md px-3 py-2 text-sm whitespace-nowrap [@media(max-height:520px)]:py-1.5",
               compact
                 ? active
                   ? "bg-ink text-paper"
