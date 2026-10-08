@@ -1,17 +1,20 @@
 "use client";
 
 import { useState, type FormEvent } from "react";
+import { useI18n } from "@/components/i18n";
 import { useWarehouse } from "@/components/warehouse";
 import { Field, Flash, PageHeader, Panel, buttonClass, controlClass } from "@/components/ui";
-import { assertCan, can, errorText } from "@/lib/auth";
-import { locationKindLabel } from "@/lib/labels";
+import { assertCan, can } from "@/lib/auth";
+import { translateError, type MessageKey } from "@/lib/i18n/messages";
 import { createLocation } from "@/lib/services/ledger";
 import { listLocations } from "@/lib/services/queries";
 
 export default function LocationsPage() {
-  const { db, session, refresh, revision } = useWarehouse();
+  const { db, session, users, refresh, revision } = useWarehouse();
+  const { t, lang } = useI18n();
   const allowed = can(session.role, "location.write");
   const rows = listLocations(db);
+  const warehouse = users.find((user) => user.role === "warehouse")?.name ?? "";
   const [flash, setFlash] = useState<{ error?: string; ok?: string }>({});
   void revision;
 
@@ -21,39 +24,35 @@ export default function LocationsPage() {
     const kind = String(form.get("kind") ?? "zone");
     try {
       assertCan(session.role, "location.write");
-      if (kind !== "warehouse" && kind !== "zone" && kind !== "bin") throw new Error("Неизвестный тип локации");
+      if (kind !== "warehouse" && kind !== "zone" && kind !== "bin") throw new Error("kind");
       createLocation(db, { name: String(form.get("name") ?? ""), kind, parentId: String(form.get("parentId") ?? "") || undefined }, session.id);
       refresh();
       event.currentTarget.reset();
-      setFlash({ ok: "Локация добавлена" });
+      setFlash({ ok: t("locations.added") });
     } catch (error) {
-      setFlash({ error: errorText(error) });
+      setFlash({ error: translateError(lang, error) });
     }
   }
 
   return (
     <div>
-      <PageHeader
-        eyebrow="Склад"
-        title="Локации"
-        description="Зоны и ячейки без карты. Привязка к mapper появится позже, контракт локаций уже отдельный."
-      />
+      <PageHeader eyebrow={t("locations.eyebrow")} title={t("locations.title")} description={t("locations.description")} />
       <Flash error={flash.error} ok={flash.ok} />
       <div className="grid gap-4 lg:grid-cols-[1fr_320px]">
         <div className="overflow-x-auto rounded-lg border border-line bg-sand">
-          <table className="w-full min-w-[560px] text-left text-sm">
+          <table className="w-full min-w-[560px] text-start text-sm">
             <thead className="bg-paper text-xs tracking-wide text-ink/50 uppercase">
               <tr>
-                <th className="px-3 py-2 font-medium">Название</th>
-                <th className="px-3 py-2 font-medium">Тип</th>
-                <th className="px-3 py-2 font-medium">Внутри</th>
+                <th className="px-3 py-2 font-medium">{t("locations.name")}</th>
+                <th className="px-3 py-2 font-medium">{t("locations.kind")}</th>
+                <th className="px-3 py-2 font-medium">{t("locations.inside")}</th>
               </tr>
             </thead>
             <tbody>
               {rows.map((row) => (
                 <tr key={row.id} className="border-t border-line">
                   <td className="px-3 py-2">{row.name}</td>
-                  <td className="px-3 py-2">{locationKindLabel[row.kind]}</td>
+                  <td className="px-3 py-2">{t(`loc.${row.kind}` as MessageKey)}</td>
                   <td className="px-3 py-2 text-ink/70">{row.parentName ?? "—"}</td>
                 </tr>
               ))}
@@ -61,22 +60,22 @@ export default function LocationsPage() {
           </table>
         </div>
         <Panel>
-          <h2 className="mb-3 font-medium">Новая локация</h2>
+          <h2 className="mb-3 font-medium">{t("locations.new")}</h2>
           {allowed ? (
             <form onSubmit={onSubmit} className="flex flex-col gap-3">
-              <Field label="Название">
-                <input name="name" required className={controlClass} placeholder="Зона D — запас" />
+              <Field label={t("locations.name")}>
+                <input name="name" required className={controlClass} />
               </Field>
-              <Field label="Тип">
+              <Field label={t("locations.kind")}>
                 <select name="kind" className={controlClass} defaultValue="zone">
-                  <option value="warehouse">Склад</option>
-                  <option value="zone">Зона</option>
-                  <option value="bin">Ячейка</option>
+                  <option value="warehouse">{t("loc.warehouse")}</option>
+                  <option value="zone">{t("loc.zone")}</option>
+                  <option value="bin">{t("loc.bin")}</option>
                 </select>
               </Field>
-              <Field label="Родитель">
+              <Field label={t("locations.parent")}>
                 <select name="parentId" className={controlClass} defaultValue="">
-                  <option value="">Нет</option>
+                  <option value="">{t("common.none")}</option>
                   {rows.map((row) => (
                     <option key={row.id} value={row.id}>
                       {row.name}
@@ -85,11 +84,11 @@ export default function LocationsPage() {
                 </select>
               </Field>
               <button type="submit" className={buttonClass("primary")}>
-                Добавить локацию
+                {t("locations.add")}
               </button>
             </form>
           ) : (
-            <p className="text-sm text-ink/60">Локации заводит роль склада. Переключитесь на Алексея.</p>
+            <p className="text-sm text-ink/60">{t("locations.switch", { name: warehouse })}</p>
           )}
         </Panel>
       </div>

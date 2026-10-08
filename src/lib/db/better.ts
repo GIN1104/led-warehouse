@@ -1,7 +1,12 @@
 import Database from "better-sqlite3";
 import type { Sql } from "@/lib/db/sql";
 
-export function openBetterSqlite(filename = ":memory:"): Sql {
+export type SqliteHandle = Sql & {
+  close(): void;
+  serialize(): Buffer;
+};
+
+export function openBetterSqlite(filename = ":memory:"): SqliteHandle {
   const sqlite = new Database(filename);
   sqlite.pragma("foreign_keys = ON");
   return {
@@ -19,6 +24,12 @@ export function openBetterSqlite(filename = ":memory:"): Sql {
     },
     transaction(fn) {
       return sqlite.transaction(fn)();
+    },
+    close() {
+      sqlite.close();
+    },
+    serialize() {
+      return sqlite.serialize();
     },
   };
 }

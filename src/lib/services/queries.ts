@@ -111,16 +111,22 @@ export function listOrders(db: Sql) {
     notes: string;
     createdAt: number;
     createdBy: string;
+    source: string;
   }>(
-    `SELECT id, customer_name AS customerName, start_date AS startDate, end_date AS endDate, status, notes, created_at AS createdAt, created_by AS createdBy
+    `SELECT id, customer_name AS customerName, start_date AS startDate, end_date AS endDate, status, notes, created_at AS createdAt, created_by AS createdBy, source
      FROM rental_orders ORDER BY created_at DESC`,
   );
-  const lines = db.all<{ orderId: string; qtyShortage: number }>(
-    `SELECT order_id AS orderId, qty_shortage AS qtyShortage FROM rental_lines`,
+  const lines = db.all<{ orderId: string; qtyShortage: number; qtyIssued: number }>(
+    `SELECT order_id AS orderId, qty_shortage AS qtyShortage, qty_issued AS qtyIssued FROM rental_lines`,
   );
   return orders.map((order) => {
     const own = lines.filter((line) => line.orderId === order.id);
-    return { ...order, lineCount: own.length, shortage: own.reduce((sumQty, line) => sumQty + line.qtyShortage, 0) };
+    return {
+      ...order,
+      lineCount: own.length,
+      shortage: own.reduce((sumQty, line) => sumQty + line.qtyShortage, 0),
+      issued: own.reduce((sumQty, line) => sumQty + line.qtyIssued, 0),
+    };
   });
 }
 
@@ -134,8 +140,10 @@ export function getOrderDetail(db: Sql, orderId: string) {
     notes: string;
     createdAt: number;
     createdBy: string;
+    source: string;
+    externalId: string | null;
   }>(
-    `SELECT id, customer_name AS customerName, start_date AS startDate, end_date AS endDate, status, notes, created_at AS createdAt, created_by AS createdBy
+    `SELECT id, customer_name AS customerName, start_date AS startDate, end_date AS endDate, status, notes, created_at AS createdAt, created_by AS createdBy, source, external_id AS externalId
      FROM rental_orders WHERE id = ?`,
     [orderId],
   );
@@ -149,9 +157,11 @@ export function getOrderDetail(db: Sql, orderId: string) {
     qtyRequested: number;
     qtySoftReserved: number;
     qtyShortage: number;
+    qtyIssued: number;
   }>(
     `SELECT l.id AS id, l.sku_id AS skuId, s.code AS code, s.name AS name, s.unit AS unit,
-            l.qty_requested AS qtyRequested, l.qty_soft_reserved AS qtySoftReserved, l.qty_shortage AS qtyShortage
+            l.qty_requested AS qtyRequested, l.qty_soft_reserved AS qtySoftReserved, l.qty_shortage AS qtyShortage,
+            l.qty_issued AS qtyIssued
      FROM rental_lines l INNER JOIN skus s ON s.id = l.sku_id WHERE l.order_id = ?`,
     [orderId],
   );
@@ -180,10 +190,17 @@ export function listAlerts(db: Sql, status?: "open" | "ack" | "closed") {
     orderId: string | null;
     skuId: string | null;
     customerName: string | null;
+    skuCode: string | null;
+    unit: string | null;
+    qtyShort: number | null;
   }>(
     `SELECT a.id AS id, a.type AS type, a.status AS status, a.message AS message, a.created_at AS createdAt,
-            a.order_id AS orderId, a.sku_id AS skuId, o.customer_name AS customerName
-     FROM alerts a LEFT JOIN rental_orders o ON o.id = a.order_id
+            a.order_id AS orderId, a.sku_id AS skuId, o.customer_name AS customerName,
+            s.code AS skuCode, s.unit AS unit, g.qty_short AS qtyShort
+     FROM alerts a
+     LEFT JOIN rental_orders o ON o.id = a.order_id
+     LEFT JOIN skus s ON s.id = a.sku_id
+     LEFT JOIN shortage_signals g ON g.order_id = a.order_id AND g.sku_id = a.sku_id
      ORDER BY a.created_at DESC`,
   );
   return status ? rows.filter((row) => row.status === status) : rows;

@@ -14,7 +14,7 @@ export function seedIfEmpty(db: Sql): void {
   if ((existing?.value ?? 0) > 0) return;
 
   db.run(`INSERT INTO users (id, name, role) VALUES (?, 'Алексей', 'warehouse')`, [WAREHOUSE_ID]);
-  db.run(`INSERT INTO users (id, name, role) VALUES (?, 'Мария', 'manager')`, [MANAGER_ID]);
+  db.run(`INSERT INTO users (id, name, role) VALUES (?, 'Дмитрий', 'manager')`, [MANAGER_ID]);
 
   db.run(`INSERT INTO locations (id, name, kind, parent_id) VALUES (?, 'Главный склад', 'warehouse', NULL)`, [LOC_MAIN]);
   db.run(`INSERT INTO locations (id, name, kind, parent_id) VALUES (?, 'Зона A — кабинеты', 'zone', ?)`, [LOC_A, LOC_MAIN]);

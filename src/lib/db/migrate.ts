@@ -54,7 +54,9 @@ CREATE TABLE IF NOT EXISTS rental_orders (
   status TEXT NOT NULL CHECK (status IN ('confirmed', 'cancelled', 'closed')),
   notes TEXT NOT NULL DEFAULT '',
   created_at INTEGER NOT NULL,
-  created_by TEXT NOT NULL
+  created_by TEXT NOT NULL,
+  source TEXT NOT NULL DEFAULT 'ui',
+  external_id TEXT
 );
 
 CREATE TABLE IF NOT EXISTS rental_lines (
@@ -63,7 +65,8 @@ CREATE TABLE IF NOT EXISTS rental_lines (
   sku_id TEXT NOT NULL REFERENCES skus(id),
   qty_requested INTEGER NOT NULL,
   qty_soft_reserved INTEGER NOT NULL,
-  qty_shortage INTEGER NOT NULL DEFAULT 0
+  qty_shortage INTEGER NOT NULL DEFAULT 0,
+  qty_issued INTEGER NOT NULL DEFAULT 0
 );
 
 CREATE TABLE IF NOT EXISTS shortage_signals (
@@ -114,6 +117,11 @@ CREATE TABLE IF NOT EXISTS alerts (
   created_at INTEGER NOT NULL
 );
 
+CREATE TABLE IF NOT EXISTS ledger_meta (
+  key TEXT PRIMARY KEY,
+  value TEXT NOT NULL
+);
+
 CREATE TABLE IF NOT EXISTS audit_log (
   id TEXT PRIMARY KEY,
   actor TEXT NOT NULL,
@@ -125,12 +133,29 @@ CREATE TABLE IF NOT EXISTS audit_log (
 );
 
 CREATE UNIQUE INDEX IF NOT EXISTS uq_signal_order_sku ON shortage_signals(order_id, sku_id);
+CREATE UNIQUE INDEX IF NOT EXISTS uq_order_external ON rental_orders(external_id) WHERE external_id IS NOT NULL;
 CREATE UNIQUE INDEX IF NOT EXISTS uq_hire_order_sku ON external_hires(order_id, sku_id);
 CREATE INDEX IF NOT EXISTS idx_lines_order ON rental_lines(order_id);
 CREATE INDEX IF NOT EXISTS idx_lines_sku ON rental_lines(sku_id);
 CREATE INDEX IF NOT EXISTS idx_alerts_status ON alerts(status);
 `;
 
+function columnExists(db: Sql, table: string, column: string): boolean {
+  const rows = db.all<{ name: string }>(`PRAGMA table_info(${table})`);
+  return rows.some((row) => row.name === column);
+}
+
 export function migrate(db: Sql): void {
   db.exec(SQL);
+  if (!columnExists(db, "rental_orders", "source")) {
+    db.exec(`ALTER TABLE rental_orders ADD COLUMN source TEXT NOT NULL DEFAULT 'ui'`);
+  }
+  if (!columnExists(db, "rental_orders", "external_id")) {
+    db.exec(`ALTER TABLE rental_orders ADD COLUMN external_id TEXT`);
+  }
+  if (!columnExists(db, "rental_lines", "qty_issued")) {
+    db.exec(`ALTER TABLE rental_lines ADD COLUMN qty_issued INTEGER NOT NULL DEFAULT 0`);
+  }
+  db.run(`INSERT INTO ledger_meta (key, value) VALUES ('revision', '0') ON CONFLICT(key) DO NOTHING`);
+  db.run(`UPDATE users SET name = 'Дмитрий' WHERE id = 'user_manager' AND name = 'Мария'`);
 }

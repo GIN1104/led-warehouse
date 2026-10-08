@@ -1,14 +1,17 @@
 "use client";
 
 import { useState, type FormEvent } from "react";
+import { useI18n } from "@/components/i18n";
 import { useWarehouse } from "@/components/warehouse";
 import { Badge, Field, Flash, PageHeader, Panel, buttonClass, controlClass } from "@/components/ui";
-import { assertCan, can, errorText } from "@/lib/auth";
+import { assertCan, can } from "@/lib/auth";
+import { translateError } from "@/lib/i18n/messages";
 import { createSku } from "@/lib/services/ledger";
 import { listSkuSummaries } from "@/lib/services/queries";
 
 export default function CatalogPage() {
   const { db, session, refresh, revision } = useWarehouse();
+  const { t, lang } = useI18n();
   const allowed = can(session.role, "catalog.write");
   const rows = listSkuSummaries(db);
   const [flash, setFlash] = useState<{ error?: string; ok?: string }>({});
@@ -32,30 +35,26 @@ export default function CatalogPage() {
       );
       refresh();
       event.currentTarget.reset();
-      setFlash({ ok: "Позиция добавлена" });
+      setFlash({ ok: t("catalog.added") });
     } catch (error) {
-      setFlash({ error: errorText(error) });
+      setFlash({ error: translateError(lang, error) });
     }
   }
 
   return (
     <div>
-      <PageHeader
-        eyebrow="Справочник"
-        title="Номенклатура"
-        description="Кабинеты, кабели и расходники учитываются по количеству. Серийные номера на этой фазе не ведутся."
-      />
+      <PageHeader eyebrow={t("catalog.eyebrow")} title={t("catalog.title")} description={t("catalog.description")} />
       <Flash error={flash.error} ok={flash.ok} />
       <div className="grid gap-4 lg:grid-cols-[1fr_320px]">
         <div className="overflow-x-auto rounded-lg border border-line bg-sand">
-          <table className="w-full min-w-[720px] text-left text-sm">
+          <table className="w-full min-w-[720px] text-start text-sm">
             <thead className="bg-paper text-xs tracking-wide text-ink/50 uppercase">
               <tr>
-                <th className="px-3 py-2 font-medium">Код</th>
-                <th className="px-3 py-2 font-medium">Название</th>
-                <th className="px-3 py-2 font-medium">Категория</th>
-                <th className="px-3 py-2 font-medium">На руках</th>
-                <th className="px-3 py-2 font-medium">Свободно сегодня</th>
+                <th className="px-3 py-2 font-medium">{t("catalog.code")}</th>
+                <th className="px-3 py-2 font-medium">{t("catalog.name")}</th>
+                <th className="px-3 py-2 font-medium">{t("catalog.category")}</th>
+                <th className="px-3 py-2 font-medium">{t("catalog.onHand")}</th>
+                <th className="px-3 py-2 font-medium">{t("catalog.freeToday")}</th>
               </tr>
             </thead>
             <tbody>
@@ -70,8 +69,8 @@ export default function CatalogPage() {
                   <td className="px-3 py-2">
                     {row.availableToday} {row.unit}
                     {row.shortage > 0 ? (
-                      <span className="ml-2">
-                        <Badge tone="warn">дефицит {row.shortage}</Badge>
+                      <span className="ms-2">
+                        <Badge tone="warn">{t("catalog.deficit", { qty: row.shortage })}</Badge>
                       </span>
                     ) : null}
                   </td>
@@ -81,27 +80,27 @@ export default function CatalogPage() {
           </table>
         </div>
         <Panel>
-          <h2 className="mb-3 font-medium">Новая позиция</h2>
+          <h2 className="mb-3 font-medium">{t("catalog.new")}</h2>
           {allowed ? (
             <form onSubmit={onSubmit} className="flex flex-col gap-3">
-              <Field label="Код">
+              <Field label={t("catalog.code")}>
                 <input name="code" required className={controlClass} placeholder="CAB-P19" />
               </Field>
-              <Field label="Название">
-                <input name="name" required className={controlClass} placeholder="Кабинет LED P1.9" />
+              <Field label={t("catalog.name")}>
+                <input name="name" required className={controlClass} placeholder="LED P1.9" />
               </Field>
-              <Field label="Категория">
-                <input name="category" required className={controlClass} placeholder="Кабинеты" />
+              <Field label={t("catalog.category")}>
+                <input name="category" required className={controlClass} />
               </Field>
-              <Field label="Единица">
+              <Field label={t("catalog.unit")}>
                 <input name="unit" className={controlClass} defaultValue="шт" />
               </Field>
               <button type="submit" className={buttonClass("primary")}>
-                Добавить позицию
+                {t("catalog.add")}
               </button>
             </form>
           ) : (
-            <p className="text-sm text-ink/60">Добавлять номенклатуру могут склад и менеджер.</p>
+            <p className="text-sm text-ink/60">{t("catalog.denied")}</p>
           )}
         </Panel>
       </div>

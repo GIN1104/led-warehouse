@@ -2,9 +2,11 @@
 
 import { useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
+import { useI18n } from "@/components/i18n";
 import { useWarehouse } from "@/components/warehouse";
 import { Field, buttonClass, controlClass } from "@/components/ui";
-import { assertCan, errorText } from "@/lib/auth";
+import { assertCan } from "@/lib/auth";
+import { translateError } from "@/lib/i18n/messages";
 import { orderHref } from "@/lib/paths";
 import { createOrder } from "@/lib/services/ledger";
 
@@ -20,6 +22,7 @@ export function OrderForm({
   endDate: string;
 }) {
   const { db, session, refresh } = useWarehouse();
+  const { t, lang } = useI18n();
   const router = useRouter();
   const [lines, setLines] = useState([{ skuId: skus[0]?.id ?? "", qty: 1 }]);
   const [error, setError] = useState<string | null>(null);
@@ -45,7 +48,7 @@ export function OrderForm({
       refresh();
       router.push(orderHref(result.orderId));
     } catch (caught) {
-      setError(errorText(caught));
+      setError(translateError(lang, caught));
       setPending(false);
     }
   }
@@ -53,28 +56,28 @@ export function OrderForm({
   return (
     <form onSubmit={onSubmit} className="flex flex-col gap-4">
       <div className="grid gap-3 md:grid-cols-2">
-        <Field label="Заказчик">
-          <input name="customerName" required className={controlClass} placeholder="ООО «Сцена Про»" />
+        <Field label={t("form.customer")}>
+          <input name="customerName" required className={controlClass} placeholder={t("form.placeholderCustomer")} />
         </Field>
-        <Field label="Заметка">
-          <input name="notes" className={controlClass} placeholder="Площадка, контакт" />
+        <Field label={t("form.note")}>
+          <input name="notes" className={controlClass} placeholder={t("form.placeholderNote")} />
         </Field>
-        <Field label="Начало">
+        <Field label={t("form.start")}>
           <input name="startDate" type="date" required defaultValue={startDate} className={controlClass} />
         </Field>
-        <Field label="Окончание">
+        <Field label={t("form.end")}>
           <input name="endDate" type="date" required defaultValue={endDate} className={controlClass} />
         </Field>
       </div>
       <div className="flex flex-col gap-2">
         <div className="flex items-center justify-between">
-          <p className="text-sm font-medium">Состав</p>
+          <p className="text-sm font-medium">{t("form.lines")}</p>
           <button
             type="button"
             className={buttonClass("ghost")}
             onClick={() => setLines((current) => [...current, { skuId: skus[0]?.id ?? "", qty: 1 }])}
           >
-            Добавить строку
+            {t("form.addLine")}
           </button>
         </div>
         {lines.map((line, index) => (
@@ -88,7 +91,7 @@ export function OrderForm({
             >
               {skus.map((sku) => (
                 <option key={sku.id} value={sku.id}>
-                  {sku.code} — {sku.name} (сегодня свободно {sku.availableToday} {sku.unit})
+                  {sku.code} — {sku.name} ({t("form.freeToday", { qty: sku.availableToday, unit: sku.unit })})
                 </option>
               ))}
             </select>
@@ -109,7 +112,7 @@ export function OrderForm({
                 className={buttonClass("ghost")}
                 onClick={() => setLines((current) => current.filter((_, itemIndex) => itemIndex !== index))}
               >
-                Убрать
+                {t("form.remove")}
               </button>
             ) : (
               <span />
@@ -118,12 +121,9 @@ export function OrderForm({
         ))}
       </div>
       {error ? <p className="text-sm text-alert">{error}</p> : null}
-      <p className="text-sm text-ink/60">
-        Заказ сохранится даже при нехватке. Система посчитает мягкий резерв и, если остатка не хватит, создаст заявку на
-        внешнюю аренду.
-      </p>
+      <p className="text-sm text-ink/60">{t("form.hint")}</p>
       <button type="submit" className={buttonClass("primary", "w-fit")} disabled={pending || skus.length === 0}>
-        {pending ? "Сохраняем…" : "Сохранить заказ"}
+        {pending ? t("form.saving") : t("form.save")}
       </button>
     </form>
   );

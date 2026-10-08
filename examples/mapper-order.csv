@@ -1,0 +1,2 @@
+code,qty,customer,start,end,external_id,notes
+CAB-P39,30,Тест проката,2026-10-08,2026-10-10,mapper-demo-1,Заказ из mapper

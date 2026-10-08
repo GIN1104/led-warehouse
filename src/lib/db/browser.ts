@@ -40,11 +40,32 @@ export function persistBrowserDb(): Promise<void> {
   });
 }
 
+async function loadSqlJs() {
+  const base = process.env.NEXT_PUBLIC_BASE_PATH ?? "";
+  return initSqlJs({ locateFile: () => `${base}/sql-wasm.wasm` });
+}
+
+export function exportSqlBytes(): Uint8Array {
+  if (!raw) throw new Error("База не открыта");
+  return raw.export();
+}
+
+/** Снимок общего учёта: схема обновляется, демо-наполнение уже сделал сервер. */
+export async function openSqlFromBytes(bytes: Uint8Array): Promise<Sql> {
+  const SQL = await loadSqlJs();
+  raw?.close();
+  raw = bytes.byteLength > 0 ? new SQL.Database(bytes) : new SQL.Database();
+  raw.run("PRAGMA foreign_keys = ON");
+  const db = wrapSqlJs(raw);
+  migrate(db);
+  return db;
+}
+
 /** База Pages живёт в IndexedDB этого браузера и не уходит на сервер. */
 export async function openBrowserDb(): Promise<Sql> {
-  const base = process.env.NEXT_PUBLIC_BASE_PATH ?? "";
-  const SQL = await initSqlJs({ locateFile: () => `${base}/sql-wasm.wasm` });
+  const SQL = await loadSqlJs();
   const saved = await readSaved();
+  raw?.close();
   raw = saved ? new SQL.Database(saved) : new SQL.Database();
   raw.run("PRAGMA foreign_keys = ON");
   const db = wrapSqlJs(raw);

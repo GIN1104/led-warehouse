@@ -1,0 +1,9 @@
+services:
+  warehouse:
+    build: .
+    ports:
+      - "3000:3000"
+    environment:
+      LEDGER_PATH: /data/warehouse.sqlite
+    volumes:
+      - ./data:/data
