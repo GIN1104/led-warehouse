@@ -1,21 +1,24 @@
 "use client";
 
 import { useState, type FormEvent } from "react";
+import { useI18n } from "@/components/i18n";
 import { useWarehouse } from "@/components/warehouse";
 import { Field, Flash, PageHeader, Panel, buttonClass, controlClass } from "@/components/ui";
-import { assertCan, can, errorText } from "@/lib/auth";
+import { assertCan, can } from "@/lib/auth";
 import { formatDateTime } from "@/lib/dates";
-import { movementLabel } from "@/lib/labels";
+import { translateError, type MessageKey } from "@/lib/i18n/messages";
 import { applyMovement, type MovementType } from "@/lib/services/ledger";
 import { listLocationBalances, listLocations, listMovements, listSkuSummaries } from "@/lib/services/queries";
 
 export default function StockPage() {
-  const { db, session, refresh, revision } = useWarehouse();
+  const { db, session, users, refresh, revision } = useWarehouse();
+  const { t, lang } = useI18n();
   const allowed = can(session.role, "stock.write");
   const summary = listSkuSummaries(db);
   const balances = listLocationBalances(db);
   const locations = listLocations(db);
   const movements = listMovements(db);
+  const warehouse = users.find((user) => user.role === "warehouse")?.name ?? "";
   const [flash, setFlash] = useState<{ error?: string; ok?: string }>({});
   void revision;
 
@@ -26,7 +29,7 @@ export default function StockPage() {
     try {
       assertCan(session.role, "stock.write");
       if (type !== "in" && type !== "out" && type !== "adjust" && type !== "move") {
-        throw new Error("Неизвестный тип движения");
+        throw new Error("type");
       }
       applyMovement(
         db,
@@ -41,28 +44,24 @@ export default function StockPage() {
         session.id,
       );
       refresh();
-      setFlash({ ok: "Движение проведено" });
+      setFlash({ ok: t("stock.posted") });
     } catch (error) {
-      setFlash({ error: errorText(error) });
+      setFlash({ error: translateError(lang, error) });
     }
   }
 
   return (
     <div>
-      <PageHeader
-        eyebrow="Остатки"
-        title="Движения склада"
-        description="Остаток меняется только движением: приход, расход, корректировка или перемещение. Заказ сам по себе товар со склада не списывает."
-      />
+      <PageHeader eyebrow={t("stock.eyebrow")} title={t("stock.title")} description={t("stock.description")} />
       <Flash error={flash.error} ok={flash.ok} />
       <div className="mb-4 overflow-x-auto rounded-lg border border-line bg-sand">
-        <table className="w-full min-w-[760px] text-left text-sm">
+        <table className="w-full min-w-[760px] text-start text-sm">
           <thead className="bg-paper text-xs tracking-wide text-ink/50 uppercase">
             <tr>
-              <th className="px-3 py-2 font-medium">Код</th>
-              <th className="px-3 py-2 font-medium">Локация</th>
-              <th className="px-3 py-2 font-medium">На руках</th>
-              <th className="px-3 py-2 font-medium">Резерв сегодня</th>
+              <th className="px-3 py-2 font-medium">{t("stock.code")}</th>
+              <th className="px-3 py-2 font-medium">{t("stock.location")}</th>
+              <th className="px-3 py-2 font-medium">{t("stock.onHand")}</th>
+              <th className="px-3 py-2 font-medium">{t("stock.reservedToday")}</th>
             </tr>
           </thead>
           <tbody>
@@ -81,18 +80,18 @@ export default function StockPage() {
       </div>
       <div className="grid gap-4 lg:grid-cols-[320px_1fr]">
         <Panel>
-          <h2 className="mb-3 font-medium">Провести движение</h2>
+          <h2 className="mb-3 font-medium">{t("stock.post")}</h2>
           {allowed ? (
             <form onSubmit={onSubmit} className="flex flex-col gap-3">
-              <Field label="Тип">
+              <Field label={t("stock.type")}>
                 <select name="type" className={controlClass} defaultValue="in">
-                  <option value="in">Приход</option>
-                  <option value="out">Расход</option>
-                  <option value="adjust">Корректировка (±)</option>
-                  <option value="move">Перемещение</option>
+                  <option value="in">{t("move.in")}</option>
+                  <option value="out">{t("move.out")}</option>
+                  <option value="adjust">{t("stock.adjustOption")}</option>
+                  <option value="move">{t("move.move")}</option>
                 </select>
               </Field>
-              <Field label="Номенклатура">
+              <Field label={t("stock.sku")}>
                 <select name="skuId" className={controlClass}>
                   {summary.map((sku) => (
                     <option key={sku.id} value={sku.id}>
@@ -101,10 +100,10 @@ export default function StockPage() {
                   ))}
                 </select>
               </Field>
-              <Field label="Количество">
+              <Field label={t("stock.qty")}>
                 <input name="qty" type="number" required className={controlClass} defaultValue={1} />
               </Field>
-              <Field label="Локация">
+              <Field label={t("stock.location")}>
                 <select name="locationId" className={controlClass}>
                   {locations.map((location) => (
                     <option key={location.id} value={location.id}>
@@ -113,9 +112,9 @@ export default function StockPage() {
                   ))}
                 </select>
               </Field>
-              <Field label="Откуда (для перемещения)">
+              <Field label={t("stock.from")}>
                 <select name="fromLocationId" className={controlClass} defaultValue="">
-                  <option value="">Не нужно</option>
+                  <option value="">{t("common.notNeeded")}</option>
                   {locations.map((location) => (
                     <option key={location.id} value={location.id}>
                       {location.name}
@@ -123,24 +122,24 @@ export default function StockPage() {
                   ))}
                 </select>
               </Field>
-              <Field label="Причина">
-                <input name="reason" className={controlClass} placeholder="Инвентаризация" />
+              <Field label={t("stock.reason")}>
+                <input name="reason" className={controlClass} placeholder={t("stock.reasonHint")} />
               </Field>
               <button type="submit" className={buttonClass("primary")}>
-                Провести движение
+                {t("stock.submit")}
               </button>
             </form>
           ) : (
-            <p className="text-sm text-ink/60">Движения проводит склад. Переключитесь на Алексея.</p>
+            <p className="text-sm text-ink/60">{t("stock.switch", { name: warehouse })}</p>
           )}
         </Panel>
         <Panel>
-          <h2 className="mb-3 font-medium">Последние движения</h2>
+          <h2 className="mb-3 font-medium">{t("stock.recent")}</h2>
           <ul className="flex flex-col gap-2 text-sm">
             {movements.map((movement) => (
               <li key={movement.id} className="flex justify-between gap-3 border-b border-line pb-2 last:border-0">
                 <span>
-                  {movementLabel[movement.type]} {movement.skuCode} · {movement.qty} · {movement.locationName}
+                  {t(`move.${movement.type}` as MessageKey)} {movement.skuCode} · {movement.qty} · {movement.locationName}
                   {movement.reason ? <span className="text-ink/50"> — {movement.reason}</span> : null}
                 </span>
                 <span className="shrink-0 text-ink/50">{formatDateTime(movement.createdAt)}</span>

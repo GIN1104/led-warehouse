@@ -5,7 +5,7 @@ import { getOrderDetail, listAlerts, listExternalHires } from "@/lib/services/qu
 
 function setup() {
   const db = createDb();
-  db.run(`INSERT INTO users (id, name, role) VALUES ('manager', 'Мария', 'manager')`);
+  db.run(`INSERT INTO users (id, name, role) VALUES ('manager', 'Дмитрий', 'manager')`);
   db.run(`INSERT INTO locations (id, name, kind, parent_id) VALUES ('loc', 'Склад', 'warehouse', NULL)`);
   db.run(
     `INSERT INTO skus (id, code, name, category, unit, track_mode, description) VALUES ('CAB-P25', 'CAB-P25', 'Кабинет', 'Кабинеты', 'шт', 'quantity', '')`,

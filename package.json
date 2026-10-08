@@ -9,6 +9,8 @@
     "prebuild": "node scripts/copy-sql-wasm.mjs",
     "dev": "next dev",
     "build": "next build",
+    "build:pages": "node scripts/export-build.mjs",
+    "start": "next start",
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
     "test": "vitest run"
@@ -17,6 +19,7 @@
     "better-sqlite3": "^12.8.0",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
+    "exceljs": "^4.4.0",
     "lucide-react": "^1.52.0",
     "next": "^16.4.0",
     "react": "^19.3.0",

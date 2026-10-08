@@ -92,6 +92,8 @@ export type CreateOrderInput = {
   notes?: string;
   lines: { skuId: string; qty: number }[];
   createdAt?: number;
+  source?: "ui" | "mapper";
+  externalId?: string;
 };
 
 export type ScanResult = {
@@ -100,6 +102,7 @@ export type ScanResult = {
   reason?: string;
   movement_id?: string;
   alert_ids?: string[];
+  issued?: { order_id: string; qty: number }[];
   idempotent?: boolean;
 };
 
@@ -224,6 +227,7 @@ export function recalcSku(tx: Sql, skuId: string): void {
   const rows = tx.all<{
     id: string;
     qtyRequested: number;
+    qtyIssued: number;
     qtySoftReserved: number;
     qtyShortage: number;
     startDate: string;
@@ -235,7 +239,7 @@ export function recalcSku(tx: Sql, skuId: string): void {
     notes: string;
     createdBy: string;
   }>(
-    `SELECT l.id AS id, l.qty_requested AS qtyRequested, l.qty_soft_reserved AS qtySoftReserved, l.qty_shortage AS qtyShortage,
+    `SELECT l.id AS id, l.qty_requested AS qtyRequested, l.qty_issued AS qtyIssued, l.qty_soft_reserved AS qtySoftReserved, l.qty_shortage AS qtyShortage,
             o.start_date AS startDate, o.end_date AS endDate, o.created_at AS createdAt, o.customer_name AS customerName,
             o.id AS orderId, o.status AS status, o.notes AS notes, o.created_by AS createdBy
      FROM rental_lines l
@@ -248,7 +252,7 @@ export function recalcSku(tx: Sql, skuId: string): void {
     onHand,
     rows.map((row) => ({
       id: row.id,
-      qtyRequested: row.qtyRequested,
+      qtyRequested: Math.max(0, row.qtyRequested - row.qtyIssued),
       startDate: row.startDate,
       endDate: row.endDate,
       createdAt: row.createdAt,
@@ -476,8 +480,18 @@ export function createOrder(
   const orderId = newId();
   return inTx(db, (tx) => {
     tx.run(
-      `INSERT INTO rental_orders (id, customer_name, start_date, end_date, status, notes, created_at, created_by) VALUES (?, ?, ?, ?, 'confirmed', ?, ?, ?)`,
-      [orderId, customerName, input.startDate, input.endDate, input.notes?.trim() ?? "", input.createdAt ?? Date.now(), actor],
+      `INSERT INTO rental_orders (id, customer_name, start_date, end_date, status, notes, created_at, created_by, source, external_id) VALUES (?, ?, ?, ?, 'confirmed', ?, ?, ?, ?, ?)`,
+      [
+        orderId,
+        customerName,
+        input.startDate,
+        input.endDate,
+        input.notes?.trim() ?? "",
+        input.createdAt ?? Date.now(),
+        actor,
+        input.source ?? "ui",
+        input.externalId ?? null,
+      ],
     );
     for (const [skuId, qty] of merged) {
       tx.run(
@@ -647,6 +661,42 @@ function storeScan(
   );
 }
 
+function orderIdFromScan(tx: Sql, meta: IncomingScan["meta"]): string | undefined {
+  const orderId = meta?.orderId;
+  if (typeof orderId === "string" && orderId.trim()) return orderId.trim();
+  const externalId = meta?.externalId;
+  if (typeof externalId !== "string" || !externalId.trim()) return undefined;
+  return tx.get<{ id: string }>(`SELECT id FROM rental_orders WHERE external_id = ?`, [externalId.trim()])?.id;
+}
+
+/** Расход скана закрывает бронь: сначала указанный заказ, затем более ранние. */
+function issueReserved(tx: Sql, skuId: string, qty: number, preferredOrderId?: string): { order_id: string; qty: number }[] {
+  const lines = tx.all<{ id: string; orderId: string; room: number }>(
+    `SELECT l.id AS id, l.order_id AS orderId, (l.qty_requested - l.qty_issued) AS room
+     FROM rental_lines l INNER JOIN rental_orders o ON o.id = l.order_id
+     WHERE l.sku_id = ? AND o.status = 'confirmed' AND l.qty_issued < l.qty_requested
+     ORDER BY o.created_at ASC, l.id ASC`,
+    [skuId],
+  );
+  const ordered = preferredOrderId
+    ? [...lines.filter((line) => line.orderId === preferredOrderId), ...lines.filter((line) => line.orderId !== preferredOrderId)]
+    : lines;
+  let left = qty;
+  const applied: { order_id: string; qty: number }[] = [];
+  for (const line of ordered) {
+    if (left <= 0) break;
+    const take = Math.min(line.room, left);
+    if (take <= 0) continue;
+    tx.run(`UPDATE rental_lines SET qty_issued = qty_issued + ? WHERE id = ?`, [take, line.id]);
+    left -= take;
+    const same = applied.find((row) => row.order_id === line.orderId);
+    if (same) same.qty += take;
+    else applied.push({ order_id: line.orderId, qty: take });
+  }
+  if (applied.length > 0) recalcSku(tx, skuId);
+  return applied;
+}
+
 /** Каноническое событие скана. Повтор того же event_id не двигает остаток второй раз. */
 export function ingestScan(db: Sql, event: IncomingScan, actor: string): ScanResult {
   if (!event.eventId.trim()) throw new DomainError("Нужен event_id");
@@ -674,6 +724,7 @@ export function ingestScan(db: Sql, event: IncomingScan, actor: string): ScanRes
       const again = tx.get<{ result: string }>(`SELECT result FROM scan_events WHERE event_id = ?`, [event.eventId]);
       if (again) return { ...(JSON.parse(again.result) as ScanResult), idempotent: true };
       const place = resolveScanLocations(tx, sku.id, event);
+      const preferredOrderId = orderIdFromScan(tx, event.meta);
       const movementId = applyMovementTx(
         tx,
         {
@@ -684,9 +735,11 @@ export function ingestScan(db: Sql, event: IncomingScan, actor: string): ScanRes
           fromLocationId: place.fromLocationId,
           reason: `Скан ${event.source}`,
           scanEventId: event.eventId,
+          orderId: preferredOrderId,
         },
         actor,
       );
+      const issued = event.direction === "out" ? issueReserved(tx, sku.id, event.qty, preferredOrderId) : [];
       const alertIds = tx
         .all<{ id: string }>(`SELECT id FROM alerts WHERE sku_id = ? AND status = 'open'`, [sku.id])
         .map((alert) => alert.id);
@@ -695,6 +748,7 @@ export function ingestScan(db: Sql, event: IncomingScan, actor: string): ScanRes
         status: "accepted",
         movement_id: movementId,
         alert_ids: alertIds,
+        issued,
       };
       storeScan(tx, event, result, sku.id, place.locationId, place.fromLocationId ?? null, createdAt);
       return result;

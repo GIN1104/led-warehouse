@@ -2,7 +2,7 @@ name: GitHub Pages
 
 on:
   push:
-    branches: [main, cursor/mvp-phase-1-cc23]
+    branches: [main, cursor/mvp-phase-1-cc23, cursor/i18n-shared-mapper-cc23]
   workflow_dispatch:
 
 permissions:
@@ -25,9 +25,10 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm test
-      - run: npm run build
+      - run: npm run build:pages
         env:
           NEXT_PUBLIC_BASE_PATH: /led-warehouse
+          NEXT_PUBLIC_SHARED: ""
       - uses: actions/upload-pages-artifact@v3
         with:
           path: out

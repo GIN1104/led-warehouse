@@ -2,10 +2,11 @@
 
 import Link from "next/link";
 import { useState, type FormEvent } from "react";
+import { useI18n } from "@/components/i18n";
 import { useWarehouse } from "@/components/warehouse";
 import { Badge, Flash, PageHeader, controlClass } from "@/components/ui";
-import { assertCan, can, errorText } from "@/lib/auth";
-import { hireStatusLabel } from "@/lib/labels";
+import { assertCan, can } from "@/lib/auth";
+import { translateError, type MessageKey } from "@/lib/i18n/messages";
 import { orderHref } from "@/lib/paths";
 import { setHireStatus } from "@/lib/services/ledger";
 import { listExternalHires } from "@/lib/services/queries";
@@ -18,9 +19,11 @@ const tone = {
 } as const;
 
 export default function ExternalHiresPage() {
-  const { db, session, refresh, revision } = useWarehouse();
+  const { db, session, users, refresh, revision } = useWarehouse();
+  const { t, lang } = useI18n();
   const allowed = can(session.role, "hire.write");
   const rows = listExternalHires(db);
+  const manager = users.find((user) => user.role === "manager")?.name ?? "";
   const [flash, setFlash] = useState<{ error?: string; ok?: string }>({});
   void revision;
 
@@ -32,26 +35,23 @@ export default function ExternalHiresPage() {
     try {
       assertCan(session.role, "hire.write");
       if (status !== "needed" && status !== "ordered" && status !== "received" && status !== "closed") {
-        throw new Error("Неизвестный статус аренды");
+        throw new Error("status");
       }
       setHireStatus(db, String(form.get("id") ?? ""), status, String(form.get("supplierNote") ?? ""), session.id);
       refresh();
-      setFlash({ ok: "Внешняя аренда обновлена" });
+      setFlash({ ok: t("hires.updated") });
     } catch (error) {
-      setFlash({ error: errorText(error) });
+      setFlash({ error: translateError(lang, error) });
     }
   }
 
   return (
     <div>
-      <PageHeader
-        eyebrow="Дефицит"
-        title="Внешняя аренда"
-        description="Если своего парка не хватает, заявка появляется сама в статусе «нужно арендовать». Дальше менеджер отмечает заказ у поставщика и получение."
-      />
+      <PageHeader eyebrow={t("hires.eyebrow")} title={t("hires.title")} description={t("hires.description")} />
       <Flash error={flash.error} ok={flash.ok} />
+      {!allowed ? <p className="mb-4 text-sm text-ink/60">{t("hires.switch", { name: manager })}</p> : null}
       <div className="flex flex-col gap-3">
-        {rows.length === 0 ? <p className="text-sm text-ink/60">Заявок нет.</p> : null}
+        {rows.length === 0 ? <p className="text-sm text-ink/60">{t("hires.empty")}</p> : null}
         {rows.map((hire) => (
           <article key={hire.id} className="rounded-lg border border-line bg-sand p-4">
             <div className="flex flex-wrap items-start justify-between gap-3">
@@ -64,7 +64,7 @@ export default function ExternalHiresPage() {
                   {hire.customerName}
                 </Link>
               </div>
-              <Badge tone={tone[hire.status]}>{hireStatusLabel[hire.status]}</Badge>
+              <Badge tone={tone[hire.status]}>{t(`hire.${hire.status}` as MessageKey)}</Badge>
             </div>
             {allowed && hire.status !== "closed" ? (
               <form onSubmit={onSubmit} className="mt-3 flex flex-col gap-2 md:flex-row md:items-center">
@@ -72,21 +72,21 @@ export default function ExternalHiresPage() {
                 <input
                   name="supplierNote"
                   defaultValue={hire.supplierNote}
-                  placeholder="Поставщик или комментарий"
+                  placeholder={t("hires.note")}
                   className={`${controlClass} md:flex-1`}
                 />
                 {hire.status === "needed" ? (
                   <button name="status" value="ordered" className="rounded-md bg-copper px-3 py-2 text-sm text-white">
-                    Заказано снаружи
+                    {t("hire.ordered")}
                   </button>
                 ) : null}
                 {hire.status === "ordered" || hire.status === "needed" ? (
                   <button name="status" value="received" className="rounded-md border border-line bg-white px-3 py-2 text-sm">
-                    Получено
+                    {t("hire.received")}
                   </button>
                 ) : null}
                 <button name="status" value="closed" className="rounded-md border border-line bg-white px-3 py-2 text-sm">
-                  Закрыть
+                  {t("hire.closed")}
                 </button>
               </form>
             ) : hire.supplierNote ? (

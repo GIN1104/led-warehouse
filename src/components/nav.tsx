@@ -3,21 +3,24 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Bell, Boxes, ClipboardList, LayoutDashboard, MapPin, ScanLine, Truck, Warehouse } from "lucide-react";
+import { useI18n } from "@/components/i18n";
+import type { MessageKey } from "@/lib/i18n/messages";
 import { cn } from "@/lib/utils";
 
-const links = [
-  { href: "/", label: "Обзор", icon: LayoutDashboard },
-  { href: "/catalog", label: "Номенклатура", icon: Boxes },
-  { href: "/locations", label: "Локации", icon: MapPin },
-  { href: "/stock", label: "Остатки", icon: Warehouse },
-  { href: "/scan", label: "Сканирование", icon: ScanLine },
-  { href: "/orders", label: "Заказы", icon: ClipboardList },
-  { href: "/alerts", label: "Сигналы", icon: Bell },
-  { href: "/external-hires", label: "Внешняя аренда", icon: Truck },
+const links: { href: string; label: MessageKey; icon: typeof LayoutDashboard }[] = [
+  { href: "/", label: "nav.overview", icon: LayoutDashboard },
+  { href: "/catalog", label: "nav.catalog", icon: Boxes },
+  { href: "/locations", label: "nav.locations", icon: MapPin },
+  { href: "/stock", label: "nav.stock", icon: Warehouse },
+  { href: "/scan", label: "nav.scan", icon: ScanLine },
+  { href: "/orders", label: "nav.orders", icon: ClipboardList },
+  { href: "/alerts", label: "nav.alerts", icon: Bell },
+  { href: "/external-hires", label: "nav.hires", icon: Truck },
 ];
 
-export function Nav({ compact = false }: { compact?: boolean }) {
+export function Nav({ compact = false, onNavigate }: { compact?: boolean; onNavigate?: () => void }) {
   const pathname = usePathname();
+  const { t } = useI18n();
   return (
     <nav className={cn(compact ? "flex gap-2 overflow-x-auto px-4 py-3" : "flex flex-col gap-1")}>
       {links.map((link) => {
@@ -28,8 +31,9 @@ export function Nav({ compact = false }: { compact?: boolean }) {
           <Link
             key={link.href}
             href={link.href}
+            onClick={onNavigate}
             className={cn(
-              "flex items-center gap-2 rounded-md px-3 py-2 text-sm whitespace-nowrap",
+              "flex items-center gap-2 rounded-md px-3 py-2 text-sm whitespace-nowrap [@media(max-height:520px)]:py-1.5",
               compact
                 ? active
                   ? "bg-ink text-paper"
@@ -40,7 +44,7 @@ export function Nav({ compact = false }: { compact?: boolean }) {
             )}
           >
             <Icon size={16} aria-hidden />
-            {link.label}
+            {t(link.label)}
           </Link>
         );
       })}
