@@ -14,8 +14,13 @@ export const PROJECT_GOOGLE_EMAIL = "ledvision2026.il@gmail.com";
 export const PROJECT_DRIVE_EXCEL_FOLDER = "LED Warehouse / Excel";
 
 /** Публичный OAuth Web Client ID из env (вшивается в production Pages build). */
+/** Публичный Web Client ID проекта (не secret). Fallback для Pages, если env не прокинут. */
+export const PUBLIC_GOOGLE_CLIENT_ID =
+  "821406929437-le4vbhpvf8b0khkpdhid8s0fu47bgn3o.apps.googleusercontent.com";
+
 export function googleClientId(): string {
-  return (process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID ?? "").trim();
+  const fromEnv = (process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID ?? "").trim();
+  return fromEnv || PUBLIC_GOOGLE_CLIENT_ID;
 }
 
 /**
