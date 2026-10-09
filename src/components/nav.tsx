@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Bell, Boxes, ClipboardList, LayoutDashboard, MapPin, ScanLine, Truck, Warehouse } from "lucide-react";
+import { Bell, Boxes, CalendarDays, ClipboardList, LayoutDashboard, MapPin, ScanLine, Truck, Warehouse } from "lucide-react";
 import { useI18n } from "@/components/i18n";
 import type { MessageKey } from "@/lib/i18n/messages";
 import { cn } from "@/lib/utils";
@@ -14,6 +14,7 @@ const links: { href: string; label: MessageKey; icon: typeof LayoutDashboard }[]
   { href: "/stock", label: "nav.stock", icon: Warehouse },
   { href: "/scan", label: "nav.scan", icon: ScanLine },
   { href: "/orders", label: "nav.orders", icon: ClipboardList },
+  { href: "/calendar", label: "nav.calendar", icon: CalendarDays },
   { href: "/alerts", label: "nav.alerts", icon: Bell },
   { href: "/external-hires", label: "nav.hires", icon: Truck },
 ];

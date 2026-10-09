@@ -60,6 +60,20 @@ docker compose up --build
 
 Публикация идёт из GitHub Actions (`.github/workflows/pages.yml`): тесты и статическая сборка `npm run build:pages`. Источник Pages — **GitHub Actions**. Это личная копия в браузере, не общий склад.
 
+## Google Calendar (Pages)
+
+Календарь: [https://GIN1104.github.io/led-warehouse/calendar/](https://GIN1104.github.io/led-warehouse/calendar/)
+
+1. В [Google Cloud Console](https://console.cloud.google.com/) у Web Client ID должны быть:
+   - **Authorized JavaScript origins:** `http://localhost:3000`, `https://gin1104.github.io`
+   - **Authorized redirect URIs:** `http://localhost:3000/`, `http://localhost:3000/calendar/`, `https://gin1104.github.io/led-warehouse/`, `https://gin1104.github.io/led-warehouse/calendar/`
+2. Откройте календарь под аккаунтом **`ledvision2026.il@gmail.com`** (тестовый пользователь OAuth).
+3. Нажмите **Подключить Google** → разрешите доступ к Calendar.
+4. Client Secret и пароль Google **не нужны**. `NEXT_PUBLIC_GOOGLE_CLIENT_ID` вшивается в Pages через GitHub Actions.
+
+Локально: скопируйте `.env.example` → `.env.local` и `npm run dev` (порт 3000 совпадает с origin в Console).
+
+
 ## Локальный запуск
 
 ```bash

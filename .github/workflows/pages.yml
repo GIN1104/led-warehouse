@@ -2,7 +2,7 @@ name: GitHub Pages
 
 on:
   push:
-    branches: [main, cursor/mvp-phase-1-cc23, cursor/i18n-shared-mapper-cc23]
+    branches: [main, cursor/mvp-phase-1-cc23, cursor/i18n-shared-mapper-cc23, cursor/google-calendar-pages-4744]
   workflow_dispatch:
 
 permissions:
@@ -29,6 +29,8 @@ jobs:
         env:
           NEXT_PUBLIC_BASE_PATH: /led-warehouse
           NEXT_PUBLIC_SHARED: ""
+          # Публичный OAuth Web Client ID (не secret). Нужен в production бандле для Connect на Pages.
+          NEXT_PUBLIC_GOOGLE_CLIENT_ID: 821406929437-le4vbhpvf8b0khkpdhid8s0fu47bgn3o.apps.googleusercontent.com
       - uses: actions/upload-pages-artifact@v3
         with:
           path: out
