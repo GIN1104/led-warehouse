@@ -64,7 +64,10 @@ export function CalendarMonth({
                 ) : null}
               </span>
               <ul className="mt-1 flex flex-col gap-0.5 overflow-hidden">
-                {dayItems.slice(0, 3).map((item) => (
+                {[...dayItems]
+                  .sort((a, b) => Number(b.source === "task") - Number(a.source === "task"))
+                  .slice(0, 3)
+                  .map((item) => (
                   <li
                     key={item.id}
                     className={cn(
