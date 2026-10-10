@@ -1,10 +1,6 @@
+import { GOOGLE_CALENDAR_SCOPES, googleClientId } from "@/lib/google/config";
 import {
-  GOOGLE_CALENDAR_SCOPES,
-  PROJECT_GOOGLE_EMAIL,
-  googleClientId,
-  googleOAuthRedirectUri,
-} from "@/lib/google/config";
-import {
+  GOOGLE_TOKEN_KEY,
   browserTokenStorage,
   clearStoredGoogleToken,
   readStoredGoogleToken,
@@ -52,6 +48,13 @@ let scriptPromise: Promise<void> | null = null;
 let accessToken: string | null = null;
 let tokenExpiresAt = 0;
 
+/** Токен протух. Вход в этом браузере не сбрасываем. */
+export function forgetGoogleAccessToken(): void {
+  accessToken = null;
+  tokenExpiresAt = 0;
+  browserTokenStorage()?.removeItem(GOOGLE_TOKEN_KEY);
+}
+
 export function clearGoogleAccessToken(): void {
   accessToken = null;
   tokenExpiresAt = 0;
@@ -97,9 +100,9 @@ function loadGisScript(): Promise<void> {
 }
 
 /**
- * Запрос access token через GIS Token Client (public Client ID, без client secret).
- * Токен лежит в localStorage этого браузера до истечения срока (обычно час).
- * Повторный вход не передаёт prompt=consent: согласие уже хранит Google.
+ * Запрос access token через GIS Token Client.
+ * Без redirect и без hint: иначе Google уводит со страницы склада и кажется, что вход сброшен.
+ * Токен лежит в localStorage до конца срока. Новый запрос только по нажатию кнопки.
  */
 export async function requestGoogleAccessToken(options?: { prompt?: string }): Promise<string> {
   const clientId = googleClientId();
@@ -120,10 +123,6 @@ export async function requestGoogleAccessToken(options?: { prompt?: string }): P
     const client = google.accounts.oauth2.initTokenClient({
       client_id: clientId,
       scope: GOOGLE_CALENDAR_SCOPES.join(" "),
-      hint: PROJECT_GOOGLE_EMAIL,
-      ux_mode: "popup",
-      // На Pages: https://gin1104.github.io/led-warehouse/calendar/
-      redirect_uri: googleOAuthRedirectUri() || undefined,
       callback: (response) => {
         if (response.error || !response.access_token) {
           reject(new Error(response.error_description || response.error || "Отказ в доступе Google"));

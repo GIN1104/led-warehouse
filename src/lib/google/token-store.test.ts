@@ -2,7 +2,9 @@ import { describe, expect, it } from "vitest";
 import {
   GOOGLE_CONNECTED_KEY,
   GOOGLE_TOKEN_KEY,
+  clearStoredAccessToken,
   clearStoredGoogleToken,
+  hasStoredGoogleConnection,
   readStoredGoogleToken,
   writeStoredGoogleToken,
 } from "@/lib/google/token-store";
@@ -25,6 +27,14 @@ describe("сохранение входа Google", () => {
     expect(storage.getItem(GOOGLE_CONNECTED_KEY)).toBe("1");
     expect(readStoredGoogleToken(storage, now + 120_000)).toBeNull();
     expect(storage.getItem(GOOGLE_TOKEN_KEY)).toBeNull();
+  });
+
+  it("протухший токен не стирает флаг входа", () => {
+    const storage = memoryStore();
+    writeStoredGoogleToken(storage, { accessToken: "ya29.test", expiresAt: Date.now() + 60_000 });
+    clearStoredAccessToken(storage);
+    expect(storage.getItem(GOOGLE_TOKEN_KEY)).toBeNull();
+    expect(hasStoredGoogleConnection(storage)).toBe(true);
   });
 
   it("выход стирает и токен, и флаг", () => {

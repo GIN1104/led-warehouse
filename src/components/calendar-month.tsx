@@ -35,7 +35,7 @@ export function CalendarMonth({
           </div>
         ))}
       </div>
-      <div className="grid grid-cols-7 gap-1">
+      <div className="grid min-w-0 grid-cols-7 gap-1">
         {days.map((iso) => {
           const inMonth = iso.startsWith(monthPrefix);
           const dayItems = itemsOnDate(items, iso);
@@ -47,7 +47,7 @@ export function CalendarMonth({
               type="button"
               onClick={() => onSelect(iso)}
               className={cn(
-                "flex min-h-[4.5rem] flex-col rounded-md border px-1.5 py-1 text-start transition",
+                "flex min-h-[4.5rem] min-w-0 flex-col overflow-hidden rounded-md border px-1.5 py-1 text-start transition",
                 inMonth ? "border-line bg-white" : "border-transparent bg-sand/40 text-ink/40",
                 isSelected && "border-copper ring-2 ring-copper/30",
                 isToday && !isSelected && "border-copper/50",
@@ -59,7 +59,7 @@ export function CalendarMonth({
                   <li
                     key={item.id}
                     className={cn(
-                      "truncate rounded px-1 text-[10px] leading-4",
+                      "max-w-full truncate rounded px-1 text-[10px] leading-4",
                       item.source === "order" && "bg-copper/15 text-copper-dark",
                       item.source === "task" && "bg-amber-100 text-amber-900",
                       (item.source === "google" || item.source === "mock") && "bg-ink/5 text-ink/80",

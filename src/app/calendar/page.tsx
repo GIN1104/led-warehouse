@@ -6,6 +6,7 @@ import { CalendarMonth } from "@/components/calendar-month";
 import { useI18n } from "@/components/i18n";
 import { useWarehouse } from "@/components/warehouse";
 import { Badge, Empty, Flash, PageHeader, Panel, buttonClass } from "@/components/ui";
+import { linkify } from "@/lib/calendar/links";
 import { mockCalendarEvents } from "@/lib/calendar/mock-events";
 import { itemsOnDate, mergeCalendarItems, ordersToCalendarItems, shiftMonth } from "@/lib/calendar/merge";
 import type { CalendarItem, GoogleSyncStatus } from "@/lib/calendar/types";
@@ -17,12 +18,13 @@ import {
   syncGoogleCalendar,
 } from "@/lib/google/calendar-sync";
 import { PROJECT_GOOGLE_EMAIL, googleClientId } from "@/lib/google/config";
+import { readStoredGoogleEvents, writeStoredGoogleEvents } from "@/lib/google/event-cache";
 import { getCachedGoogleAccessToken } from "@/lib/google/gis";
-import { GOOGLE_CONNECTED_KEY } from "@/lib/google/token-store";
 import { getDriveSyncStatus } from "@/lib/google/drive-sync";
 import type { MessageKey } from "@/lib/i18n/messages";
 import { orderHref } from "@/lib/paths";
 import { listOrders } from "@/lib/services/queries";
+import { cn } from "@/lib/utils";
 
 function statusLabel(status: GoogleSyncStatus, t: (key: MessageKey, vars?: Record<string, string | number>) => string): string {
   switch (status.kind) {
@@ -39,6 +41,28 @@ function statusLabel(status: GoogleSyncStatus, t: (key: MessageKey, vars?: Recor
     default:
       return t("calendar.syncIdle");
   }
+}
+
+function LinkedText({ text, className }: { text: string; className?: string }) {
+  return (
+    <p className={cn("break-words whitespace-pre-wrap [overflow-wrap:anywhere]", className)}>
+      {linkify(text).map((part, index) =>
+        part.kind === "link" ? (
+          <a
+            key={index}
+            href={part.href}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="break-all text-copper underline"
+          >
+            {part.text}
+          </a>
+        ) : (
+          <span key={index}>{part.text}</span>
+        ),
+      )}
+    </p>
+  );
 }
 
 function sourceTone(source: CalendarItem["source"]): "neutral" | "ok" | "warn" | "alert" {
@@ -59,7 +83,7 @@ export default function CalendarPage() {
   });
   const [selected, setSelected] = useState(today);
   const [googleEvents, setGoogleEvents] = useState<CalendarItem[]>([]);
-  const [syncStatus, setSyncStatus] = useState<GoogleSyncStatus>(() => getGoogleSyncStatus());
+  const [syncStatus, setSyncStatus] = useState<GoogleSyncStatus>({ kind: "idle" });
   const [busy, setBusy] = useState(false);
   const [flash, setFlash] = useState<{ error?: string; ok?: string }>({});
   const hasClientId = Boolean(googleClientId());
@@ -81,17 +105,19 @@ export default function CalendarPage() {
   }, [cursor, lang]);
 
   useEffect(() => {
-    if (!hasClientId) return;
-    const wants =
-      Boolean(getCachedGoogleAccessToken()) || window.localStorage.getItem(GOOGLE_CONNECTED_KEY) === "1";
-    if (!wants) return;
     let cancel = false;
     void (async () => {
+      await Promise.resolve();
+      const saved = readStoredGoogleEvents();
+      if (!cancel && saved.length > 0) setGoogleEvents(saved);
+      if (!cancel) setSyncStatus(getGoogleSyncStatus());
+      if (!hasClientId || !getCachedGoogleAccessToken()) return;
       try {
         const result = await syncGoogleCalendar();
         if (cancel) return;
         setSyncStatus(result.status);
         setGoogleEvents(result.events);
+        writeStoredGoogleEvents(result.events);
       } catch {
         if (!cancel) setSyncStatus(getGoogleSyncStatus());
       }
@@ -125,7 +151,7 @@ export default function CalendarPage() {
       }
     } catch (error) {
       const message = error instanceof Error ? error.message : t("common.saveFailed");
-      setSyncStatus({ kind: "error", message });
+      setSyncStatus(getGoogleSyncStatus());
       setFlash({ error: message });
     } finally {
       setBusy(false);
@@ -208,7 +234,7 @@ export default function CalendarPage() {
         <h2 className="ms-2 text-lg font-semibold capitalize">{monthTitle}</h2>
       </div>
 
-      <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_18rem]">
+      <div className="grid min-w-0 gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,18rem)]">
         <Panel>
           <CalendarMonth
             year={cursor.year}
@@ -220,19 +246,29 @@ export default function CalendarPage() {
             weekdayLabels={weekdays}
           />
         </Panel>
-        <Panel>
+        <Panel className="min-w-0 overflow-hidden">
           <h2 className="mb-1 font-medium">{formatDate(selected)}</h2>
           <p className="mb-3 text-xs text-ink/50">{t("calendar.dayHint")}</p>
           {dayItems.length === 0 ? <Empty>{t("calendar.dayEmpty")}</Empty> : null}
-          <ul className="flex flex-col gap-3">
+          <ul className="flex min-w-0 flex-col gap-3">
             {dayItems.map((item) => (
-              <li key={item.id} className="border-b border-line pb-3 last:border-0">
+              <li key={item.id} className="min-w-0 border-b border-line pb-3 last:border-0">
                 <div className="mb-1 flex flex-wrap items-center gap-2">
                   <Badge tone={sourceTone(item.source)}>{t(`calendar.source.${item.source}` as MessageKey)}</Badge>
                   {!item.allDay ? <span className="text-xs text-ink/50">{t("calendar.timed")}</span> : null}
                 </div>
-                <p className="font-medium">{item.title}</p>
-                {item.note ? <p className="mt-1 text-sm text-ink/60">{item.note}</p> : null}
+                <LinkedText text={item.title} className="font-medium" />
+                {item.note ? <LinkedText text={item.note} className="mt-1 text-sm text-ink/60" /> : null}
+                {item.href ? (
+                  <a
+                    href={item.href}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="mt-2 block max-w-full break-all text-sm text-copper underline"
+                  >
+                    {t("calendar.openGoogle")}
+                  </a>
+                ) : null}
                 {item.orderId ? (
                   <Link href={orderHref(item.orderId)} className="mt-2 inline-block text-sm text-copper">
                     {t("calendar.openOrder")}

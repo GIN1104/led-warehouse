@@ -41,6 +41,15 @@ export function writeStoredGoogleToken(storage: KeyValueStore | undefined, token
   storage?.setItem(GOOGLE_CONNECTED_KEY, "1");
 }
 
+/** Срок токена вышел. Флаг «уже входили» остаётся, чтобы страница не показывала выход. */
+export function clearStoredAccessToken(storage: KeyValueStore | undefined): void {
+  storage?.removeItem(GOOGLE_TOKEN_KEY);
+}
+
+export function hasStoredGoogleConnection(storage: KeyValueStore | undefined): boolean {
+  return storage?.getItem(GOOGLE_CONNECTED_KEY) === "1";
+}
+
 export function clearStoredGoogleToken(storage: KeyValueStore | undefined): void {
   storage?.removeItem(GOOGLE_TOKEN_KEY);
   storage?.removeItem(GOOGLE_CONNECTED_KEY);

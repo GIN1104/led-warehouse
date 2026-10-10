@@ -12,6 +12,8 @@ export type CalendarItem = {
   source: CalendarItemSource;
   /** Ссылка на заказ склада, если source === "order". */
   orderId?: string;
+  /** Ссылка на событие в Google Calendar. */
+  href?: string;
   note?: string;
 };
 
