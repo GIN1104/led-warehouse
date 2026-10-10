@@ -5,5 +5,7 @@ services:
       - "3000:3000"
     environment:
       LEDGER_PATH: /data/warehouse.sqlite
+      TURSO_DATABASE_URL: ${TURSO_DATABASE_URL:-}
+      TURSO_AUTH_TOKEN: ${TURSO_AUTH_TOKEN:-}
     volumes:
       - ./data:/data

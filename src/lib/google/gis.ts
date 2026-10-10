@@ -4,6 +4,12 @@ import {
   googleClientId,
   googleOAuthRedirectUri,
 } from "@/lib/google/config";
+import {
+  browserTokenStorage,
+  clearStoredGoogleToken,
+  readStoredGoogleToken,
+  writeStoredGoogleToken,
+} from "@/lib/google/token-store";
 
 type TokenClient = {
   requestAccessToken: (overrideConfig?: { prompt?: string }) => void;
@@ -49,14 +55,17 @@ let tokenExpiresAt = 0;
 export function clearGoogleAccessToken(): void {
   accessToken = null;
   tokenExpiresAt = 0;
+  clearStoredGoogleToken(browserTokenStorage());
 }
 
 export function getCachedGoogleAccessToken(): string | null {
-  if (!accessToken) return null;
-  if (Date.now() >= tokenExpiresAt - 30_000) {
-    clearGoogleAccessToken();
-    return null;
-  }
+  if (accessToken && Date.now() < tokenExpiresAt - 30_000) return accessToken;
+  accessToken = null;
+  tokenExpiresAt = 0;
+  const stored = readStoredGoogleToken(browserTokenStorage());
+  if (!stored) return null;
+  accessToken = stored.accessToken;
+  tokenExpiresAt = stored.expiresAt;
   return accessToken;
 }
 
@@ -89,7 +98,8 @@ function loadGisScript(): Promise<void> {
 
 /**
  * Запрос access token через GIS Token Client (public Client ID, без client secret).
- * Токен только в памяти вкладки.
+ * Токен лежит в localStorage этого браузера до истечения срока (обычно час).
+ * Повторный вход не передаёт prompt=consent: согласие уже хранит Google.
  */
 export async function requestGoogleAccessToken(options?: { prompt?: string }): Promise<string> {
   const clientId = googleClientId();
@@ -122,6 +132,7 @@ export async function requestGoogleAccessToken(options?: { prompt?: string }): P
         accessToken = response.access_token;
         const ttlSec = typeof response.expires_in === "number" ? response.expires_in : 3600;
         tokenExpiresAt = Date.now() + ttlSec * 1000;
+        writeStoredGoogleToken(browserTokenStorage(), { accessToken, expiresAt: tokenExpiresAt });
         resolve(accessToken);
       },
       error_callback: (error) => {

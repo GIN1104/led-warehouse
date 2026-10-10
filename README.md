@@ -46,6 +46,17 @@
 
 GitHub Pages эту базу не хостит. Там остаётся демо «только этот браузер».
 
+Общая база в облаке — [Turso](https://turso.tech/pricing): тот же SQLite. Бесплатно 5 ГБ, 500 млн чтений строк и 10 млн записей в месяц, без карты. Дальше план Developer ($4.99 в месяц при оплате за год, 9 ГБ и доплата $0.75 за лишний ГБ). Токен живёт только на сервере склада (`npm run dev` или Docker), не в сайте Pages.
+
+```bash
+# https://docs.turso.tech/quickstart — войти и создать базу
+turso db create led-warehouse
+turso db show led-warehouse --url
+turso db tokens create led-warehouse
+```
+
+В `.env.local`: `TURSO_DATABASE_URL` и `TURSO_AUTH_TOKEN`. При старте сервер забирает более новую копию из Turso или отдаёт туда локальный файл, и каждая запись склада уходит туда же.
+
 Docker стоит завести сразу, если учёт должен переезжать с компьютера на компьютер: образ собирает окружение, а переносится каталог `data`.
 
 ```bash

@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { CalendarMonth } from "@/components/calendar-month";
 import { useI18n } from "@/components/i18n";
 import { useWarehouse } from "@/components/warehouse";
@@ -17,6 +17,8 @@ import {
   syncGoogleCalendar,
 } from "@/lib/google/calendar-sync";
 import { PROJECT_GOOGLE_EMAIL, googleClientId } from "@/lib/google/config";
+import { getCachedGoogleAccessToken } from "@/lib/google/gis";
+import { GOOGLE_CONNECTED_KEY } from "@/lib/google/token-store";
 import { getDriveSyncStatus } from "@/lib/google/drive-sync";
 import type { MessageKey } from "@/lib/i18n/messages";
 import { orderHref } from "@/lib/paths";
@@ -77,6 +79,27 @@ export default function CalendarPage() {
     const locale = lang === "he" ? "he-IL" : lang === "en" ? "en-US" : "ru-RU";
     return new Intl.DateTimeFormat(locale, { month: "long", year: "numeric", timeZone: "UTC" }).format(date);
   }, [cursor, lang]);
+
+  useEffect(() => {
+    if (!hasClientId) return;
+    const wants =
+      Boolean(getCachedGoogleAccessToken()) || window.localStorage.getItem(GOOGLE_CONNECTED_KEY) === "1";
+    if (!wants) return;
+    let cancel = false;
+    void (async () => {
+      try {
+        const result = await syncGoogleCalendar();
+        if (cancel) return;
+        setSyncStatus(result.status);
+        setGoogleEvents(result.events);
+      } catch {
+        if (!cancel) setSyncStatus(getGoogleSyncStatus());
+      }
+    })();
+    return () => {
+      cancel = true;
+    };
+  }, [hasClientId]);
 
   const weekdays = useMemo(() => {
     if (lang === "en") return ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];

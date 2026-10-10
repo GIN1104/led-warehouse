@@ -4,6 +4,7 @@ import { openBetterSqlite, type SqliteHandle } from "@/lib/db/better";
 import { migrate } from "@/lib/db/migrate";
 import { seedIfEmpty } from "@/lib/db/seed";
 import type { Sql } from "@/lib/db/sql";
+import { alignWithRemote, pushSnapshot, replayStatements, tursoEnabled, type SqlStmt } from "@/lib/db/turso";
 
 const filePath = process.env.LEDGER_PATH ?? "data/warehouse.sqlite";
 
@@ -11,6 +12,8 @@ type Live = { handle: SqliteHandle; revision: number };
 
 let live: Live | null = null;
 let chain: Promise<unknown> = Promise.resolve();
+let cloudReady = false;
+let replaceNeedsPush = false;
 
 function readRevision(db: Sql): number {
   const row = db.get<{ value: string }>(`SELECT value FROM ledger_meta WHERE key = 'revision'`);
@@ -22,14 +25,76 @@ function openLive(): Live {
   mkdirSync(dirname(filePath), { recursive: true });
   const handle = openBetterSqlite(filePath);
   migrate(handle);
-  seedIfEmpty(handle);
+  if (!tursoEnabled()) seedIfEmpty(handle);
   live = { handle, revision: readRevision(handle) };
   return live;
 }
 
+function userCount(db: Sql): number {
+  const row = db.get<{ value: number }>(`SELECT COUNT(*) AS value FROM users`);
+  return Number(row?.value ?? 0);
+}
+
+/** Облако подключается один раз за процесс. Локальный файл остаётся рабочей копией. */
+async function ensureCloud(): Promise<void> {
+  if (!tursoEnabled() || cloudReady) return;
+  const current = openLive();
+  const direction = await alignWithRemote(current.handle, userCount(current.handle), readRevision(current.handle));
+  if (direction === "pull") current.revision = readRevision(current.handle);
+  if (userCount(current.handle) === 0) {
+    seedIfEmpty(current.handle);
+    if (userCount(current.handle) > 0) await pushSnapshot(current.handle);
+  }
+  cloudReady = true;
+}
+
+/** Записи в журнал уходят в Turso после успешной локальной транзакции. */
+function journaled(inner: Sql, journal: SqlStmt[]): Sql {
+  return {
+    exec(sql) {
+      inner.exec(sql);
+      journal.push({ sql, args: [] });
+    },
+    get(sql, params) {
+      return inner.get(sql, params);
+    },
+    all(sql, params) {
+      return inner.all(sql, params);
+    },
+    run(sql, params = []) {
+      inner.run(sql, params);
+      journal.push({ sql, args: params });
+    },
+    transaction(fn) {
+      const mark = journal.length;
+      try {
+        return inner.transaction(fn);
+      } catch (error) {
+        journal.splice(mark);
+        throw error;
+      }
+    },
+  };
+}
+
 /** Одна очередь на процесс: браузер, mapper и рамка не перетирают файл одновременно. */
 export function enqueueLedger<T>(fn: (db: Sql) => T): Promise<T> {
-  const run = chain.then(() => fn(openLive().handle));
+  const run = chain.then(async () => {
+    await ensureCloud();
+    const current = openLive();
+    const journal: SqlStmt[] = [];
+    replaceNeedsPush = false;
+    const result = fn(journaled(current.handle, journal));
+    if (tursoEnabled() && replaceNeedsPush) await pushSnapshot(openLive().handle);
+    else if (tursoEnabled() && journal.length > 0) {
+      try {
+        await replayStatements(journal);
+      } catch {
+        await pushSnapshot(current.handle);
+      }
+    }
+    return result;
+  });
   chain = run.then(
     () => undefined,
     () => undefined,
@@ -82,6 +147,7 @@ export function replaceLedger(
     renameSync(tmp, filePath);
     const reopened = openLive();
     reopened.revision = readRevision(reopened.handle);
+    replaceNeedsPush = true;
     return { ok: true as const, revision: reopened.revision };
   });
 }

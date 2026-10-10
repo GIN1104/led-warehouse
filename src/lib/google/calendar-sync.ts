@@ -101,7 +101,7 @@ export async function connectGoogleCalendar(): Promise<SyncResult> {
   if (!googleClientId()) {
     return { status: { kind: "missing_client_id" }, events: [], scopes: GOOGLE_CALENDAR_SCOPES };
   }
-  const token = await requestGoogleAccessToken({ prompt: "consent" });
+  const token = await requestGoogleAccessToken();
   const events = await fetchCalendarEvents(token);
   return {
     status: getGoogleSyncStatus(),

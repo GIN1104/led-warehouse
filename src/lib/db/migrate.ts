@@ -1,6 +1,6 @@
 import type { Sql } from "@/lib/db/sql";
 
-const SQL = `
+export const MIGRATION_SQL = `
 CREATE TABLE IF NOT EXISTS users (
   id TEXT PRIMARY KEY,
   name TEXT NOT NULL,
@@ -146,7 +146,7 @@ function columnExists(db: Sql, table: string, column: string): boolean {
 }
 
 export function migrate(db: Sql): void {
-  db.exec(SQL);
+  db.exec(MIGRATION_SQL);
   if (!columnExists(db, "rental_orders", "source")) {
     db.exec(`ALTER TABLE rental_orders ADD COLUMN source TEXT NOT NULL DEFAULT 'ui'`);
   }
