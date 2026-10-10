@@ -31,7 +31,7 @@ function base(ws) {
   ws.pageSetup = { orientation: "landscape", fitToPage: true, fitToWidth: 1, fitToHeight: 0, paperSize: 9 };
   ws.pageSetup.horizontalCentered = true;
   ws.headerFooter = {
-    oddFooter: "LED Warehouse · проём 2 м · бирка на кубик · 500–1000 кейсов · Израиль 915–917 МГц · 8 октября 2026 · не юридическое заключение",
+    oddFooter: "LED Warehouse · проём 2 м · бирка на кубик · 500–1000 кейсов · Израиль 915–917 МГц · сверка с GitHub 10 октября 2026 · не юридическое заключение",
   };
   ws.properties.defaultRowHeight = 18;
 }
@@ -123,6 +123,32 @@ note(
   2,
 );
 start.getRow(21).height = 64;
+
+const live = wb.addWorksheet("Что на GitHub", { properties: { tabColor: { argb: "FF2457A6" } } });
+base(live);
+live.columns = [{ width: 32 }, { width: 100 }];
+sectionTitle(live, 1, "Что уже залито на GitHub, сверка 10 октября 2026", 2);
+note(
+  live,
+  2,
+  "Сайт публикуется только из ветки main. Этот файл сметы в main не влит: он лежит в черновике запроса №3, ветка cursor/israel-scan-kit-cc23. Календарь Google на сайте есть с 9 октября 2026. Приём прохода рамки на сайте нет: для него нужен компьютер склада с сервером.",
+  2,
+);
+live.getRow(2).height = 52;
+live.getRow(4).values = ["Куда залито", "Что там сейчас"];
+styleHeader(live.getRow(4));
+writePairs(
+  live,
+  5,
+  [
+    ["Сайт склада", "https://gin1104.github.io/led-warehouse/ — номенклатура, остатки, заказы, меню, русский, английский и иврит. У каждого браузера своя копия в IndexedDB. Общий файл склада этот адрес не хранит."],
+    ["Календарь", "https://gin1104.github.io/led-warehouse/calendar/ — месяц, заказы склада и кнопка «Подключить Google». Аккаунт проекта ledvision2026.il@gmail.com. Это занятость экранов, не чтение бирок в проёме."],
+    ["Публикация", "Последняя успешная выкладка Pages — 9 октября 2026, после вливания календаря в main. Ветка сметы на Pages не публикуется."],
+    ["Сервер склада", "Код приёма рамки уже в main: POST /api/v1/integrations/scan/events/ и POST /api/v1/integrations/mapper/orders/. Он оживает на компьютере у двери: npm run dev или docker compose, файл data/warehouse.sqlite."],
+    ["Этот Excel", "Скачивание: https://github.com/GIN1104/led-warehouse/raw/cursor/israel-scan-kit-cc23/docs/procurement/israel-scan-kit.xlsx. Запрос: https://github.com/GIN1104/led-warehouse/pull/3. На сайт склада файл не выложен."],
+  ],
+  (index) => (index === 4 ? "FFF6E4" : index % 2 ? paper : sand),
+);
 
 const pass = wb.addWorksheet("Проход кейса", { properties: { tabColor: { argb: `FF${copper}` } } });
 base(pass);
@@ -406,7 +432,7 @@ sectionTitle(api, 1, "Удобный API: SDK ридера на этом ком�
 note(
   api,
   2,
-  "Два разных языка, и это нормально. Ридер говорит протоколом CHAFON. Склад говорит JSON. Между ними одна программа на компьютере, который уже стоит рядом с дверью и уже держит базу. В прошивку ридера адрес склада не вшивается. GitHub Pages пачку не запишет: пишет сервер, docker compose up или npm run dev, файл data/warehouse.sqlite.",
+  "Два разных языка, и это нормально. Ридер говорит протоколом CHAFON. Склад говорит JSON. Между ними одна программа на компьютере, который уже стоит рядом с дверью и уже держит базу. В прошивку ридера адрес склада не вшивается. На 10 октября 2026 сайт https://gin1104.github.io/led-warehouse/ показывает учёт в браузере и календарь Google. Пачку прохода туда отправить нельзя: её принимает сервер на этом компьютере, docker compose up или npm run dev, файл data/warehouse.sqlite.",
   2,
 );
 api.getRow(2).height = 48;
@@ -607,7 +633,8 @@ const sourceRows = [
   ["משרד התקשורת", "requests@moc.gov.il, 03-5198282. Письмо до включения: модель, четыре канала, 2 Вт EIRP."],
   ["Хомуты, витрина поиска 8 октября 2026", "3256810079211017 sale $23.66 (без скидки $45.50, 20 продаж). 3256808948767414 sale $30.94 (без скидки $34.38, 109 продаж). 3256808098729184 sale $36.80 (без скидки $66.91, 10 продаж)."],
   ["Опт хомутов, не AliExpress", "https://rfidnfccard.com/products/disposable-cable-ties-uhf-rfid-labels-with-alien-h3-chip — $0.17, MOQ 1000. https://www.twsetech.com/products/rfid-card/rfid-tag/uhf-tag/logistic-management-and-inventory-tracking-uhf-seal-passive-zip-tie-rfid-tag-1047.html — $0.40–0.50 от 500. GoldSupplier $0.19–0.30 от 500."],
-  ["Код склада", "POST /api/v1/integrations/scan/events/ принимает пачку events, direction in или out, повтор eventId остаток не двигает."],
+  ["Код склада на main", "POST /api/v1/integrations/scan/events/ уже в ветке main: пачка events, direction in или out, повтор eventId остаток не двигает. На GitHub Pages этот адрес не отвечает."],
+  ["Сайт 10 октября 2026", "https://gin1104.github.io/led-warehouse/ и календарь /calendar/. Выкладка Pages от 9 октября 2026. Файл сметы в main не влит, он в запросе №3."],
 ];
 sourceRows.forEach((values, index) => {
   const row = sources.getRow(4 + index);
