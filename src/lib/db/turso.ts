@@ -15,6 +15,8 @@ const INSERT_ORDER = [
   "shortage_signals",
   "external_hires",
   "alerts",
+  "workers",
+  "work_tasks",
   "ledger_meta",
   "audit_log",
 ] as const;

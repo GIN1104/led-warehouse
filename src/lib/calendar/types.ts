@@ -14,6 +14,12 @@ export type CalendarItem = {
   orderId?: string;
   /** Ссылка на событие в Google Calendar. */
   href?: string;
+  /** Задание бригады, если source === "task". */
+  taskId?: string;
+  /** Цвет работника, #rrggbb. */
+  color?: string;
+  /** Прогресс задания, 0–100. */
+  progress?: number;
   note?: string;
 };
 

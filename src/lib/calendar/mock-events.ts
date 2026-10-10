@@ -1,19 +1,10 @@
 import { addDays, todayIso } from "@/lib/dates";
 import type { CalendarItem } from "@/lib/calendar/types";
 
-/** Демо-события без OAuth: задачи склада и вымышленные Google-слоты. */
+/** Вымышленные слоты Google, пока календарь не подключён. Задания бригады сюда не входят. */
 export function mockCalendarEvents(now = new Date()): CalendarItem[] {
   const today = todayIso(now);
   return [
-    {
-      id: "mock-task-unload",
-      title: "Разгрузка кейсов после выезда",
-      startDate: today,
-      endDate: today,
-      allDay: true,
-      source: "task",
-      note: "Демо-задача (mock)",
-    },
     {
       id: "mock-google-call",
       title: "Созвон с площадкой (Google)",
@@ -22,14 +13,6 @@ export function mockCalendarEvents(now = new Date()): CalendarItem[] {
       allDay: false,
       source: "mock",
       note: "Заглушка события Google Calendar",
-    },
-    {
-      id: "mock-task-inventory",
-      title: "Инвентаризация кабелей",
-      startDate: addDays(today, 3),
-      endDate: addDays(today, 3),
-      allDay: true,
-      source: "task",
     },
     {
       id: "mock-google-delivery",

@@ -14,6 +14,10 @@ describe("копия склада в Turso", () => {
     const source = openBetterSqlite(join(dir, "local.sqlite"));
     migrate(source);
     source.run(`INSERT INTO users (id, name, role) VALUES ('user_warehouse', 'Алексей', 'warehouse')`);
+    source.run(`INSERT INTO workers (id, name, color, active, created_at) VALUES ('w1', 'Илья', '#1d4e89', 1, 1)`);
+    source.run(
+      `INSERT INTO work_tasks (id, title, notes, worker_id, work_date, progress, status, created_at, created_by) VALUES ('t1', 'Собрать кейс', '', 'w1', '2026-10-12', 25, 'doing', 1, 'user_warehouse')`,
+    );
     source.run(`UPDATE ledger_meta SET value = '3' WHERE key = 'revision'`);
 
     await migrateRemote(remote);
@@ -26,6 +30,8 @@ describe("копия склада в Turso", () => {
     const revision = copy.get<{ value: string }>(`SELECT value FROM ledger_meta WHERE key = 'revision'`);
     expect(user?.name).toBe("Алексей");
     expect(revision?.value).toBe("3");
+    const task = copy.get<{ title: string; progress: number }>(`SELECT title, progress FROM work_tasks WHERE id = 't1'`);
+    expect(task).toMatchObject({ title: "Собрать кейс", progress: 25 });
     source.close();
     copy.close();
     remote.close();

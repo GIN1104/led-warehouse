@@ -39,6 +39,8 @@ export function CalendarMonth({
         {days.map((iso) => {
           const inMonth = iso.startsWith(monthPrefix);
           const dayItems = itemsOnDate(items, iso);
+          const taskItems = dayItems.filter((item) => item.source === "task");
+          const doneTasks = taskItems.filter((item) => (item.progress ?? 0) >= 100).length;
           const isSelected = iso === selected;
           const isToday = iso === today;
           return (
@@ -53,20 +55,33 @@ export function CalendarMonth({
                 isToday && !isSelected && "border-copper/50",
               )}
             >
-              <span className={cn("text-xs font-medium", isToday && "text-copper")}>{Number(iso.slice(8))}</span>
+              <span className="flex items-center justify-between gap-1">
+                <span className={cn("text-xs font-medium", isToday && "text-copper")}>{Number(iso.slice(8))}</span>
+                {taskItems.length > 0 ? (
+                  <span className="text-[10px] font-medium text-ink/60">
+                    {doneTasks}/{taskItems.length}
+                  </span>
+                ) : null}
+              </span>
               <ul className="mt-1 flex flex-col gap-0.5 overflow-hidden">
                 {dayItems.slice(0, 3).map((item) => (
                   <li
                     key={item.id}
                     className={cn(
-                      "max-w-full truncate rounded px-1 text-[10px] leading-4",
-                      item.source === "order" && "bg-copper/15 text-copper-dark",
-                      item.source === "task" && "bg-amber-100 text-amber-900",
-                      (item.source === "google" || item.source === "mock") && "bg-ink/5 text-ink/80",
+                      "max-w-full overflow-hidden rounded px-1 text-[10px] leading-4",
+                      item.color ? "text-white" : item.source === "order" && "bg-copper/15 text-copper-dark",
+                      !item.color && item.source === "task" && "bg-amber-100 text-amber-900",
+                      !item.color && (item.source === "google" || item.source === "mock") && "bg-ink/5 text-ink/80",
                     )}
-                    title={item.title}
+                    style={item.color ? { backgroundColor: item.color } : undefined}
+                    title={item.progress == null ? item.title : `${item.title} · ${item.progress}%`}
                   >
-                    {item.title}
+                    <span className="block truncate">{item.title}</span>
+                    {item.progress == null ? null : (
+                      <span className="mb-0.5 block h-0.5 rounded bg-white/35">
+                        <span className="block h-0.5 rounded bg-white" style={{ width: `${item.progress}%` }} />
+                      </span>
+                    )}
                   </li>
                 ))}
                 {dayItems.length > 3 ? <li className="px-1 text-[10px] text-ink/50">+{dayItems.length - 3}</li> : null}

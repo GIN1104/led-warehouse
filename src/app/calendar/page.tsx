@@ -9,6 +9,7 @@ import { Badge, Empty, Flash, PageHeader, Panel, buttonClass } from "@/component
 import { linkify } from "@/lib/calendar/links";
 import { mockCalendarEvents } from "@/lib/calendar/mock-events";
 import { itemsOnDate, mergeCalendarItems, ordersToCalendarItems, shiftMonth } from "@/lib/calendar/merge";
+import { TaskProgress } from "@/components/task-progress";
 import type { CalendarItem, GoogleSyncStatus } from "@/lib/calendar/types";
 import { formatDate, todayIso } from "@/lib/dates";
 import {
@@ -21,9 +22,11 @@ import { PROJECT_GOOGLE_EMAIL, googleClientId } from "@/lib/google/config";
 import { readStoredGoogleEvents, writeStoredGoogleEvents } from "@/lib/google/event-cache";
 import { getCachedGoogleAccessToken } from "@/lib/google/gis";
 import { getDriveSyncStatus } from "@/lib/google/drive-sync";
-import type { MessageKey } from "@/lib/i18n/messages";
+import { can } from "@/lib/auth";
+import { translateError, type MessageKey } from "@/lib/i18n/messages";
 import { orderHref } from "@/lib/paths";
 import { listOrders } from "@/lib/services/queries";
+import { listTasks, setTaskProgress, tasksToCalendarItems } from "@/lib/services/tasks";
 import { cn } from "@/lib/utils";
 
 function statusLabel(status: GoogleSyncStatus, t: (key: MessageKey, vars?: Record<string, string | number>) => string): string {
@@ -72,7 +75,7 @@ function sourceTone(source: CalendarItem["source"]): "neutral" | "ok" | "warn" |
 }
 
 export default function CalendarPage() {
-  const { db, revision } = useWarehouse();
+  const { db, session, refresh, revision } = useWarehouse();
   const { t, lang } = useI18n();
   void revision;
 
@@ -89,11 +92,19 @@ export default function CalendarPage() {
   const hasClientId = Boolean(googleClientId());
   const connected = syncStatus.kind === "connected";
 
-  const orderItems = useMemo(() => ordersToCalendarItems(listOrders(db)), [db, revision]);
+  const canWriteTasks = can(session.role, "task.write");
+  const orderItems = useMemo(() => {
+    void revision;
+    return ordersToCalendarItems(listOrders(db));
+  }, [db, revision]);
+  const taskItems = useMemo(() => {
+    void revision;
+    return tasksToCalendarItems(listTasks(db));
+  }, [db, revision]);
   const mockItems = useMemo(() => mockCalendarEvents(), []);
   const items = useMemo(
-    () => mergeCalendarItems(orderItems, mockItems, googleEvents),
-    [orderItems, mockItems, googleEvents],
+    () => mergeCalendarItems(orderItems, taskItems, mockItems, googleEvents),
+    [orderItems, taskItems, mockItems, googleEvents],
   );
   const dayItems = itemsOnDate(items, selected);
   const driveStatus = getDriveSyncStatus();
@@ -268,6 +279,29 @@ export default function CalendarPage() {
                   >
                     {t("calendar.openGoogle")}
                   </a>
+                ) : null}
+                {item.taskId && item.progress != null ? (
+                  <div className="mt-2">
+                    <TaskProgress
+                      value={item.progress}
+                      disabled={!canWriteTasks}
+                      onChange={(step) => {
+                        const taskId = item.taskId;
+                        if (!taskId) return;
+                        try {
+                          setTaskProgress(db, taskId, step);
+                          void refresh();
+                        } catch (error) {
+                          setFlash({ error: translateError(lang, error) });
+                        }
+                      }}
+                    />
+                  </div>
+                ) : null}
+                {item.taskId ? (
+                  <Link href={`/tasks/?date=${item.startDate}`} className="mt-2 inline-block text-sm text-copper">
+                    {t("calendar.openTasks")}
+                  </Link>
                 ) : null}
                 {item.orderId ? (
                   <Link href={orderHref(item.orderId)} className="mt-2 inline-block text-sm text-copper">

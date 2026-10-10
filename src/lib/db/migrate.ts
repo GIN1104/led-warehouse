@@ -132,12 +132,34 @@ CREATE TABLE IF NOT EXISTS audit_log (
   created_at INTEGER NOT NULL
 );
 
+CREATE TABLE IF NOT EXISTS workers (
+  id TEXT PRIMARY KEY,
+  name TEXT NOT NULL,
+  color TEXT NOT NULL,
+  active INTEGER NOT NULL DEFAULT 1,
+  created_at INTEGER NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS work_tasks (
+  id TEXT PRIMARY KEY,
+  title TEXT NOT NULL,
+  notes TEXT NOT NULL DEFAULT '',
+  worker_id TEXT REFERENCES workers(id),
+  work_date TEXT NOT NULL,
+  progress INTEGER NOT NULL DEFAULT 0 CHECK (progress IN (0, 25, 50, 75, 100)),
+  status TEXT NOT NULL CHECK (status IN ('todo', 'doing', 'done')),
+  created_at INTEGER NOT NULL,
+  created_by TEXT NOT NULL
+);
+
 CREATE UNIQUE INDEX IF NOT EXISTS uq_signal_order_sku ON shortage_signals(order_id, sku_id);
 CREATE UNIQUE INDEX IF NOT EXISTS uq_order_external ON rental_orders(external_id) WHERE external_id IS NOT NULL;
 CREATE UNIQUE INDEX IF NOT EXISTS uq_hire_order_sku ON external_hires(order_id, sku_id);
 CREATE INDEX IF NOT EXISTS idx_lines_order ON rental_lines(order_id);
 CREATE INDEX IF NOT EXISTS idx_lines_sku ON rental_lines(sku_id);
 CREATE INDEX IF NOT EXISTS idx_alerts_status ON alerts(status);
+CREATE INDEX IF NOT EXISTS idx_tasks_date ON work_tasks(work_date);
+CREATE INDEX IF NOT EXISTS idx_tasks_worker ON work_tasks(worker_id);
 `;
 
 function columnExists(db: Sql, table: string, column: string): boolean {

@@ -18,7 +18,7 @@ type ReadyWarehouse = {
   revision: number;
   shared: boolean;
   notice: string | null;
-  refresh: () => void;
+  refresh: () => Promise<void>;
   reloadShared: () => void;
   switchUser: (userId: string) => void;
 };
@@ -57,7 +57,7 @@ export function WarehouseProvider({ children }: { children: ReactNode }) {
           revision: 0,
           shared: sharedLedger,
           notice: null,
-          refresh: () => undefined,
+          refresh: () => Promise.resolve(),
           reloadShared: () => undefined,
           switchUser: () => undefined,
         });
@@ -93,7 +93,7 @@ export function WarehouseProvider({ children }: { children: ReactNode }) {
     return {
       ...state,
       refresh: () => {
-        void (async () => {
+        return (async () => {
           if (sharedLedger) {
             const result = await pushSharedDb();
             if (result === "conflict") {

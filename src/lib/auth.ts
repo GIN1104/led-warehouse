@@ -2,8 +2,8 @@ import { DomainError } from "@/lib/domain/errors";
 import type { Role } from "@/lib/services/queries";
 
 const grants: Record<Role, readonly string[]> = {
-  warehouse: ["catalog.write", "location.write", "stock.write", "scan.write"],
-  manager: ["catalog.write", "order.write", "hire.write", "alert.write"],
+  warehouse: ["catalog.write", "location.write", "stock.write", "scan.write", "task.write"],
+  manager: ["catalog.write", "order.write", "hire.write", "alert.write", "task.write"],
   logistics: [],
   admin: ["*"],
 };
