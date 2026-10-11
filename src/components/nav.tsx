@@ -54,14 +54,19 @@ export function Nav({ compact = false, onNavigate }: { compact?: boolean; onNavi
   );
 }
 
-const mobileHrefs = ["/", "/tasks", "/scan", "/calendar"];
+const mobileHrefs = [
+  { href: "/", label: "nav.overview" as const },
+  { href: "/tasks", label: "nav.tasks" as const },
+  { href: "/scan", label: "nav.scanShort" as const },
+  { href: "/calendar", label: "nav.calendar" as const },
+];
 
 export function MobileBar({ moreOpen, onMore }: { moreOpen: boolean; onMore: () => void }) {
   const pathname = usePathname();
   const { t } = useI18n();
-  const primary = mobileHrefs.flatMap((href) => {
-    const link = links.find((item) => item.href === href);
-    return link ? [link] : [];
+  const primary = mobileHrefs.flatMap((item) => {
+    const link = links.find((entry) => entry.href === item.href);
+    return link ? [{ ...link, label: item.label }] : [];
   });
   return (
     <nav className="fixed inset-x-0 bottom-0 z-40 border-t border-line bg-sand pb-[env(safe-area-inset-bottom)] md:hidden">
