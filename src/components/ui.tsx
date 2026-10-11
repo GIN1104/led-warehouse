@@ -3,7 +3,7 @@ import { cn } from "@/lib/utils";
 
 export function buttonClass(variant: "primary" | "ghost" | "danger" = "primary", className?: string) {
   return cn(
-    "inline-flex items-center justify-center rounded-md px-3 py-2 text-sm font-medium transition disabled:cursor-not-allowed disabled:opacity-50",
+    "inline-flex min-h-11 items-center justify-center rounded-md px-3 py-2 text-sm font-medium transition disabled:cursor-not-allowed disabled:opacity-50 md:min-h-0",
     variant === "primary" && "bg-copper text-white hover:bg-copper-dark",
     variant === "ghost" && "border border-line bg-sand text-ink hover:border-copper/40",
     variant === "danger" && "border border-alert/30 bg-white text-alert hover:bg-rose-50",
@@ -26,7 +26,7 @@ export function PageHeader({
     <div className="mb-6 flex flex-wrap items-end justify-between gap-4">
       <div>
         {eyebrow ? <p className="mb-1 text-xs font-medium tracking-[0.16em] text-copper uppercase">{eyebrow}</p> : null}
-        <h1 className="text-2xl font-semibold tracking-tight">{title}</h1>
+        <h1 className="text-xl font-semibold tracking-tight sm:text-2xl">{title}</h1>
         {description ? <p className="mt-1 max-w-2xl text-sm leading-6 text-ink/70">{description}</p> : null}
       </div>
       {action}
@@ -58,7 +58,7 @@ export function Field({ label, children }: { label: string; children: ReactNode 
 }
 
 export const controlClass =
-  "h-10 rounded-md border border-line bg-white px-3 text-sm text-ink outline-none ring-copper/30 placeholder:text-ink/40 focus:ring-2";
+  "h-11 w-full rounded-md border border-line bg-white px-3 text-base text-ink outline-none ring-copper/30 placeholder:text-ink/40 focus:ring-2 md:h-10 md:text-sm";
 
 export function Badge({
   tone,

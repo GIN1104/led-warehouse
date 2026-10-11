@@ -22,7 +22,7 @@ export function TaskProgress({
           aria-pressed={value === step}
           onClick={() => onChange(step)}
           className={cn(
-            "rounded-md border px-2 py-1 text-xs font-medium",
+            "min-h-11 min-w-11 rounded-md border px-2 py-1 text-xs font-medium md:min-h-0 md:min-w-0",
             value === step ? "border-ink bg-ink text-paper" : "border-line bg-white text-ink/70 hover:border-ink/30",
           )}
         >

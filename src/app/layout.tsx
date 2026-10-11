@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { IBM_Plex_Mono, Manrope, Rubik } from "next/font/google";
 import { I18nProvider } from "@/components/i18n";
 import { Shell } from "@/components/shell";
@@ -10,6 +10,13 @@ const hebrew = Rubik({ subsets: ["latin", "cyrillic", "hebrew"], variable: "--fo
 const mono = IBM_Plex_Mono({ subsets: ["latin", "cyrillic"], weight: ["400", "500"], variable: "--font-ibm" });
 
 const basePath = process.env.NEXT_PUBLIC_BASE_PATH ?? "";
+
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  viewportFit: "cover",
+  themeColor: "#1c1915",
+};
 
 export const metadata: Metadata = {
   title: "LED Warehouse",
