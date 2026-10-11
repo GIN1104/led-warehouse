@@ -49,7 +49,7 @@ export function CalendarMonth({
               type="button"
               onClick={() => onSelect(iso)}
               className={cn(
-                "flex min-h-[4.5rem] min-w-0 flex-col overflow-hidden rounded-md border px-1.5 py-1 text-start transition",
+                "flex min-h-14 min-w-0 flex-col overflow-hidden rounded-md border px-1 py-1 text-start transition sm:min-h-[4.5rem] sm:px-1.5",
                 inMonth ? "border-line bg-white" : "border-transparent bg-sand/40 text-ink/40",
                 isSelected && "border-copper ring-2 ring-copper/30",
                 isToday && !isSelected && "border-copper/50",
@@ -63,7 +63,19 @@ export function CalendarMonth({
                   </span>
                 ) : null}
               </span>
-              <ul className="mt-1 flex flex-col gap-0.5 overflow-hidden">
+              <div className="mt-1 flex gap-0.5 sm:hidden">
+                {[...dayItems]
+                  .sort((a, b) => Number(b.source === "task") - Number(a.source === "task"))
+                  .slice(0, 4)
+                  .map((item) => (
+                    <span
+                      key={item.id}
+                      className="size-1.5 shrink-0 rounded-full"
+                      style={{ backgroundColor: item.color ?? (item.source === "order" ? "#b4532a" : "#a8a29e") }}
+                    />
+                  ))}
+              </div>
+              <ul className="mt-1 hidden flex-col gap-0.5 overflow-hidden sm:flex">
                 {[...dayItems]
                   .sort((a, b) => Number(b.source === "task") - Number(a.source === "task"))
                   .slice(0, 3)
@@ -87,7 +99,7 @@ export function CalendarMonth({
                     )}
                   </li>
                 ))}
-                {dayItems.length > 3 ? <li className="px-1 text-[10px] text-ink/50">+{dayItems.length - 3}</li> : null}
+                {dayItems.length > 3 ? <li className="hidden px-1 text-[10px] text-ink/50 sm:list-item">+{dayItems.length - 3}</li> : null}
               </ul>
             </button>
           );
