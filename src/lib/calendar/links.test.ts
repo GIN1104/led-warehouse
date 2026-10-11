@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { linkify } from "@/lib/calendar/links";
+import { linkCaption, linkify } from "@/lib/calendar/links";
 import { mapGoogleEvents } from "@/lib/google/map-events";
 
 describe("ссылки события Google", () => {
@@ -10,6 +10,13 @@ describe("ссылки события Google", () => {
       { kind: "link", text: "https://example.com/a/very/long/path", href: "https://example.com/a/very/long/path" },
       { kind: "text", text: ". Готово" },
     ]);
+  });
+
+  it("помечает файл Excel и таблицу на Диске, обычный адрес не трогает", () => {
+    expect(linkCaption("https://drive.google.com/file/d/abc/view")).toBe("excel");
+    expect(linkCaption("https://docs.google.com/spreadsheets/d/abc/edit")).toBe("excel");
+    expect(linkCaption("https://files.example.com/screen.xlsx")).toBe("excel");
+    expect(linkCaption("https://meet.google.com/abc-defg-hij")).toBe("url");
   });
 
   it("кладёт ссылку встречи и карточку Google в событие", () => {

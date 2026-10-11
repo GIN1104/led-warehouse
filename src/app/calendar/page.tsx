@@ -6,7 +6,7 @@ import { CalendarMonth } from "@/components/calendar-month";
 import { useI18n } from "@/components/i18n";
 import { useWarehouse } from "@/components/warehouse";
 import { Badge, Empty, Flash, PageHeader, Panel, buttonClass } from "@/components/ui";
-import { linkify } from "@/lib/calendar/links";
+import { linkCaption, linkify } from "@/lib/calendar/links";
 import { mockCalendarEvents } from "@/lib/calendar/mock-events";
 import { itemsOnDate, mergeCalendarItems, ordersToCalendarItems, shiftMonth } from "@/lib/calendar/merge";
 import { TaskProgress } from "@/components/task-progress";
@@ -47,6 +47,7 @@ function statusLabel(status: GoogleSyncStatus, t: (key: MessageKey, vars?: Recor
 }
 
 function LinkedText({ text, className }: { text: string; className?: string }) {
+  const { t } = useI18n();
   return (
     <p className={cn("break-words whitespace-pre-wrap [overflow-wrap:anywhere]", className)}>
       {linkify(text).map((part, index) =>
@@ -56,9 +57,9 @@ function LinkedText({ text, className }: { text: string; className?: string }) {
             href={part.href}
             target="_blank"
             rel="noopener noreferrer"
-            className="break-all text-copper underline"
+            className="text-copper underline"
           >
-            {part.text}
+            {linkCaption(part.href) === "excel" ? t("calendar.linkExcel") : part.text}
           </a>
         ) : (
           <span key={index}>{part.text}</span>

@@ -28,3 +28,18 @@ export function linkify(value: string): TextPart[] {
   }
   return merged;
 }
+
+/** Excel и файл на Диске показываем словом, сам адрес остаётся только в href. */
+export function linkCaption(href: string): "excel" | "url" {
+  try {
+    const url = new URL(href);
+    const host = url.hostname.replace(/^www\./, "");
+    const path = decodeURIComponent(url.pathname).toLowerCase();
+    if (path.endsWith(".xlsx") || path.endsWith(".xls")) return "excel";
+    if (host === "docs.google.com" && (path.includes("/spreadsheets") || path.includes("/file/"))) return "excel";
+    if (host === "drive.google.com" && path.includes("/file/")) return "excel";
+  } catch {
+    return "url";
+  }
+  return "url";
+}
