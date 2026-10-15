@@ -3,7 +3,9 @@ import {
   isEquipmentStatus,
   type EquipmentStatus,
 } from "@/lib/domain/equipment-status";
+import { canonicalizeEquipmentName } from "@/lib/domain/he-ru-glossary";
 import { DomainError } from "@/lib/domain/errors";
+import { normalizeEquipmentName } from "@/lib/domain/sku-code";
 import { newId, type Sql } from "@/lib/db/sql";
 import { findOrCreateSkuByName } from "@/lib/services/catalog-hierarchy";
 import type { MapperOrderDraft } from "@/lib/services/mapper-sheet";
@@ -238,6 +240,114 @@ export function setEquipmentStatus(
   const row = getEquipmentItem(db, itemId);
   if (!row) throw new DomainError("Позиция оборудования не найдена");
   return row;
+}
+
+export type UpdateEquipmentInput = {
+  qty?: number;
+  skuName?: string;
+  note?: string;
+  customerName?: string;
+  locationId?: string | null;
+  status?: EquipmentStatus;
+};
+
+/** Обновить qty / имя SKU / заметку / статус позиции. */
+export function updateEquipmentItem(
+  db: Sql,
+  itemId: string,
+  input: UpdateEquipmentInput,
+  actor: string,
+): EquipmentItemRow {
+  const current = db.get<{ id: string; skuId: string; qty: number; status: EquipmentStatus; note: string; customerName: string; locationId: string | null }>(
+    `SELECT id, sku_id AS skuId, qty, status, note, customer_name AS customerName, location_id AS locationId
+     FROM equipment_items WHERE id = ?`,
+    [itemId],
+  );
+  if (!current) throw new DomainError("Позиция оборудования не найдена");
+
+  const nextQty = input.qty !== undefined ? input.qty : current.qty;
+  if (!Number.isInteger(nextQty) || nextQty <= 0) {
+    throw new DomainError("Количество должно быть целым и больше нуля");
+  }
+
+  let nextStatus = current.status;
+  if (input.status !== undefined) {
+    if (!isEquipmentStatus(input.status)) throw new DomainError("Неизвестный статус оборудования");
+    if (input.status !== current.status && !canTransitionEquipment(current.status, input.status)) {
+      throw new DomainError(`Нельзя сменить статус с «${current.status}» на «${input.status}»`);
+    }
+    nextStatus = input.status;
+  }
+
+  const nextNote = input.note !== undefined ? input.note.trim() : current.note;
+  const nextCustomer = input.customerName !== undefined ? input.customerName.trim() : current.customerName;
+  const nextLocation =
+    input.locationId !== undefined ? (input.locationId?.trim() || null) : current.locationId;
+  if (nextLocation) {
+    const location = db.get<{ id: string }>(`SELECT id FROM locations WHERE id = ?`, [nextLocation]);
+    if (!location) throw new DomainError("Локация не найдена");
+  }
+
+  const nameTrimmed = input.skuName?.trim();
+  const now = Date.now();
+  const notes: string[] = [];
+
+  db.transaction(() => {
+    if (nameTrimmed !== undefined) {
+      if (nameTrimmed.length < 1) throw new DomainError("Укажите название");
+      const display = canonicalizeEquipmentName(nameTrimmed);
+      const nameKey = normalizeEquipmentName(display);
+      if (!nameKey) throw new DomainError("Укажите название");
+      const clash = db.get<{ id: string }>(
+        `SELECT id FROM skus WHERE name_key = ? AND id != ?`,
+        [nameKey, current.skuId],
+      );
+      if (clash) throw new DomainError("Номенклатура с таким названием уже есть");
+      const before = db.get<{ name: string }>(`SELECT name FROM skus WHERE id = ?`, [current.skuId]);
+      db.run(`UPDATE skus SET name = ?, name_key = ? WHERE id = ?`, [display, nameKey, current.skuId]);
+      if (before && before.name !== display) notes.push(`имя → ${display}`);
+    }
+
+    if (nextQty !== current.qty) notes.push(`qty → ${nextQty}`);
+    if (nextStatus !== current.status) notes.push(`→ ${nextStatus}`);
+    if (nextNote !== current.note) notes.push("заметка");
+    if (nextCustomer !== current.customerName) notes.push("заказчик");
+    if (nextLocation !== current.locationId) notes.push("локация");
+
+    db.run(
+      `UPDATE equipment_items
+       SET qty = ?, status = ?, note = ?, customer_name = ?, location_id = ?, updated_at = ?, created_by = ?
+       WHERE id = ?`,
+      [nextQty, nextStatus, nextNote, nextCustomer, nextLocation, now, actor, itemId],
+    );
+
+    if (notes.length > 0) {
+      writeHistory(
+        db,
+        itemId,
+        current.status,
+        nextStatus,
+        actor,
+        notes.join(" · ") || "обновление",
+        now,
+      );
+    }
+  });
+
+  const row = getEquipmentItem(db, itemId);
+  if (!row) throw new DomainError("Позиция оборудования не найдена");
+  return row;
+}
+
+/** Удалить qty-строку и её историю статусов. */
+export function deleteEquipmentItem(db: Sql, itemId: string, actor: string): void {
+  void actor;
+  const current = db.get<{ id: string }>(`SELECT id FROM equipment_items WHERE id = ?`, [itemId]);
+  if (!current) throw new DomainError("Позиция оборудования не найдена");
+  db.transaction(() => {
+    db.run(`DELETE FROM equipment_status_history WHERE item_id = ?`, [itemId]);
+    db.run(`DELETE FROM equipment_items WHERE id = ?`, [itemId]);
+  });
 }
 
 export function getEquipmentItem(db: Sql, id: string): EquipmentItemRow | undefined {

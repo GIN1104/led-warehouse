@@ -18,11 +18,14 @@ import {
 } from "@/lib/services/catalog-hierarchy";
 import {
   addEquipmentItem,
+  deleteEquipmentItem,
   importEquipmentReserved,
   listEquipmentHistory,
   listEquipmentItems,
   setEquipmentStatus,
   sortEquipmentItems,
+  updateEquipmentItem,
+  type EquipmentItemRow,
   type EquipmentSortKey,
 } from "@/lib/services/equipment";
 import { applyMovement, type MovementType } from "@/lib/services/ledger";
@@ -54,6 +57,7 @@ export default function StockPage() {
   const [historyId, setHistoryId] = useState<string | null>(null);
   const [showMovements, setShowMovements] = useState(false);
   const [variantFamilyId, setVariantFamilyId] = useState("");
+  const [drafts, setDrafts] = useState<Record<string, { qty: string; name: string }>>({});
   void revision;
 
   const items = useMemo(() => {
@@ -65,6 +69,76 @@ export default function StockPage() {
   const realFamilies = familyTree.filter((node) => node.id !== "__uncategorized__");
 
   const history = historyId ? listEquipmentHistory(db, historyId) : [];
+
+  function draftFor(row: EquipmentItemRow) {
+    return drafts[row.id] ?? { qty: String(row.qty), name: row.skuName };
+  }
+
+  function setDraft(id: string, patch: Partial<{ qty: string; name: string }>, row: EquipmentItemRow) {
+    setDrafts((prev) => ({
+      ...prev,
+      [id]: { qty: prev[id]?.qty ?? String(row.qty), name: prev[id]?.name ?? row.skuName, ...patch },
+    }));
+  }
+
+  async function saveRow(row: EquipmentItemRow, patch?: { qty?: string; name?: string }) {
+    const draft = {
+      qty: patch?.qty ?? drafts[row.id]?.qty ?? String(row.qty),
+      name: patch?.name ?? drafts[row.id]?.name ?? row.skuName,
+    };
+    const nextQty = Number(draft.qty);
+    const nameChanged = draft.name.trim() !== row.skuName;
+    const qtyChanged = Number.isFinite(nextQty) && nextQty !== row.qty;
+    if (!nameChanged && !qtyChanged) {
+      setDrafts((prev) => {
+        if (!prev[row.id]) return prev;
+        const next = { ...prev };
+        delete next[row.id];
+        return next;
+      });
+      return;
+    }
+    try {
+      assertCan(session.role, "stock.write");
+      updateEquipmentItem(
+        db,
+        row.id,
+        {
+          qty: qtyChanged ? nextQty : undefined,
+          skuName: nameChanged ? draft.name : undefined,
+        },
+        session.id,
+      );
+      setDrafts((prev) => {
+        const next = { ...prev };
+        delete next[row.id];
+        return next;
+      });
+      await refresh();
+      setFlash({ ok: t("eq.saved") });
+    } catch (error) {
+      setFlash({ error: translateError(lang, error) });
+      setDrafts((prev) => ({ ...prev, [row.id]: { qty: String(row.qty), name: row.skuName } }));
+    }
+  }
+
+  async function onDelete(row: EquipmentItemRow) {
+    if (!window.confirm(t("eq.deleteConfirm"))) return;
+    try {
+      assertCan(session.role, "stock.write");
+      deleteEquipmentItem(db, row.id, session.id);
+      if (historyId === row.id) setHistoryId(null);
+      setDrafts((prev) => {
+        const next = { ...prev };
+        delete next[row.id];
+        return next;
+      });
+      await refresh();
+      setFlash({ ok: t("eq.deleted") });
+    } catch (error) {
+      setFlash({ error: translateError(lang, error) });
+    }
+  }
 
   function onAdd(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -83,9 +157,8 @@ export default function StockPage() {
         },
         session.id,
       );
-      refresh();
+      void refresh().then(() => setFlash({ ok: t("eq.added") }));
       event.currentTarget.reset();
-      setFlash({ ok: t("eq.added") });
     } catch (error) {
       setFlash({ error: translateError(lang, error) });
     }
@@ -99,7 +172,7 @@ export default function StockPage() {
       assertCan(session.role, "stock.write");
       const draft = await parseMapperFile(file);
       const result = importEquipmentReserved(db, draft, session.id);
-      refresh();
+      await refresh();
       setFlash({
         ok: t("eq.importOk", {
           created: result.created,
@@ -119,10 +192,11 @@ export default function StockPage() {
     try {
       assertCan(session.role, "stock.write");
       const family = createProductFamily(db, String(form.get("name") ?? ""), session.id);
-      refresh();
-      setVariantFamilyId(family.id);
+      void refresh().then(() => {
+        setVariantFamilyId(family.id);
+        setFlash({ ok: t("eq.familyCreated") });
+      });
       event.currentTarget.reset();
-      setFlash({ ok: t("eq.familyCreated") });
     } catch (error) {
       setFlash({ error: translateError(lang, error) });
     }
@@ -143,10 +217,11 @@ export default function StockPage() {
         },
         session.id,
       );
-      refresh();
+      void refresh().then(() => {
+        setVariantFamilyId(familyId);
+        setFlash({ ok: t("eq.variantAdded") });
+      });
       event.currentTarget.reset();
-      setVariantFamilyId(familyId);
-      setFlash({ ok: t("eq.variantAdded") });
     } catch (error) {
       setFlash({ error: translateError(lang, error) });
     }
@@ -156,8 +231,7 @@ export default function StockPage() {
     try {
       assertCan(session.role, "stock.write");
       setEquipmentStatus(db, itemId, to, session.id);
-      refresh();
-      setFlash({ ok: t("eq.statusChanged") });
+      void refresh().then(() => setFlash({ ok: t("eq.statusChanged") }));
     } catch (error) {
       setFlash({ error: translateError(lang, error) });
     }
@@ -184,8 +258,7 @@ export default function StockPage() {
         },
         session.id,
       );
-      refresh();
-      setFlash({ ok: t("stock.posted") });
+      void refresh().then(() => setFlash({ ok: t("stock.posted") }));
     } catch (error) {
       setFlash({ error: translateError(lang, error) });
     }
@@ -268,7 +341,7 @@ export default function StockPage() {
                           try {
                             assertCan(session.role, "stock.write");
                             moveFamily(db, family.id, "up");
-                            refresh();
+                            void refresh();
                           } catch (error) {
                             setFlash({ error: translateError(lang, error) });
                           }
@@ -283,7 +356,7 @@ export default function StockPage() {
                           try {
                             assertCan(session.role, "stock.write");
                             moveFamily(db, family.id, "down");
-                            refresh();
+                            void refresh();
                           } catch (error) {
                             setFlash({ error: translateError(lang, error) });
                           }
@@ -313,7 +386,7 @@ export default function StockPage() {
                                 try {
                                   assertCan(session.role, "stock.write");
                                   moveSkuInFamily(db, sku.id, "up");
-                                  refresh();
+                                  void refresh();
                                 } catch (error) {
                                   setFlash({ error: translateError(lang, error) });
                                 }
@@ -328,7 +401,7 @@ export default function StockPage() {
                                 try {
                                   assertCan(session.role, "stock.write");
                                   moveSkuInFamily(db, sku.id, "down");
-                                  refresh();
+                                  void refresh();
                                 } catch (error) {
                                   setFlash({ error: translateError(lang, error) });
                                 }
@@ -347,6 +420,75 @@ export default function StockPage() {
           )}
         </div>
       </Panel>
+
+      <div className="mb-4 grid gap-4 lg:grid-cols-2">
+        <Panel>
+          <h2 className="mb-1 font-medium">{t("eq.addTitle")}</h2>
+          <p className="mb-3 text-sm leading-6 text-ink/70">{t("eq.addHelp")}</p>
+          {allowed ? (
+            <form onSubmit={onAdd} className="flex flex-col gap-3">
+              <Field label={t("stock.sku")}>
+                <select name="skuId" className={controlClass} required>
+                  {summary.map((sku) => (
+                    <option key={sku.id} value={sku.id}>
+                      {sku.code} — {sku.name}
+                    </option>
+                  ))}
+                </select>
+              </Field>
+              <div className="grid gap-3 sm:grid-cols-2">
+                <Field label={t("stock.qty")}>
+                  <input name="qty" type="number" required min={1} step={1} className={controlClass} defaultValue={1} />
+                </Field>
+                <Field label={t("stock.location")}>
+                  <select name="locationId" className={controlClass} defaultValue="">
+                    <option value="">{t("common.notNeeded")}</option>
+                    {locations.map((location) => (
+                      <option key={location.id} value={location.id}>
+                        {location.name}
+                      </option>
+                    ))}
+                  </select>
+                </Field>
+              </div>
+              <Field label={t("eq.customer")}>
+                <input name="customerName" className={controlClass} />
+              </Field>
+              <Field label={t("eq.note")}>
+                <input name="note" className={controlClass} />
+              </Field>
+              <button type="submit" className={buttonClass("primary")}>
+                {t("eq.add")}
+              </button>
+            </form>
+          ) : (
+            <p className="text-sm text-ink/60">{t("stock.switch", { name: warehouse })}</p>
+          )}
+        </Panel>
+
+        <Panel>
+          <h2 className="mb-2 font-medium">{t("eq.importTitle")}</h2>
+          <p className="mb-3 text-sm leading-6 text-ink/70">{t("eq.importHelp", { folder: drive.folder, email: drive.email })}</p>
+          {allowed ? (
+            <form onSubmit={(event) => void onImport(event)} className="flex flex-col gap-3">
+              <Field label={t("eq.importFile")}>
+                <input
+                  name="file"
+                  type="file"
+                  accept=".csv,.xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,text/csv"
+                  required
+                  className={controlClass}
+                />
+              </Field>
+              <button type="submit" className={buttonClass("primary")}>
+                {t("eq.import")}
+              </button>
+            </form>
+          ) : (
+            <p className="text-sm text-ink/60">{t("stock.switch", { name: warehouse })}</p>
+          )}
+        </Panel>
+      </div>
 
       <div className="mb-4 flex flex-col gap-3 rounded-lg border border-line bg-sand p-3 md:flex-row md:flex-wrap md:items-end">
         <Field label={t("eq.status")}>
@@ -384,6 +526,8 @@ export default function StockPage() {
         </Field>
       </div>
 
+      <p className="mb-2 text-xs text-ink/50">{t("eq.qtyHint")}</p>
+
       <div className="mb-4 overflow-x-auto rounded-lg border border-line bg-sand">
         <table className="w-full min-w-[960px] text-start text-sm">
           <thead className="bg-paper text-xs tracking-wide text-ink/50 uppercase">
@@ -408,15 +552,58 @@ export default function StockPage() {
             ) : (
               items.map((row) => {
                 const next = EQUIPMENT_TRANSITIONS[row.status];
+                const draft = draftFor(row);
+                const dirty = draft.name.trim() !== row.skuName || Number(draft.qty) !== row.qty;
                 return (
                   <tr key={row.id} className="border-t border-line align-top">
                     <td className="px-3 py-2 font-mono text-xs">{row.skuCode}</td>
                     <td className="px-3 py-2">
-                      {row.skuName}
-                      {row.note ? <p className="text-xs text-ink/50">{row.note}</p> : null}
+                      {allowed ? (
+                        <input
+                          className={`${controlClass} min-w-[10rem]`}
+                          value={draft.name}
+                          aria-label={t("stock.name")}
+                          onChange={(event) => setDraft(row.id, { name: event.target.value }, row)}
+                          onBlur={(event) => void saveRow(row, { name: event.target.value, qty: draft.qty })}
+                          onKeyDown={(event) => {
+                            if (event.key === "Enter") {
+                              event.preventDefault();
+                              (event.target as HTMLInputElement).blur();
+                            }
+                          }}
+                        />
+                      ) : (
+                        row.skuName
+                      )}
+                      {row.note ? <p className="mt-1 text-xs text-ink/50">{row.note}</p> : null}
                     </td>
                     <td className="px-3 py-2">
-                      {row.qty} {row.unit}
+                      {allowed ? (
+                        <div className="flex items-center gap-1">
+                          <input
+                            type="number"
+                            min={1}
+                            step={1}
+                            className={`${controlClass} w-20`}
+                            value={draft.qty}
+                            aria-label={t("stock.qty")}
+                            title={t("eq.qtyHint")}
+                            onChange={(event) => setDraft(row.id, { qty: event.target.value }, row)}
+                            onBlur={(event) => void saveRow(row, { qty: event.target.value, name: draft.name })}
+                            onKeyDown={(event) => {
+                              if (event.key === "Enter") {
+                                event.preventDefault();
+                                (event.target as HTMLInputElement).blur();
+                              }
+                            }}
+                          />
+                          <span className="text-xs text-ink/50">{row.unit}</span>
+                        </div>
+                      ) : (
+                        <>
+                          {row.qty} {row.unit}
+                        </>
+                      )}
                     </td>
                     <td className="px-3 py-2">
                       <Badge tone={statusTone(row.status)}>{t(`eq.status.${row.status}` as MessageKey)}</Badge>
@@ -427,6 +614,15 @@ export default function StockPage() {
                     <td className="px-3 py-2">
                       {allowed ? (
                         <div className="flex flex-wrap gap-1">
+                          {dirty ? (
+                            <button
+                              type="button"
+                              className={buttonClass("primary", "px-2 py-1 text-xs")}
+                              onClick={() => void saveRow(row)}
+                            >
+                              {t("eq.save")}
+                            </button>
+                          ) : null}
                           {next.map((status) => (
                             <button
                               key={status}
@@ -443,6 +639,13 @@ export default function StockPage() {
                             onClick={() => setHistoryId(historyId === row.id ? null : row.id)}
                           >
                             {t("eq.history")}
+                          </button>
+                          <button
+                            type="button"
+                            className={buttonClass("danger", "px-2 py-1 text-xs")}
+                            onClick={() => void onDelete(row)}
+                          >
+                            {t("eq.delete")}
                           </button>
                         </div>
                       ) : null}
@@ -476,66 +679,6 @@ export default function StockPage() {
           )}
         </Panel>
       ) : null}
-
-      <div className="mb-6 grid gap-4 lg:grid-cols-2">
-        <Panel>
-          <h2 className="mb-3 font-medium">{t("eq.add")}</h2>
-          {allowed ? (
-            <form onSubmit={onAdd} className="flex flex-col gap-3">
-              <Field label={t("stock.sku")}>
-                <select name="skuId" className={controlClass} required>
-                  {summary.map((sku) => (
-                    <option key={sku.id} value={sku.id}>
-                      {sku.code} — {sku.name}
-                    </option>
-                  ))}
-                </select>
-              </Field>
-              <Field label={t("stock.qty")}>
-                <input name="qty" type="number" required min={1} step={1} className={controlClass} defaultValue={1} />
-              </Field>
-              <Field label={t("stock.location")}>
-                <select name="locationId" className={controlClass} defaultValue="">
-                  <option value="">{t("common.notNeeded")}</option>
-                  {locations.map((location) => (
-                    <option key={location.id} value={location.id}>
-                      {location.name}
-                    </option>
-                  ))}
-                </select>
-              </Field>
-              <Field label={t("eq.customer")}>
-                <input name="customerName" className={controlClass} />
-              </Field>
-              <Field label={t("eq.note")}>
-                <input name="note" className={controlClass} />
-              </Field>
-              <button type="submit" className={buttonClass("primary")}>
-                {t("eq.add")}
-              </button>
-            </form>
-          ) : (
-            <p className="text-sm text-ink/60">{t("stock.switch", { name: warehouse })}</p>
-          )}
-        </Panel>
-
-        <Panel>
-          <h2 className="mb-2 font-medium">{t("eq.importTitle")}</h2>
-          <p className="mb-3 text-sm leading-6 text-ink/70">{t("eq.importHelp", { folder: drive.folder, email: drive.email })}</p>
-          {allowed ? (
-            <form onSubmit={(event) => void onImport(event)} className="flex flex-col gap-3">
-              <Field label={t("eq.importFile")}>
-                <input name="file" type="file" accept=".csv,.xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,text/csv" required className={controlClass} />
-              </Field>
-              <button type="submit" className={buttonClass("primary")}>
-                {t("eq.import")}
-              </button>
-            </form>
-          ) : (
-            <p className="text-sm text-ink/60">{t("stock.switch", { name: warehouse })}</p>
-          )}
-        </Panel>
-      </div>
 
       <div className="mb-3">
         <button type="button" className={buttonClass("ghost")} onClick={() => setShowMovements((value) => !value)}>
