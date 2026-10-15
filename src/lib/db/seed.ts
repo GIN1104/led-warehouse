@@ -1,5 +1,6 @@
 import { addDays, todayIso } from "@/lib/dates";
 import type { Sql } from "@/lib/db/sql";
+import { addEquipmentItem } from "@/lib/services/equipment";
 import { applyMovement, createOrder } from "@/lib/services/ledger";
 
 const MANAGER_ID = "user_manager";
@@ -46,6 +47,18 @@ export function seedIfEmpty(db: Sql): void {
   ];
   for (const row of opening) {
     applyMovement(db, { skuId: row.skuId, locationId: row.locationId, type: "in", qty: row.qty, reason: "Начальный остаток" }, WAREHOUSE_ID);
+    addEquipmentItem(
+      db,
+      {
+        skuId: row.skuId,
+        locationId: row.locationId,
+        qty: row.qty,
+        status: "available",
+        note: "Начальный остаток",
+        source: "seed",
+      },
+      WAREHOUSE_ID,
+    );
   }
 
   const today = todayIso();

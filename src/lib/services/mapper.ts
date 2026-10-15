@@ -1,5 +1,6 @@
 import { DomainError } from "@/lib/domain/errors";
 import type { Sql } from "@/lib/db/sql";
+import { importEquipmentReserved } from "@/lib/services/equipment";
 import { createOrder } from "@/lib/services/ledger";
 import type { MapperOrderDraft } from "@/lib/services/mapper-sheet";
 import { getOrderDetail } from "@/lib/services/queries";
@@ -66,6 +67,7 @@ export function importMapperOrder(db: Sql, draft: MapperOrderDraft, actor = "map
     },
     actor,
   );
+  importEquipmentReserved(db, { ...draft, externalId }, actor, { orderId: created.orderId });
   const detail = getOrderDetail(db, created.orderId);
   return {
     orderId: created.orderId,

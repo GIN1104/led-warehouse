@@ -160,6 +160,37 @@ CREATE INDEX IF NOT EXISTS idx_lines_sku ON rental_lines(sku_id);
 CREATE INDEX IF NOT EXISTS idx_alerts_status ON alerts(status);
 CREATE INDEX IF NOT EXISTS idx_tasks_date ON work_tasks(work_date);
 CREATE INDEX IF NOT EXISTS idx_tasks_worker ON work_tasks(worker_id);
+
+CREATE TABLE IF NOT EXISTS equipment_items (
+  id TEXT PRIMARY KEY,
+  sku_id TEXT NOT NULL REFERENCES skus(id),
+  qty INTEGER NOT NULL CHECK (qty > 0),
+  status TEXT NOT NULL CHECK (status IN ('available', 'reserved', 'checked_out', 'needs_repair', 'in_repair')),
+  location_id TEXT REFERENCES locations(id),
+  note TEXT NOT NULL DEFAULT '',
+  source TEXT NOT NULL DEFAULT 'manual',
+  external_ref TEXT,
+  order_id TEXT,
+  customer_name TEXT NOT NULL DEFAULT '',
+  created_at INTEGER NOT NULL,
+  updated_at INTEGER NOT NULL,
+  created_by TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS equipment_status_history (
+  id TEXT PRIMARY KEY,
+  item_id TEXT NOT NULL REFERENCES equipment_items(id),
+  from_status TEXT,
+  to_status TEXT NOT NULL,
+  note TEXT NOT NULL DEFAULT '',
+  actor TEXT NOT NULL,
+  created_at INTEGER NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_equipment_status ON equipment_items(status);
+CREATE INDEX IF NOT EXISTS idx_equipment_sku ON equipment_items(sku_id);
+CREATE INDEX IF NOT EXISTS idx_equipment_external ON equipment_items(external_ref);
+CREATE INDEX IF NOT EXISTS idx_equipment_history_item ON equipment_status_history(item_id);
 `;
 
 function columnExists(db: Sql, table: string, column: string): boolean {
