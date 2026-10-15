@@ -1,6 +1,7 @@
 import { addDays, todayIso } from "@/lib/dates";
+import { normalizeEquipmentName } from "@/lib/domain/sku-code";
 
-export type MapperLine = { code: string; qty: number };
+export type MapperLine = { code?: string; name?: string; category?: string; qty: number };
 
 export type MapperOrderDraft = {
   externalId?: string;
@@ -11,12 +12,20 @@ export type MapperOrderDraft = {
   lines: MapperLine[];
 };
 
-const HEADER: Record<string, "code" | "qty" | "customer" | "start" | "end" | "external" | "notes"> = {
+const HEADER: Record<string, "code" | "name" | "qty" | "customer" | "start" | "end" | "external" | "notes" | "category"> = {
   code: "code",
   sku: "code",
   sku_code: "code",
   артикул: "code",
   код: "code",
+  name: "name",
+  title: "name",
+  item: "name",
+  equipment: "name",
+  название: "name",
+  наименование: "name",
+  оборудование: "name",
+  товар: "name",
   qty: "qty",
   quantity: "qty",
   количество: "qty",
@@ -36,6 +45,12 @@ const HEADER: Record<string, "code" | "qty" | "customer" | "start" | "end" | "ex
   номер: "external",
   notes: "notes",
   заметка: "notes",
+  category: "category",
+  family: "category",
+  group: "category",
+  категория: "category",
+  группа: "category",
+  семейство: "category",
 };
 
 function normalizeHeader(value: string): string {
@@ -57,14 +72,18 @@ function normalizeDate(value: string, fallback: string): string {
   return trimmed;
 }
 
-/** Таблица с заголовком: код, количество и поля заказа. Повтор кода суммируется. */
+type LineBucket = { code?: string; name?: string; category?: string; qty: number };
+
+/** Таблица с заголовком: code и/или name + qty. Повтор одной позиции суммируется. */
 export function parseMapperTable(rows: string[][]): MapperOrderDraft {
   const table = rows.filter((row) => row.some((cell) => cell.trim() !== ""));
   const header = table[0];
   if (!header) throw new Error("В таблице нет строк");
   const columns = header.map((cell) => HEADER[normalizeHeader(cell)]);
-  if (!columns.includes("code") || !columns.includes("qty")) {
-    throw new Error("Нужны столбцы code и qty");
+  const hasCode = columns.includes("code");
+  const hasName = columns.includes("name");
+  if (!columns.includes("qty") || (!hasCode && !hasName)) {
+    throw new Error("Нужны столбцы qty и code или name/название");
   }
   const today = todayIso();
   let customerName = "";
@@ -72,7 +91,7 @@ export function parseMapperTable(rows: string[][]): MapperOrderDraft {
   let endDate = "";
   let externalId = "";
   let notes = "";
-  const qtyByCode = new Map<string, number>();
+  const buckets = new Map<string, LineBucket>();
 
   for (const row of table.slice(1)) {
     const record: Partial<Record<(typeof columns)[number], string>> = {};
@@ -86,10 +105,28 @@ export function parseMapperTable(rows: string[][]): MapperOrderDraft {
     if (record.external) externalId = record.external;
     if (record.notes) notes = record.notes;
     const code = (record.code ?? "").trim().toUpperCase();
-    if (!code) continue;
+    const name = (record.name ?? "").trim();
+    const category = (record.category ?? "").trim();
+    if (!code && !name) continue;
     const qty = Number(String(record.qty ?? "").replace(",", "."));
-    if (!Number.isFinite(qty) || qty <= 0) throw new Error(`Некорректное количество для ${code}`);
-    qtyByCode.set(code, (qtyByCode.get(code) ?? 0) + qty);
+    if (!Number.isFinite(qty) || qty <= 0) {
+      throw new Error(`Некорректное количество для ${name || code}`);
+    }
+    const key = name ? `n:${normalizeEquipmentName(name)}` : `c:${code}`;
+    const prev = buckets.get(key);
+    if (prev) {
+      prev.qty += qty;
+      if (category && !prev.category) prev.category = category;
+      if (code && !prev.code) prev.code = code;
+      if (name && !prev.name) prev.name = name;
+    } else {
+      buckets.set(key, {
+        qty,
+        ...(code ? { code } : {}),
+        ...(name ? { name } : {}),
+        ...(category ? { category } : {}),
+      });
+    }
   }
 
   const start = normalizeDate(startDate, today);
@@ -98,7 +135,7 @@ export function parseMapperTable(rows: string[][]): MapperOrderDraft {
     startDate: start,
     endDate: normalizeDate(endDate, addDays(start, 2)),
     notes,
-    lines: [...qtyByCode.entries()].map(([code, qty]) => ({ code, qty })),
+    lines: [...buckets.values()],
   };
   if (externalId) draft.externalId = externalId;
   return draft;

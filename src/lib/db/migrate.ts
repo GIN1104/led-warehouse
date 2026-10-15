@@ -1,3 +1,4 @@
+import { normalizeEquipmentName } from "@/lib/domain/sku-code";
 import type { Sql } from "@/lib/db/sql";
 
 export const MIGRATION_SQL = `
@@ -191,11 +192,60 @@ CREATE INDEX IF NOT EXISTS idx_equipment_status ON equipment_items(status);
 CREATE INDEX IF NOT EXISTS idx_equipment_sku ON equipment_items(sku_id);
 CREATE INDEX IF NOT EXISTS idx_equipment_external ON equipment_items(external_ref);
 CREATE INDEX IF NOT EXISTS idx_equipment_history_item ON equipment_status_history(item_id);
+
+CREATE TABLE IF NOT EXISTS product_families (
+  id TEXT PRIMARY KEY,
+  name TEXT NOT NULL UNIQUE,
+  sort_order INTEGER NOT NULL DEFAULT 0,
+  created_at INTEGER NOT NULL
+);
 `;
 
 function columnExists(db: Sql, table: string, column: string): boolean {
   const rows = db.all<{ name: string }>(`PRAGMA table_info(${table})`);
   return rows.some((row) => row.name === column);
+}
+
+function backfillSkuHierarchy(db: Sql): void {
+  const skus = db.all<{ id: string; name: string; category: string; nameKey: string | null; familyId: string | null }>(
+    `SELECT id, name, category, name_key AS nameKey, family_id AS familyId FROM skus`,
+  );
+  const familyByName = new Map<string, string>();
+  for (const row of db.all<{ id: string; name: string }>(`SELECT id, name FROM product_families`)) {
+    familyByName.set(row.name.trim().toLowerCase(), row.id);
+  }
+  let sort = 0;
+  for (const sku of skus) {
+    const nameKey = sku.nameKey?.trim() || normalizeEquipmentName(sku.name);
+    let familyId = sku.familyId;
+    const category = sku.category?.trim();
+    if (!familyId && category && category.length >= 2) {
+      const key = category.toLowerCase();
+      let id = familyByName.get(key);
+      if (!id) {
+        id = `fam_${category.replace(/[^a-zA-Z0-9а-яА-Я]+/g, "_").slice(0, 40)}_${sort}`;
+        const now = Date.now();
+        try {
+          db.run(`INSERT INTO product_families (id, name, sort_order, created_at) VALUES (?, ?, ?, ?)`, [
+            id,
+            category,
+            sort,
+            now,
+          ]);
+          familyByName.set(key, id);
+          sort += 1;
+        } catch {
+          id = familyByName.get(key);
+        }
+      }
+      familyId = id ?? null;
+    }
+    db.run(`UPDATE skus SET name_key = ?, family_id = COALESCE(family_id, ?), sort_order = COALESCE(sort_order, 0) WHERE id = ?`, [
+      nameKey,
+      familyId,
+      sku.id,
+    ]);
+  }
 }
 
 export function migrate(db: Sql): void {
@@ -209,6 +259,18 @@ export function migrate(db: Sql): void {
   if (!columnExists(db, "rental_lines", "qty_issued")) {
     db.exec(`ALTER TABLE rental_lines ADD COLUMN qty_issued INTEGER NOT NULL DEFAULT 0`);
   }
+  if (!columnExists(db, "skus", "family_id")) {
+    db.exec(`ALTER TABLE skus ADD COLUMN family_id TEXT REFERENCES product_families(id)`);
+  }
+  if (!columnExists(db, "skus", "name_key")) {
+    db.exec(`ALTER TABLE skus ADD COLUMN name_key TEXT`);
+  }
+  if (!columnExists(db, "skus", "sort_order")) {
+    db.exec(`ALTER TABLE skus ADD COLUMN sort_order INTEGER NOT NULL DEFAULT 0`);
+  }
+  db.exec(`CREATE UNIQUE INDEX IF NOT EXISTS uq_skus_name_key ON skus(name_key) WHERE name_key IS NOT NULL AND name_key != ''`);
+  db.exec(`CREATE INDEX IF NOT EXISTS idx_skus_family ON skus(family_id)`);
+  backfillSkuHierarchy(db);
   db.run(`INSERT INTO ledger_meta (key, value) VALUES ('revision', '0') ON CONFLICT(key) DO NOTHING`);
   db.run(`UPDATE users SET name = 'Дмитрий' WHERE id = 'user_manager' AND name = 'Мария'`);
 }

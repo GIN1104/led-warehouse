@@ -58,6 +58,27 @@ describe("оборудование: статусы и импорт", () => {
     expect(again.items[0]?.qty).toBe(15);
   });
 
+  it("импорт name+qty создаёт SKU со стабильным code и ставит reserved", () => {
+    const db = setup();
+    const draft = parseMapperCsv(
+      'название,количество,категория,заказчик,external_id\n"TV 32""",4,Телевизор,Зал A,eq-name-1\n"Телевизор 40""",2,Телевизор,Зал A,eq-name-1\n',
+    );
+    const first = importEquipmentReserved(db, draft, "wh");
+    expect(first.created).toBe(2);
+    expect(first.skusCreated).toBe(2);
+    expect(first.items.map((row) => row.skuCode).sort()).toEqual(["TV-32", "TV-40"]);
+
+    const again = importEquipmentReserved(
+      db,
+      parseMapperCsv('название,количество,категория,заказчик,external_id\n"  tv  32""",6,Телевизор,Зал A,eq-name-1\n'),
+      "wh",
+    );
+    expect(again.skusCreated).toBe(0);
+    expect(again.updated).toBe(1);
+    expect(again.items[0]?.skuCode).toBe("TV-32");
+    expect(again.items[0]?.qty).toBe(6);
+  });
+
   it("вручную: reserved → checked_out → needs_repair → in_repair → available", () => {
     const db = setup();
     const item = addEquipmentItem(db, { skuId: "CAB-P25", qty: 4, status: "reserved" }, "wh");
