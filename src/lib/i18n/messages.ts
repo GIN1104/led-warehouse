@@ -269,7 +269,7 @@ export const ru = {
   "eq.added": "Позиция добавлена",
   "eq.empty": "Пока нет позиций. Добавьте вручную или импортируйте Excel из mapper.",
   "eq.importTitle": "Импорт Excel (mapper)",
-  "eq.importHelp": "Файл с ПК (CSV или Excel). Колонки: название/name и количество/qty (code не обязателен — присвоится сам). Опционально категория/группа. Строки → «забронировано». Папка Drive «{folder}» на {email}: скачайте и загрузите сюда.",
+  "eq.importHelp": "Файл с ПК (CSV или Excel). Колонки: название/name/שם и количество/qty/כמות (code не обязателен). Ивритские названия из словаря → по-русски. Опционально категория. Без заголовка: 2 колонки name,qty. Строки → «забронировано». Drive «{folder}» на {email}.",
   "eq.importFile": "Файл CSV / Excel",
   "eq.import": "Импортировать как бронь",
   "eq.importOk": "Импорт: позиций {created}, обновлено {updated}, новых SKU {skus}",
@@ -308,7 +308,7 @@ export const ru = {
   "err.eqFile": "Нужен файл CSV или Excel (.xlsx)",
   "err.familyName": "Укажите название группы",
   "err.familyMissing": "Группа не найдена",
-  "err.mapperColumns": "Нужны столбцы qty и code или name/название",
+  "err.mapperColumns": "Не удалось сопоставить столбцы: нужны qty и (code или name). См. детали в сообщении.",
   "scan.eyebrow": "Scan Events",
   "scan.title": "Сканирование",
   "scan.description": "Ручной скан и рамка пишут одно и то же событие. Расход помечает бронь как вышедшую со склада. Повтор event_id остаток не удваивает.",
@@ -706,7 +706,7 @@ export const en: Record<MessageKey, string> = {
   "err.eqFile": "CSV or Excel (.xlsx) file required",
   "err.familyName": "Enter a group name",
   "err.familyMissing": "Group not found",
-  "err.mapperColumns": "Need qty and code or name columns",
+  "err.mapperColumns": "Could not map columns: need qty and (code or name). See details in the message.",
   "scan.eyebrow": "Scan Events",
   "scan.title": "Scanning",
   "scan.description": "A manual scan and the gate write the same event. An outbound scan marks the reservation as having left the warehouse. The same event_id does not move stock twice.",
@@ -1102,7 +1102,7 @@ export const he: Record<MessageKey, string> = {
   "err.eqFile": "נדרש קובץ CSV או Excel (.xlsx)",
   "err.familyName": "ציינו שם קבוצה",
   "err.familyMissing": "הקבוצה לא נמצאה",
-  "err.mapperColumns": "נדרשות עמודות qty ו־code או name",
+  "err.mapperColumns": "לא זוהו עמודות: נדרשים qty ו־(code או name). ראו פירוט בהודעה.",
   "scan.eyebrow": "Scan Events",
   "scan.title": "סריקה",
   "scan.description": "סריקה ידנית ומסגרת רושמות אותו אירוע. יציאה מסמנת את השמירה כיצאה מהמחסן. אותו event_id לא מזיז מלאי פעמיים.",
@@ -1254,7 +1254,8 @@ const errorRules: [RegExp, MessageKey][] = [
   [/Нужен файл CSV или Excel/, "err.eqFile"],
   [/Укажите название группы/, "err.familyName"],
   [/Группа не найдена/, "err.familyMissing"],
-  [/Нужны столбцы qty/, "err.mapperColumns"],
+  [/^Нужны столбцы qty и code или name\/название$/, "err.mapperColumns"],
+  [/^Не удалось сопоставить столбцы/, "err.mapperColumns"],
 ];
 
 export function translateError(lang: Lang, error: unknown): string {
@@ -1262,6 +1263,8 @@ export function translateError(lang: Lang, error: unknown): string {
   for (const [pattern, key] of errorRules) {
     if (pattern.test(message)) {
       if (key === "err.unknownCodes" && message.includes(":")) return `${translate(lang, key)}: ${message.split(":").slice(1).join(":").trim()}`;
+      // Детальный список заголовков/алиасов оставляем как есть
+      if (key === "err.mapperColumns" && message.includes("В файле заголовки:")) return message;
       return translate(lang, key);
     }
   }

@@ -1,3 +1,4 @@
+import { canonicalizeEquipmentName } from "@/lib/domain/he-ru-glossary";
 import { generateStableSkuCode, normalizeEquipmentName } from "@/lib/domain/sku-code";
 import { DomainError } from "@/lib/domain/errors";
 import { newId, type Sql } from "@/lib/db/sql";
@@ -102,7 +103,7 @@ export function findOrCreateSkuByName(
   input: { name: string; category?: string; code?: string; unit?: string },
   actor: string,
 ): { id: string; code: string; name: string; created: boolean } {
-  const name = input.name.trim();
+  const name = canonicalizeEquipmentName(input.name.trim());
   if (name.length < 2) throw new DomainError("Укажите название");
   const nameKey = normalizeEquipmentName(name);
 
