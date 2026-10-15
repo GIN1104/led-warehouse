@@ -1,5 +1,7 @@
 import { addDays, todayIso } from "@/lib/dates";
+import { normalizeEquipmentName } from "@/lib/domain/sku-code";
 import type { Sql } from "@/lib/db/sql";
+import { findOrCreateFamily } from "@/lib/services/catalog-hierarchy";
 import { addEquipmentItem } from "@/lib/services/equipment";
 import { applyMovement, createOrder } from "@/lib/services/ledger";
 
@@ -30,11 +32,15 @@ export function seedIfEmpty(db: Sql): void {
     ["CBL-SIG", "Кабель сигнальный EtherCON", "Кабели", ""],
     ["CASE-FC", "Кейс flight, 8 кабинетов", "Кейсы", ""],
   ];
+  let sort = 0;
   for (const [id, name, category, description] of catalog) {
+    const family = findOrCreateFamily(db, category);
     db.run(
-      `INSERT INTO skus (id, code, name, category, unit, track_mode, description) VALUES (?, ?, ?, ?, 'шт', 'quantity', ?)`,
-      [id, id, name, category, description],
+      `INSERT INTO skus (id, code, name, category, unit, track_mode, description, family_id, name_key, sort_order)
+       VALUES (?, ?, ?, ?, 'шт', 'quantity', ?, ?, ?, ?)`,
+      [id, id, name, family.name, description, family.id, normalizeEquipmentName(name), sort],
     );
+    sort += 1;
   }
 
   const opening: { skuId: string; locationId: string; qty: number }[] = [

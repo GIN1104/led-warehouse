@@ -1,6 +1,7 @@
 import { DomainError } from "@/lib/domain/errors";
+import { normalizeEquipmentName } from "@/lib/domain/sku-code";
 import type { Sql } from "@/lib/db/sql";
-import { importEquipmentReserved } from "@/lib/services/equipment";
+import { importEquipmentReserved, resolveMapperLineSku } from "@/lib/services/equipment";
 import { createOrder } from "@/lib/services/ledger";
 import type { MapperOrderDraft } from "@/lib/services/mapper-sheet";
 import { getOrderDetail } from "@/lib/services/queries";
@@ -14,7 +15,12 @@ export type MapperImportResult = {
 
 function fingerprint(draft: MapperOrderDraft): string {
   const lines = [...draft.lines]
-    .map((line) => `${line.code}:${line.qty}`)
+    .map((line) => {
+      const key = line.name?.trim()
+        ? `n:${normalizeEquipmentName(line.name)}`
+        : `c:${(line.code ?? "").trim().toUpperCase()}`;
+      return `${key}:${line.qty}`;
+    })
     .sort()
     .join(",");
   return `mapper:${draft.customerName.trim()}|${draft.startDate}|${draft.endDate}|${lines}`;
@@ -40,19 +46,12 @@ export function importMapperOrder(db: Sql, draft: MapperOrderDraft, actor = "map
     };
   }
 
-  const unknown: string[] = [];
   const lines: { skuId: string; qty: number }[] = [];
   for (const line of draft.lines) {
-    const code = line.code.trim().toUpperCase();
-    const sku = db.get<{ id: string }>(`SELECT id FROM skus WHERE upper(code) = ? OR upper(id) = ?`, [code, code]);
-    if (!sku) {
-      unknown.push(code);
-      continue;
-    }
     if (!Number.isInteger(line.qty) || line.qty <= 0) throw new DomainError("Количество в строке должно быть целым и больше нуля");
+    const sku = resolveMapperLineSku(db, line, actor);
     lines.push({ skuId: sku.id, qty: line.qty });
   }
-  if (unknown.length > 0) throw new DomainError(`Неизвестная номенклатура: ${unknown.join(", ")}`);
 
   const created = createOrder(
     db,

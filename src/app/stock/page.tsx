@@ -10,6 +10,13 @@ import { EQUIPMENT_STATUSES, EQUIPMENT_TRANSITIONS, type EquipmentStatus } from 
 import { driveManualHint } from "@/lib/google/drive-sync";
 import { translateError, type MessageKey } from "@/lib/i18n/messages";
 import {
+  addSkuVariant,
+  createProductFamily,
+  listFamilyTree,
+  moveFamily,
+  moveSkuInFamily,
+} from "@/lib/services/catalog-hierarchy";
+import {
   addEquipmentItem,
   importEquipmentReserved,
   listEquipmentHistory,
@@ -46,12 +53,16 @@ export default function StockPage() {
   const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
   const [historyId, setHistoryId] = useState<string | null>(null);
   const [showMovements, setShowMovements] = useState(false);
+  const [variantFamilyId, setVariantFamilyId] = useState("");
   void revision;
 
   const items = useMemo(() => {
     const rows = listEquipmentItems(db, { status: statusFilter, query });
     return sortEquipmentItems(rows, sortKey, sortDir);
   }, [db, statusFilter, query, sortKey, sortDir, revision]);
+
+  const familyTree = useMemo(() => listFamilyTree(db), [db, revision]);
+  const realFamilies = familyTree.filter((node) => node.id !== "__uncategorized__");
 
   const history = historyId ? listEquipmentHistory(db, historyId) : [];
 
@@ -89,8 +100,53 @@ export default function StockPage() {
       const draft = await parseMapperFile(file);
       const result = importEquipmentReserved(db, draft, session.id);
       refresh();
-      setFlash({ ok: t("eq.importOk", { created: result.created, updated: result.updated }) });
+      setFlash({
+        ok: t("eq.importOk", {
+          created: result.created,
+          updated: result.updated,
+          skus: result.skusCreated,
+        }),
+      });
       event.currentTarget.reset();
+    } catch (error) {
+      setFlash({ error: translateError(lang, error) });
+    }
+  }
+
+  function onCreateFamily(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const form = new FormData(event.currentTarget);
+    try {
+      assertCan(session.role, "stock.write");
+      const family = createProductFamily(db, String(form.get("name") ?? ""), session.id);
+      refresh();
+      setVariantFamilyId(family.id);
+      event.currentTarget.reset();
+      setFlash({ ok: t("eq.familyCreated") });
+    } catch (error) {
+      setFlash({ error: translateError(lang, error) });
+    }
+  }
+
+  function onAddVariant(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const form = new FormData(event.currentTarget);
+    try {
+      assertCan(session.role, "stock.write");
+      const familyId = String(form.get("familyId") ?? "");
+      addSkuVariant(
+        db,
+        {
+          familyId,
+          name: String(form.get("name") ?? ""),
+          code: String(form.get("code") ?? "") || undefined,
+        },
+        session.id,
+      );
+      refresh();
+      event.currentTarget.reset();
+      setVariantFamilyId(familyId);
+      setFlash({ ok: t("eq.variantAdded") });
     } catch (error) {
       setFlash({ error: translateError(lang, error) });
     }
@@ -140,6 +196,157 @@ export default function StockPage() {
       <PageHeader eyebrow={t("stock.eyebrow")} title={t("stock.title")} description={t("stock.description")} />
       {!allowed ? <p className="mb-4 text-sm text-ink/60">{t("stock.switch", { name: warehouse })}</p> : null}
       <Flash error={flash.error} ok={flash.ok} />
+
+      <Panel className="mb-4">
+        <h2 className="mb-1 font-medium">{t("eq.hierarchyTitle")}</h2>
+        <p className="mb-3 text-sm leading-6 text-ink/70">{t("eq.hierarchyHelp")}</p>
+        <div className="mb-4 flex flex-col gap-3 lg:flex-row">
+          {allowed ? (
+            <>
+              <form onSubmit={onCreateFamily} className="flex flex-1 flex-col gap-2 sm:flex-row sm:items-end">
+                <div className="flex-1">
+                  <Field label={t("eq.familyName")}>
+                    <input name="name" required className={controlClass} placeholder={t("eq.familyPlaceholder")} />
+                  </Field>
+                </div>
+                <button type="submit" className={buttonClass("primary")}>
+                  {t("eq.familyCreate")}
+                </button>
+              </form>
+              <form onSubmit={onAddVariant} className="flex flex-[1.4] flex-col gap-2 sm:flex-row sm:items-end">
+                <div className="min-w-[8rem]">
+                  <Field label={t("eq.family")}>
+                    <select
+                      name="familyId"
+                      className={controlClass}
+                      required
+                      value={variantFamilyId}
+                      onChange={(event) => setVariantFamilyId(event.target.value)}
+                    >
+                      <option value="">{t("eq.familyPick")}</option>
+                      {realFamilies.map((family) => (
+                        <option key={family.id} value={family.id}>
+                          {family.name}
+                        </option>
+                      ))}
+                    </select>
+                  </Field>
+                </div>
+                <div className="flex-1">
+                  <Field label={t("eq.variantName")}>
+                    <input name="name" required className={controlClass} placeholder={t("eq.variantPlaceholder")} />
+                  </Field>
+                </div>
+                <div className="min-w-[7rem]">
+                  <Field label={t("eq.variantCode")}>
+                    <input name="code" className={controlClass} placeholder={t("eq.variantCodeAuto")} />
+                  </Field>
+                </div>
+                <button type="submit" className={buttonClass("primary")}>
+                  {t("eq.variantAdd")}
+                </button>
+              </form>
+            </>
+          ) : (
+            <p className="text-sm text-ink/60">{t("stock.switch", { name: warehouse })}</p>
+          )}
+        </div>
+        <div className="flex flex-col gap-3">
+          {familyTree.length === 0 ? (
+            <p className="text-sm text-ink/60">{t("eq.hierarchyEmpty")}</p>
+          ) : (
+            familyTree.map((family) => (
+              <div key={family.id} className="rounded-md border border-line bg-paper/60 p-3">
+                <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+                  <h3 className="text-sm font-medium">{family.name}</h3>
+                  {allowed && family.id !== "__uncategorized__" ? (
+                    <div className="flex gap-1">
+                      <button
+                        type="button"
+                        className={buttonClass("ghost", "px-2 py-1 text-xs")}
+                        onClick={() => {
+                          try {
+                            assertCan(session.role, "stock.write");
+                            moveFamily(db, family.id, "up");
+                            refresh();
+                          } catch (error) {
+                            setFlash({ error: translateError(lang, error) });
+                          }
+                        }}
+                      >
+                        ↑
+                      </button>
+                      <button
+                        type="button"
+                        className={buttonClass("ghost", "px-2 py-1 text-xs")}
+                        onClick={() => {
+                          try {
+                            assertCan(session.role, "stock.write");
+                            moveFamily(db, family.id, "down");
+                            refresh();
+                          } catch (error) {
+                            setFlash({ error: translateError(lang, error) });
+                          }
+                        }}
+                      >
+                        ↓
+                      </button>
+                    </div>
+                  ) : null}
+                </div>
+                {family.skus.length === 0 ? (
+                  <p className="text-xs text-ink/50">{t("eq.hierarchyNoSkus")}</p>
+                ) : (
+                  <ul className="flex flex-col gap-1">
+                    {family.skus.map((sku) => (
+                      <li key={sku.id} className="flex flex-wrap items-center justify-between gap-2 text-sm">
+                        <span>
+                          <span className="me-2 font-mono text-xs text-ink/60">{sku.code}</span>
+                          {sku.name}
+                        </span>
+                        {allowed ? (
+                          <span className="flex gap-1">
+                            <button
+                              type="button"
+                              className={buttonClass("ghost", "px-2 py-0.5 text-xs")}
+                              onClick={() => {
+                                try {
+                                  assertCan(session.role, "stock.write");
+                                  moveSkuInFamily(db, sku.id, "up");
+                                  refresh();
+                                } catch (error) {
+                                  setFlash({ error: translateError(lang, error) });
+                                }
+                              }}
+                            >
+                              ↑
+                            </button>
+                            <button
+                              type="button"
+                              className={buttonClass("ghost", "px-2 py-0.5 text-xs")}
+                              onClick={() => {
+                                try {
+                                  assertCan(session.role, "stock.write");
+                                  moveSkuInFamily(db, sku.id, "down");
+                                  refresh();
+                                } catch (error) {
+                                  setFlash({ error: translateError(lang, error) });
+                                }
+                              }}
+                            >
+                              ↓
+                            </button>
+                          </span>
+                        ) : null}
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+            ))
+          )}
+        </div>
+      </Panel>
 
       <div className="mb-4 flex flex-col gap-3 rounded-lg border border-line bg-sand p-3 md:flex-row md:flex-wrap md:items-end">
         <Field label={t("eq.status")}>

@@ -1,7 +1,9 @@
 import { assertDateRange, todayIso } from "@/lib/dates";
 import { allocateForSku } from "@/lib/domain/allocation";
 import { DomainError } from "@/lib/domain/errors";
+import { normalizeEquipmentName } from "@/lib/domain/sku-code";
 import { newId, type Sql } from "@/lib/db/sql";
+import { findOrCreateFamily } from "@/lib/services/catalog-hierarchy";
 
 type SkuRecord = {
   id: string;
@@ -151,12 +153,31 @@ export function createSku(
   }
   if (name.length < 2) throw new DomainError("Укажите название");
   if (category.length < 2) throw new DomainError("Укажите категорию");
+  const nameKey = normalizeEquipmentName(name);
+  if (db.get(`SELECT id FROM skus WHERE name_key = ?`, [nameKey])) {
+    throw new DomainError("Такой код номенклатуры уже есть");
+  }
+  const family = findOrCreateFamily(db, category);
+  const maxSort =
+    db.get<{ value: number }>(`SELECT COALESCE(MAX(sort_order), -1) AS value FROM skus WHERE family_id = ?`, [family.id])
+      ?.value ?? -1;
   const id = newId();
   try {
     inTx(db, (tx) => {
       tx.run(
-        `INSERT INTO skus (id, code, name, category, unit, track_mode, description) VALUES (?, ?, ?, ?, ?, 'quantity', ?)`,
-        [id, code, name, category, input.unit?.trim() || "шт", input.description?.trim() ?? ""],
+        `INSERT INTO skus (id, code, name, category, unit, track_mode, description, family_id, name_key, sort_order)
+         VALUES (?, ?, ?, ?, ?, 'quantity', ?, ?, ?, ?)`,
+        [
+          id,
+          code,
+          name,
+          family.name,
+          input.unit?.trim() || "шт",
+          input.description?.trim() ?? "",
+          family.id,
+          nameKey,
+          maxSort + 1,
+        ],
       );
       audit(tx, actor, "sku.create", "sku", id, { code, name });
     });

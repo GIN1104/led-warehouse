@@ -5,6 +5,7 @@ import {
 } from "@/lib/domain/equipment-status";
 import { DomainError } from "@/lib/domain/errors";
 import { newId, type Sql } from "@/lib/db/sql";
+import { findOrCreateSkuByName } from "@/lib/services/catalog-hierarchy";
 import type { MapperOrderDraft } from "@/lib/services/mapper-sheet";
 
 export type EquipmentItemRow = {
@@ -117,8 +118,34 @@ export function addEquipmentItem(db: Sql, input: AddEquipmentInput, actor: strin
   return row;
 }
 
+/** Резолв строки mapper: по code или по name с автосозданием SKU/code. */
+export function resolveMapperLineSku(
+  db: Sql,
+  line: { code?: string; name?: string; category?: string },
+  actor: string,
+): { id: string; code: string; created: boolean } {
+  const code = line.code?.trim().toUpperCase() ?? "";
+  const name = line.name?.trim() ?? "";
+  if (name) {
+    const sku = findOrCreateSkuByName(
+      db,
+      { name, code: code || undefined, category: line.category },
+      actor,
+    );
+    return { id: sku.id, code: sku.code, created: sku.created };
+  }
+  if (!code) throw new DomainError("В строке нужны code или name/название");
+  const sku = db.get<{ id: string; code: string }>(
+    `SELECT id, code FROM skus WHERE upper(code) = ? OR upper(id) = ?`,
+    [code, code],
+  );
+  if (!sku) throw new DomainError(`Неизвестная номенклатура: ${code}`);
+  return { id: sku.id, code: sku.code, created: false };
+}
+
 /**
  * Импорт Excel/CSV mapper → позиции со статусом reserved.
+ * Строки с названием без code создают SKU со стабильным авто-code.
  * Повтор того же external_ref + sku обновляет qty, не дублирует строку.
  */
 export function importEquipmentReserved(
@@ -126,25 +153,21 @@ export function importEquipmentReserved(
   draft: MapperOrderDraft,
   actor: string,
   options?: { orderId?: string },
-): { created: number; updated: number; items: EquipmentItemRow[] } {
+): { created: number; updated: number; skusCreated: number; items: EquipmentItemRow[] } {
   if (draft.lines.length === 0) throw new DomainError("Добавьте хотя бы одну строку");
   const externalRef = (draft.externalId?.trim() || `mapper:${draft.customerName}|${draft.startDate}|${draft.endDate}`).slice(0, 200);
-  const unknown: string[] = [];
   let created = 0;
   let updated = 0;
+  let skusCreated = 0;
   const itemIds: string[] = [];
 
   db.transaction(() => {
     for (const line of draft.lines) {
-      const code = line.code.trim().toUpperCase();
-      const sku = db.get<{ id: string }>(`SELECT id FROM skus WHERE upper(code) = ? OR upper(id) = ?`, [code, code]);
-      if (!sku) {
-        unknown.push(code);
-        continue;
-      }
       if (!Number.isInteger(line.qty) || line.qty <= 0) {
         throw new DomainError("Количество в строке должно быть целым и больше нуля");
       }
+      const sku = resolveMapperLineSku(db, line, actor);
+      if (sku.created) skusCreated += 1;
       const existing = db.get<{ id: string; status: string }>(
         `SELECT id, status FROM equipment_items WHERE external_ref = ? AND sku_id = ? AND status = 'reserved'`,
         [externalRef, sku.id],
@@ -176,12 +199,12 @@ export function importEquipmentReserved(
         itemIds.push(id);
       }
     }
-    if (unknown.length > 0) throw new DomainError(`Неизвестная номенклатура: ${unknown.join(", ")}`);
   });
 
   return {
     created,
     updated,
+    skusCreated,
     items: itemIds.map((id) => getEquipmentItem(db, id)!).filter(Boolean),
   };
 }
