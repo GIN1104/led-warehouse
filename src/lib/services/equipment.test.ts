@@ -79,6 +79,30 @@ describe("оборудование: статусы и импорт", () => {
     expect(again.items[0]?.qty).toBe(6);
   });
 
+  it("импорт HE имён → русские SKU и стабильный code при повторном RU", () => {
+    const db = setup();
+    const he = importEquipmentReserved(
+      db,
+      parseMapperCsv("שם,כמות,external_id\nמסך,3,eq-he-1\nמחשב,1,eq-he-1\n"),
+      "wh",
+    );
+    expect(he.skusCreated).toBe(2);
+    expect(he.items.map((row) => row.skuName).sort()).toEqual(["Компьютер", "Экран"]);
+    const screenCode = he.items.find((row) => row.skuName === "Экран")?.skuCode;
+    expect(screenCode).toBeTruthy();
+
+    const ruAgain = importEquipmentReserved(
+      db,
+      parseMapperCsv("название,количество,external_id\nЭкран,5,eq-he-1\n"),
+      "wh",
+    );
+    expect(ruAgain.skusCreated).toBe(0);
+    expect(ruAgain.updated).toBe(1);
+    expect(ruAgain.items[0]?.skuCode).toBe(screenCode);
+    expect(ruAgain.items[0]?.skuName).toBe("Экран");
+    expect(ruAgain.items[0]?.qty).toBe(5);
+  });
+
   it("вручную: reserved → checked_out → needs_repair → in_repair → available", () => {
     const db = setup();
     const item = addEquipmentItem(db, { skuId: "CAB-P25", qty: 4, status: "reserved" }, "wh");
