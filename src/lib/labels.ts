@@ -1,9 +1,7 @@
-export const roleLabel = {
-  warehouse: "Склад",
-  logistics: "Логистика",
-  manager: "Менеджер",
-  admin: "Администратор",
-} as const;
+import { DEFAULT_ROLE_LABELS } from "@/lib/services/people";
+
+/** Дефолтные ярлыки ролей; кастомные читаются из БД через getRoleLabels. */
+export const roleLabel = DEFAULT_ROLE_LABELS;
 
 export const orderStatusLabel = {
   confirmed: "Подтверждён",

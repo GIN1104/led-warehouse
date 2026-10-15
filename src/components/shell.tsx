@@ -6,6 +6,8 @@ import { useI18n } from "@/components/i18n";
 import { Nav } from "@/components/nav";
 import { useWarehouse } from "@/components/warehouse";
 import type { Lang, MessageKey } from "@/lib/i18n/messages";
+import { getRoleLabels } from "@/lib/services/people";
+import type { Role } from "@/lib/services/queries";
 
 const languages: Lang[] = ["ru", "en", "he"];
 const SIDEBAR_KEY = "led-warehouse:sidebar";
@@ -36,9 +38,15 @@ function LanguageSwitch({ onDark = true }: { onDark?: boolean }) {
   );
 }
 
+function roleCaption(role: Role, labels: Record<Role, string>, t: (key: MessageKey) => string): string {
+  return labels[role] || t(`role.${role}` as MessageKey);
+}
+
 function RoleSwitch() {
-  const { users, session, switchUser } = useWarehouse();
+  const { db, users, session, switchUser, revision } = useWarehouse();
   const { t } = useI18n();
+  const labels = getRoleLabels(db);
+  void revision;
   return (
     <div className="flex flex-col gap-2">
       <p className="text-xs tracking-wide text-white/50 uppercase">{t("shell.who")}</p>
@@ -54,7 +62,7 @@ function RoleSwitch() {
           }
         >
           <span className="block truncate">
-            {user.name} · {t(`role.${user.role}` as MessageKey)}
+            {user.name} · {roleCaption(user.role, labels, t)}
           </span>
         </button>
       ))}
@@ -72,9 +80,11 @@ function rememberSidebar(open: boolean) {
 }
 
 export function Shell({ children }: { children: ReactNode }) {
-  const { session, shared, notice } = useWarehouse();
+  const { db, session, shared, notice, revision } = useWarehouse();
   const { t } = useI18n();
   const [open, setOpen] = useState(true);
+  const labels = getRoleLabels(db);
+  void revision;
 
   useEffect(() => {
     let cancel = false;
@@ -141,7 +151,7 @@ export function Shell({ children }: { children: ReactNode }) {
           </button>
           <p className="truncate font-semibold">LED Warehouse</p>
           <p className="ms-auto truncate text-xs text-ink/60">
-            {session.name} · {t(`role.${session.role}` as MessageKey)}
+            {session.name} · {roleCaption(session.role, labels, t)}
           </p>
         </header>
         <main className="min-w-0 flex-1 px-4 py-6 md:px-8 md:py-8">
