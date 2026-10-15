@@ -173,7 +173,11 @@ export function importEquipmentReserved(
         [externalRef, sku.id],
       );
       const now = Date.now();
-      const note = [draft.notes?.trim(), draft.customerName.trim() ? `заказчик: ${draft.customerName.trim()}` : ""]
+      const note = [
+        line.note?.trim(),
+        draft.notes?.trim(),
+        draft.customerName.trim() ? `заказчик: ${draft.customerName.trim()}` : "",
+      ]
         .filter(Boolean)
         .join(" · ");
       if (existing) {
