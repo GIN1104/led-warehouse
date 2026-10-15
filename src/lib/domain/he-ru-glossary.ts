@@ -66,3 +66,9 @@ export function canonicalizeEquipmentName(raw: string): string {
 export function isHebrewGlossaryName(raw: string): boolean {
   return HE_TO_RU.has(normalizeGlossaryKey(raw));
 }
+
+/** true, если строка — известный HE или канонический RU из словаря. */
+export function isGlossaryEquipmentName(raw: string): boolean {
+  const key = normalizeGlossaryKey(raw);
+  return HE_TO_RU.has(key) || RU_CANONICAL.has(key);
+}
