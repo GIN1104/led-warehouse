@@ -39,6 +39,7 @@ export default function PeoplePage() {
       createPerson(db, {
         name: String(data.get("name") ?? ""),
         role: String(data.get("role") ?? "warehouse") as Role,
+        email: String(data.get("email") ?? ""),
       });
       await refresh();
       form.reset();
@@ -55,6 +56,7 @@ export default function PeoplePage() {
       updatePerson(db, id, {
         name: String(data.get("name") ?? ""),
         role: String(data.get("role") ?? "warehouse") as Role,
+        email: String(data.get("email") ?? ""),
       });
       await refresh();
       setFlash({ ok: t("people.updated") });
@@ -115,7 +117,7 @@ export default function PeoplePage() {
             {users.map((user) => (
               <li key={user.id} className="rounded-md border border-line bg-white p-3">
                 <form
-                  className="grid gap-2 sm:grid-cols-[minmax(0,1fr)_10rem_auto_auto] sm:items-end"
+                  className="grid gap-2 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_10rem_auto_auto] sm:items-end"
                   onSubmit={(event) => {
                     event.preventDefault();
                     void onSavePerson(user.id, event.currentTarget);
@@ -129,6 +131,17 @@ export default function PeoplePage() {
                       className={controlClass}
                       required
                       maxLength={80}
+                    />
+                  </Field>
+                  <Field label={t("people.email")}>
+                    <input
+                      name="email"
+                      type="email"
+                      defaultValue={user.email ?? ""}
+                      disabled={!allowed}
+                      className={controlClass}
+                      maxLength={120}
+                      placeholder={t("people.emailPlaceholder")}
                     />
                   </Field>
                   <Field label={t("people.role")}>
@@ -157,9 +170,21 @@ export default function PeoplePage() {
           </ul>
 
           {allowed ? (
-            <form onSubmit={(event) => void onAdd(event)} className="grid gap-2 border-t border-line pt-4 sm:grid-cols-[minmax(0,1fr)_10rem_auto] sm:items-end">
+            <form
+              onSubmit={(event) => void onAdd(event)}
+              className="grid gap-2 border-t border-line pt-4 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_10rem_auto] sm:items-end"
+            >
               <Field label={t("people.name")}>
                 <input name="name" className={controlClass} required maxLength={80} placeholder={t("people.add")} />
+              </Field>
+              <Field label={t("people.email")}>
+                <input
+                  name="email"
+                  type="email"
+                  className={controlClass}
+                  maxLength={120}
+                  placeholder={t("people.emailPlaceholder")}
+                />
               </Field>
               <Field label={t("people.role")}>
                 <select name="role" defaultValue="warehouse" className={controlClass}>

@@ -3,10 +3,25 @@ import type { Sql } from "@/lib/db/sql";
 
 export type Role = "warehouse" | "logistics" | "manager" | "admin";
 
-export type UserRow = { id: string; name: string; role: Role };
+export type UserRow = { id: string; name: string; role: Role; email: string | null };
 
 export function listUsers(db: Sql): UserRow[] {
-  return db.all<UserRow>(`SELECT id, name, role FROM users ORDER BY name`);
+  return db.all<UserRow>(`SELECT id, name, role, email FROM users ORDER BY name`).map((row) => ({
+    ...row,
+    email: row.email?.trim() ? row.email.trim().toLowerCase() : null,
+  }));
+}
+
+export function findUserByEmail(db: Sql, email: string): UserRow | undefined {
+  const normalized = email.trim().toLowerCase();
+  if (!normalized) return undefined;
+  return listUsers(db).find((user) => user.email === normalized);
+}
+
+export function listDirectoryEmails(db: Sql): string[] {
+  return listUsers(db)
+    .map((user) => user.email)
+    .filter((email): email is string => Boolean(email));
 }
 
 export function listLocations(db: Sql) {
