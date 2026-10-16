@@ -2,6 +2,7 @@
 
 import { useEffect, useState, type ReactNode } from "react";
 import { PanelLeft, PanelLeftClose } from "lucide-react";
+import { useEmailAuth } from "@/components/auth-gate";
 import { useI18n } from "@/components/i18n";
 import { Nav } from "@/components/nav";
 import { useWarehouse } from "@/components/warehouse";
@@ -81,6 +82,7 @@ function rememberSidebar(open: boolean) {
 
 export function Shell({ children }: { children: ReactNode }) {
   const { db, session, shared, notice, revision } = useWarehouse();
+  const { session: auth, logout } = useEmailAuth();
   const { t } = useI18n();
   const [open, setOpen] = useState(true);
   const labels = getRoleLabels(db);
@@ -134,6 +136,18 @@ export function Shell({ children }: { children: ReactNode }) {
           <div className="mt-3">
             <RoleSwitch />
           </div>
+          {auth ? (
+            <div className="mt-3">
+              <p className="truncate text-[11px] text-white/45">{auth.email}</p>
+              <button
+                type="button"
+                onClick={logout}
+                className="mt-1 w-full rounded-md px-3 py-2 text-start text-sm text-white/80 hover:bg-white/10"
+              >
+                {t("login.logout")}
+              </button>
+            </div>
+          ) : null}
           <p className="mt-3 text-[11px] leading-4 text-white/45">{shared ? t("shell.shared") : t("shell.browser")}</p>
         </div>
       </aside>
@@ -152,6 +166,7 @@ export function Shell({ children }: { children: ReactNode }) {
           <p className="truncate font-semibold">LED Warehouse</p>
           <p className="ms-auto truncate text-xs text-ink/60">
             {session.name} · {roleCaption(session.role, labels, t)}
+            {auth ? ` · ${auth.email}` : ""}
           </p>
         </header>
         <main className="min-w-0 flex-1 px-4 py-6 md:px-8 md:py-8">

@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { IBM_Plex_Mono, Manrope, Rubik } from "next/font/google";
+import { AuthGate } from "@/components/auth-gate";
 import { I18nProvider } from "@/components/i18n";
-import { Shell } from "@/components/shell";
 import { WarehouseProvider } from "@/components/warehouse";
 import "./globals.css";
 
@@ -24,7 +24,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <body className={`${sans.variable} ${hebrew.variable} ${mono.variable} antialiased`}>
         <I18nProvider>
           <WarehouseProvider>
-            <Shell>{children}</Shell>
+            <AuthGate>{children}</AuthGate>
           </WarehouseProvider>
         </I18nProvider>
       </body>

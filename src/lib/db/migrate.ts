@@ -5,7 +5,8 @@ export const MIGRATION_SQL = `
 CREATE TABLE IF NOT EXISTS users (
   id TEXT PRIMARY KEY,
   name TEXT NOT NULL,
-  role TEXT NOT NULL CHECK (role IN ('warehouse', 'logistics', 'manager', 'admin'))
+  role TEXT NOT NULL CHECK (role IN ('warehouse', 'logistics', 'manager', 'admin')),
+  email TEXT
 );
 
 CREATE TABLE IF NOT EXISTS skus (
@@ -270,7 +271,19 @@ export function migrate(db: Sql): void {
   }
   db.exec(`CREATE UNIQUE INDEX IF NOT EXISTS uq_skus_name_key ON skus(name_key) WHERE name_key IS NOT NULL AND name_key != ''`);
   db.exec(`CREATE INDEX IF NOT EXISTS idx_skus_family ON skus(family_id)`);
+  if (!columnExists(db, "users", "email")) {
+    db.exec(`ALTER TABLE users ADD COLUMN email TEXT`);
+  }
+  db.exec(
+    `CREATE UNIQUE INDEX IF NOT EXISTS uq_users_email ON users(email) WHERE email IS NOT NULL AND email != ''`,
+  );
   backfillSkuHierarchy(db);
   db.run(`INSERT INTO ledger_meta (key, value) VALUES ('revision', '0') ON CONFLICT(key) DO NOTHING`);
   db.run(`UPDATE users SET name = 'Дмитрий' WHERE id = 'user_manager' AND name = 'Мария'`);
+  db.run(
+    `UPDATE users SET email = 'alexey@led.local' WHERE id = 'user_warehouse' AND (email IS NULL OR email = '')`,
+  );
+  db.run(
+    `UPDATE users SET email = 'dmitry@led.local' WHERE id = 'user_manager' AND (email IS NULL OR email = '')`,
+  );
 }

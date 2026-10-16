@@ -15,8 +15,10 @@ import { listUsers } from "@/lib/services/queries";
 describe("справочник людей и ярлыки ролей", () => {
   it("добавляет, переименовывает и меняет роль человека", () => {
     const db = createDb();
-    const person = createPerson(db, { name: "Ирина", role: "manager" });
-    expect(listUsers(db)).toEqual([{ id: person.id, name: "Ирина", role: "manager" }]);
+    const person = createPerson(db, { name: "Ирина", role: "manager", email: "irina@led.local" });
+    expect(listUsers(db)).toEqual([
+      { id: person.id, name: "Ирина", role: "manager", email: "irina@led.local" },
+    ]);
 
     renamePerson(db, person.id, "Ирина К.");
     expect(listUsers(db)[0]?.name).toBe("Ирина К.");
@@ -24,8 +26,14 @@ describe("справочник людей и ярлыки ролей", () => {
     setPersonRole(db, person.id, "warehouse");
     expect(listUsers(db)[0]?.role).toBe("warehouse");
 
-    updatePerson(db, person.id, { name: "Олег", role: "logistics" });
-    expect(listUsers(db)[0]).toMatchObject({ name: "Олег", role: "logistics" });
+    updatePerson(db, person.id, { name: "Олег", role: "logistics", email: "oleg@led.local" });
+    expect(listUsers(db)[0]).toMatchObject({ name: "Олег", role: "logistics", email: "oleg@led.local" });
+  });
+
+  it("не даёт дублировать email", () => {
+    const db = createDb();
+    createPerson(db, { name: "А", role: "warehouse", email: "same@led.local" });
+    expect(() => createPerson(db, { name: "Б", role: "manager", email: "same@led.local" })).toThrow(/email/);
   });
 
   it("не даёт пустое имя, неизвестную роль и удаление последнего", () => {
