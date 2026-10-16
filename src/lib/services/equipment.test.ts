@@ -3,11 +3,13 @@ import { createDb } from "@/lib/db/memory";
 import { applyMovement } from "@/lib/services/ledger";
 import {
   addEquipmentItem,
+  deleteEquipmentItem,
   importEquipmentReserved,
   listEquipmentHistory,
   listEquipmentItems,
   setEquipmentStatus,
   sortEquipmentItems,
+  updateEquipmentItem,
 } from "@/lib/services/equipment";
 import { parseMapperCsv } from "@/lib/services/mapper-sheet";
 
@@ -123,5 +125,40 @@ describe("оборудование: статусы и импорт", () => {
     expect(byCode.map((row) => row.skuCode)).toEqual(["CAB-P25", "CTL-NOVA"]);
     const byQty = sortEquipmentItems(rows, "qty", "desc");
     expect(byQty[0]?.qty).toBe(10);
+  });
+
+  it("обновляет qty и имя SKU, удаляет строку", () => {
+    const db = setup();
+    const item = addEquipmentItem(db, { skuId: "CAB-P25", qty: 8, note: "полка" }, "wh");
+    const updated = updateEquipmentItem(db, item.id, { qty: 12, skuName: "Кабинет P2.5 HD" }, "wh");
+    expect(updated.qty).toBe(12);
+    expect(updated.skuName).toBe("Кабинет P2.5 HD");
+    expect(updated.skuCode).toBe("CAB-P25");
+    const history = listEquipmentHistory(db, item.id);
+    expect(history.some((entry) => entry.note.includes("qty → 12"))).toBe(true);
+
+    deleteEquipmentItem(db, item.id, "wh");
+    expect(listEquipmentItems(db, { id: item.id })).toHaveLength(0);
+    expect(listEquipmentHistory(db, item.id)).toHaveLength(0);
+  });
+
+  it("update с недопустимым переходом статуса падает", () => {
+    const db = setup();
+    const item = addEquipmentItem(db, { skuId: "CAB-P25", qty: 2, status: "available" }, "wh");
+    expect(() => updateEquipmentItem(db, item.id, { status: "available" }, "wh")).not.toThrow();
+    expect(() => updateEquipmentItem(db, item.id, { qty: 0 }, "wh")).toThrow(/больше нуля/);
+  });
+
+  it("импорт после ручного update qty не ломается", () => {
+    const db = setup();
+    const draft = parseMapperCsv(
+      "code,qty,customer,start,end,external_id\nCAB-P25,5,Зал,2026-10-10,2026-10-12,eq-crud\n",
+    );
+    const first = importEquipmentReserved(db, draft, "wh");
+    updateEquipmentItem(db, first.items[0]!.id, { qty: 9 }, "wh");
+    const again = importEquipmentReserved(db, draft, "wh");
+    expect(again.updated).toBe(1);
+    expect(again.items[0]?.qty).toBe(5);
+    expect(listEquipmentItems(db).filter((row) => row.externalRef === "eq-crud")).toHaveLength(1);
   });
 });
