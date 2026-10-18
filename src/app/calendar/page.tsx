@@ -6,7 +6,7 @@ import { CalendarMonth } from "@/components/calendar-month";
 import { useI18n } from "@/components/i18n";
 import { useWarehouse } from "@/components/warehouse";
 import { Badge, Empty, Flash, PageHeader, Panel, buttonClass } from "@/components/ui";
-import { linkify } from "@/lib/calendar/links";
+import { driveLinkFileName, linkify } from "@/lib/calendar/links";
 import { mockCalendarEvents } from "@/lib/calendar/mock-events";
 import { itemsOnDate, mergeCalendarItems, ordersToCalendarItems, shiftMonth } from "@/lib/calendar/merge";
 import { TaskProgress } from "@/components/task-progress";
@@ -58,7 +58,7 @@ function LinkedText({ text, className }: { text: string; className?: string }) {
             rel="noopener noreferrer"
             className="break-all text-copper underline"
           >
-            {part.text}
+            {driveLinkFileName(part.href) ?? part.text}
           </a>
         ) : (
           <span key={index}>{part.text}</span>

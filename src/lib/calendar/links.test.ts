@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { linkify } from "@/lib/calendar/links";
+import { driveLinkFileName, linkify } from "@/lib/calendar/links";
 import { mapGoogleEvents } from "@/lib/google/map-events";
 
 describe("ссылки события Google", () => {
@@ -10,6 +10,13 @@ describe("ссылки события Google", () => {
       { kind: "link", text: "https://example.com/a/very/long/path", href: "https://example.com/a/very/long/path" },
       { kind: "text", text: ". Готово" },
     ]);
+  });
+
+  it("достаёт имя Excel из пути URL (ДД-ММ-ГГГГ)", () => {
+    expect(driveLinkFileName("https://files.example.com/folder/18-10-2026%20Trask.xlsx")).toBe(
+      "18-10-2026 Trask.xlsx",
+    );
+    expect(driveLinkFileName("https://drive.google.com/file/d/abc/view")).toBeUndefined();
   });
 
   it("кладёт ссылку встречи и карточку Google в событие", () => {
