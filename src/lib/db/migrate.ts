@@ -200,7 +200,23 @@ CREATE TABLE IF NOT EXISTS product_families (
   sort_order INTEGER NOT NULL DEFAULT 0,
   created_at INTEGER NOT NULL
 );
-`;
+
+CREATE TABLE IF NOT EXISTS access_requests (
+  id TEXT PRIMARY KEY,
+  email TEXT NOT NULL,
+  status TEXT NOT NULL CHECK (status IN ('pending', 'approved', 'rejected')),
+  created_at INTEGER NOT NULL,
+  decided_by TEXT,
+  decided_at INTEGER
+);
+
+CREATE TABLE IF NOT EXISTS allowed_emails (
+  email TEXT PRIMARY KEY,
+  approved_at INTEGER NOT NULL,
+  approved_by TEXT,
+  revoked_at INTEGER
+);
+`
 
 function columnExists(db: Sql, table: string, column: string): boolean {
   const rows = db.all<{ name: string }>(`PRAGMA table_info(${table})`);
@@ -277,6 +293,30 @@ export function migrate(db: Sql): void {
   db.exec(
     `CREATE UNIQUE INDEX IF NOT EXISTS uq_users_email ON users(email) WHERE email IS NOT NULL AND email != ''`,
   );
+  db.exec(`
+CREATE TABLE IF NOT EXISTS access_requests (
+  id TEXT PRIMARY KEY,
+  email TEXT NOT NULL,
+  status TEXT NOT NULL CHECK (status IN ('pending', 'approved', 'rejected')),
+  created_at INTEGER NOT NULL,
+  decided_by TEXT,
+  decided_at INTEGER
+);
+CREATE TABLE IF NOT EXISTS allowed_emails (
+  email TEXT PRIMARY KEY,
+  approved_at INTEGER NOT NULL,
+  approved_by TEXT,
+  revoked_at INTEGER
+);
+`);
+  db.exec(
+    `CREATE UNIQUE INDEX IF NOT EXISTS uq_access_requests_pending_email
+     ON access_requests(email) WHERE status = 'pending'`,
+  );
+  db.exec(`CREATE INDEX IF NOT EXISTS idx_access_requests_status ON access_requests(status)`);
+  db.exec(
+    `CREATE INDEX IF NOT EXISTS idx_allowed_emails_active ON allowed_emails(email) WHERE revoked_at IS NULL`,
+  );
   backfillSkuHierarchy(db);
   db.run(`INSERT INTO ledger_meta (key, value) VALUES ('revision', '0') ON CONFLICT(key) DO NOTHING`);
   db.run(`UPDATE users SET name = 'Дмитрий' WHERE id = 'user_manager' AND name = 'Мария'`);
@@ -286,4 +326,17 @@ export function migrate(db: Sql): void {
   db.run(
     `UPDATE users SET email = 'dmitry@led.local' WHERE id = 'user_manager' AND (email IS NULL OR email = '')`,
   );
+  // ledvision2026.il@gmail.com — в allowlist по умолчанию (revoke разрешён).
+  // Permanent owner в таблицу не пишем: он hardcoded всегда allowed.
+  const defaultAllow = "ledvision2026.il@gmail.com";
+  const existingDefault = db.get<{ email: string; revoked_at: number | null }>(
+    `SELECT email, revoked_at FROM allowed_emails WHERE email = ?`,
+    [defaultAllow],
+  );
+  if (!existingDefault) {
+    db.run(
+      `INSERT INTO allowed_emails (email, approved_at, approved_by, revoked_at) VALUES (?, ?, 'seed:default', NULL)`,
+      [defaultAllow, Date.now()],
+    );
+  }
 }

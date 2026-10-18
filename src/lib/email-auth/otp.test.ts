@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
+import { DEFAULT_ALLOW_EMAIL, PERMANENT_OWNER_EMAIL } from "@/lib/email-auth/allowlist-policy";
 import {
-  BOOTSTRAP_ALLOWLIST,
   clearPendingOtp,
   issueLocalOtp,
   isEmailAllowed,
@@ -33,17 +33,17 @@ function memoryStore(): Storage {
 }
 
 describe("email OTP allowlist и mock", () => {
-  it("пускает bootstrap и адреса из people", () => {
-    expect(isEmailAllowed("Alexey@Led.Local", [])).toBe(true);
-    expect(isEmailAllowed("new@company.com", ["new@company.com"])).toBe(true);
-    expect(isEmailAllowed("stranger@x.com", ["new@company.com"])).toBe(false);
-    expect(BOOTSTRAP_ALLOWLIST).toContain("dmitry@led.local");
+  it("пускает permanent owner и адреса из allowlist; seed local — нет", () => {
+    expect(isEmailAllowed("StarchenkoGin@gmail.com", [])).toBe(true);
+    expect(isEmailAllowed(DEFAULT_ALLOW_EMAIL, [DEFAULT_ALLOW_EMAIL])).toBe(true);
+    expect(isEmailAllowed("alexey@led.local", [])).toBe(false);
+    expect(isEmailAllowed("stranger@x.com", [DEFAULT_ALLOW_EMAIL])).toBe(false);
   });
 
-  it("выдаёт и проверяет код; отклоняет чужой email и просрочку", () => {
+  it("выдаёт и проверяет код для allowed email", () => {
     const storage = memoryStore();
     const issued = issueLocalOtp({
-      email: "  DMITRY@LED.LOCAL ",
+      email: `  ${PERMANENT_OWNER_EMAIL} `,
       directoryEmails: [],
       storage,
       now: 1_000,
@@ -57,7 +57,7 @@ describe("email OTP allowlist и mock", () => {
     expect(bad).toEqual({ ok: false, reason: "mismatch" });
 
     const ok = verifyLocalOtp({ email: issued.email, code: issued.code, storage, now: 1_002 });
-    expect(ok).toEqual({ ok: true, email: "dmitry@led.local" });
+    expect(ok).toEqual({ ok: true, email: PERMANENT_OWNER_EMAIL });
 
     const again = verifyLocalOtp({ email: issued.email, code: issued.code, storage, now: 1_003 });
     expect(again).toEqual({ ok: false, reason: "no_pending" });
@@ -68,7 +68,7 @@ describe("email OTP allowlist и mock", () => {
     expect(issueLocalOtp({ email: "nope@x.com", directoryEmails: [], storage }).ok).toBe(false);
 
     const issued = issueLocalOtp({
-      email: "alexey@led.local",
+      email: PERMANENT_OWNER_EMAIL,
       directoryEmails: [],
       storage,
       now: 0,
@@ -85,10 +85,10 @@ describe("email OTP allowlist и mock", () => {
 
   it("хранит email-сессию отдельно от Google", () => {
     const storage = memoryStore();
-    writeEmailAuthSession(storage, { email: "dmitry@led.local", userId: "user_manager", loggedInAt: 42 });
+    writeEmailAuthSession(storage, { email: PERMANENT_OWNER_EMAIL, userId: "user_owner", loggedInAt: 42 });
     expect(readEmailAuthSession(storage)).toEqual({
-      email: "dmitry@led.local",
-      userId: "user_manager",
+      email: PERMANENT_OWNER_EMAIL,
+      userId: "user_owner",
       loggedInAt: 42,
     });
     clearEmailAuthSession(storage);
