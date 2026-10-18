@@ -1,3 +1,4 @@
+import { DEFAULT_ALLOW_EMAIL, PERMANENT_OWNER_EMAIL } from "@/lib/email-auth/allowlist-policy";
 import { isValidEmailShape, normalizeEmail } from "@/lib/email-auth/normalize";
 import type { OtpIssueResult, OtpVerifyResult, PendingOtp } from "@/lib/email-auth/types";
 
@@ -16,8 +17,11 @@ export function browserOtpStorage(): KeyValueStore | undefined {
   return sessionStorage;
 }
 
-/** Демо-адреса seed-пользователей — всегда в allowlist на Pages. */
-export const BOOTSTRAP_ALLOWLIST: readonly string[] = ["alexey@led.local", "dmitry@led.local"] as const;
+/** @deprecated seed-адреса больше не дают вход; оставлены для совместимости тестов OTP. */
+export const BOOTSTRAP_ALLOWLIST: readonly string[] = [] as const;
+
+/** Адреса с постоянным/дефолтным допуском (подсказка на /login). */
+export const LOGIN_HINT_EMAILS: readonly string[] = [PERMANENT_OWNER_EMAIL, DEFAULT_ALLOW_EMAIL] as const;
 
 export function generateOtpCode(random = Math.random): string {
   const n = Math.floor(random() * 1_000_000);
@@ -54,10 +58,15 @@ export function clearPendingOtp(storage: KeyValueStore | undefined): void {
   storage?.removeItem(PENDING_OTP_KEY);
 }
 
+/**
+ * OTP allowlist: permanent owner + активные allowed_emails (directoryEmails).
+ * Seed alexey/dmitry больше не пускают.
+ */
 export function isEmailAllowed(email: string, directoryEmails: readonly string[]): boolean {
   const normalized = normalizeEmail(email);
   if (!normalized) return false;
-  const set = new Set([...BOOTSTRAP_ALLOWLIST, ...directoryEmails.map(normalizeEmail)].filter(Boolean));
+  if (normalized === PERMANENT_OWNER_EMAIL) return true;
+  const set = new Set(directoryEmails.map(normalizeEmail).filter(Boolean));
   return set.has(normalized);
 }
 

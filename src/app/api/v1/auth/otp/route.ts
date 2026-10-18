@@ -1,8 +1,9 @@
 import { DomainError } from "@/lib/domain/errors";
 import { enqueueLedger } from "@/lib/db/file-store";
 import { isValidEmailShape, normalizeEmail } from "@/lib/email-auth/normalize";
-import { BOOTSTRAP_ALLOWLIST, generateOtpCode, isEmailAllowed, OTP_TTL_MS } from "@/lib/email-auth/otp";
-import { listDirectoryEmails } from "@/lib/services/queries";
+import { PERMANENT_OWNER_EMAIL } from "@/lib/email-auth/allowlist-policy";
+import { generateOtpCode, isEmailAllowed, OTP_TTL_MS } from "@/lib/email-auth/otp";
+import { listDirectoryAllowEmails } from "@/lib/services/access-requests";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -20,10 +21,10 @@ function envAllowlist(): string[] {
 
 async function directoryEmails(): Promise<string[]> {
   try {
-    const fromDb = await enqueueLedger((db) => listDirectoryEmails(db));
+    const fromDb = await enqueueLedger((db) => listDirectoryAllowEmails(db));
     return [...fromDb, ...envAllowlist()];
   } catch {
-    return [...BOOTSTRAP_ALLOWLIST, ...envAllowlist()];
+    return [PERMANENT_OWNER_EMAIL, ...envAllowlist()];
   }
 }
 

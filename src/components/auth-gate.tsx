@@ -13,38 +13,29 @@ import { usePathname, useRouter } from "next/navigation";
 import { Shell } from "@/components/shell";
 import { useWarehouse } from "@/components/warehouse";
 import { normalizeEmail } from "@/lib/email-auth/normalize";
-import {
-  browserOtpStorage,
-  clearPendingOtp,
-  issueLocalOtp,
-  OTP_TTL_MS,
-  readPendingOtp,
-  verifyLocalOtp,
-  writePendingOtp,
-} from "@/lib/email-auth/otp";
+import { browserOtpStorage, clearPendingOtp } from "@/lib/email-auth/otp";
 import {
   browserAuthStorage,
   clearEmailAuthSession,
   readEmailAuthSession,
   writeEmailAuthSession,
 } from "@/lib/email-auth/session";
-import type { EmailAuthSession, OtpIssueResult, OtpVerifyResult } from "@/lib/email-auth/types";
-import { findUserByEmail, listDirectoryEmails } from "@/lib/services/queries";
+import type { EmailAuthSession } from "@/lib/email-auth/types";
+import {
+  requestAccessOrLogin,
+  type AccessLoginOutcome,
+} from "@/lib/services/access-requests";
+import { findUserByEmail } from "@/lib/services/queries";
 
 function isLoginPath(pathname: string): boolean {
   const path = pathname.length > 1 && pathname.endsWith("/") ? pathname.slice(0, -1) : pathname;
   return path === "/login" || path.endsWith("/login");
 }
 
-function apiBase(): string {
-  return process.env.NEXT_PUBLIC_BASE_PATH ?? "";
-}
-
 export type EmailAuthApi = {
   session: EmailAuthSession | null;
   ready: boolean;
-  requestCode: (email: string) => Promise<OtpIssueResult>;
-  verifyCode: (email: string, code: string) => Promise<OtpVerifyResult>;
+  requestAccess: (email: string) => Promise<AccessLoginOutcome>;
   logout: () => void;
 };
 
@@ -60,9 +51,10 @@ function finishLogin(
   db: ReturnType<typeof useWarehouse>["db"],
   switchUser: (userId: string) => void,
   email: string,
+  userId: string | null,
   setSession: (session: EmailAuthSession) => void,
 ): void {
-  const user = findUserByEmail(db, email);
+  const user = userId ? { id: userId } : findUserByEmail(db, email);
   const next: EmailAuthSession = {
     email: normalizeEmail(email),
     userId: user?.id ?? null,
@@ -75,7 +67,7 @@ function finishLogin(
 }
 
 export function AuthGate({ children }: { children: ReactNode }) {
-  const { db, switchUser, revision } = useWarehouse();
+  const { db, switchUser, refresh, revision } = useWarehouse();
   const pathname = usePathname();
   const router = useRouter();
   const login = isLoginPath(pathname);
@@ -84,8 +76,16 @@ export function AuthGate({ children }: { children: ReactNode }) {
   void revision;
 
   useEffect(() => {
-    setSession(readEmailAuthSession(browserAuthStorage()));
-    setReady(true);
+    let cancel = false;
+    void (async () => {
+      await Promise.resolve();
+      if (cancel) return;
+      setSession(readEmailAuthSession(browserAuthStorage()));
+      setReady(true);
+    })();
+    return () => {
+      cancel = true;
+    };
   }, []);
 
   useEffect(() => {
@@ -98,87 +98,18 @@ export function AuthGate({ children }: { children: ReactNode }) {
     }
   }, [ready, session, login, pathname, router]);
 
-  const requestCode = useCallback(
-    async (email: string): Promise<OtpIssueResult> => {
-      const directoryEmails = listDirectoryEmails(db);
-
-      try {
-        const response = await fetch(`${apiBase()}/api/v1/auth/otp/`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ email }),
-        });
-        if (response.ok) {
-          const data = (await response.json()) as {
-            ok?: boolean;
-            mode?: "mock" | "sent";
-            code?: string;
-            email?: string;
-            expiresAt?: number;
-            reason?: string;
-          };
-          if (data.ok && data.mode === "sent") {
-            writePendingOtp(browserOtpStorage(), {
-              email: normalizeEmail(email),
-              code: "__server__",
-              expiresAt: data.expiresAt ?? Date.now() + OTP_TTL_MS,
-              attempts: 0,
-            });
-            return {
-              ok: true,
-              mode: "sent",
-              email: normalizeEmail(data.email ?? email),
-              expiresAt: data.expiresAt ?? Date.now() + OTP_TTL_MS,
-            };
-          }
-          if (data.ok && data.mode === "mock" && data.code) {
-            writePendingOtp(browserOtpStorage(), {
-              email: normalizeEmail(email),
-              code: data.code,
-              expiresAt: data.expiresAt ?? Date.now() + OTP_TTL_MS,
-              attempts: 0,
-            });
-            return {
-              ok: true,
-              mode: "mock",
-              code: data.code,
-              email: normalizeEmail(data.email ?? email),
-              expiresAt: data.expiresAt ?? Date.now() + OTP_TTL_MS,
-            };
-          }
-        }
-      } catch {
-        // Pages / offline: локальный mock.
+  const requestAccess = useCallback(
+    async (email: string): Promise<AccessLoginOutcome> => {
+      const outcome = requestAccessOrLogin(db, email);
+      if (outcome.kind === "logged_in") {
+        finishLogin(db, switchUser, outcome.email, outcome.userId, setSession);
+        await refresh();
+      } else if (outcome.kind === "pending") {
+        await refresh();
       }
-
-      return issueLocalOtp({ email, directoryEmails, storage: browserOtpStorage() });
+      return outcome;
     },
-    [db],
-  );
-
-  const verifyCode = useCallback(
-    async (email: string, code: string): Promise<OtpVerifyResult> => {
-      const pending = readPendingOtp(browserOtpStorage());
-      if (pending?.code === "__server__") {
-        try {
-          const response = await fetch(`${apiBase()}/api/v1/auth/otp/`, {
-            method: "PUT",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ email, code }),
-          });
-          const data = (await response.json()) as OtpVerifyResult;
-          if (data.ok) finishLogin(db, switchUser, data.email, setSession);
-          return data;
-        } catch {
-          return { ok: false, reason: "no_pending" };
-        }
-      }
-
-      const result = verifyLocalOtp({ email, code, storage: browserOtpStorage() });
-      if (result.ok) finishLogin(db, switchUser, result.email, setSession);
-      return result;
-    },
-    [db, switchUser],
+    [db, refresh, switchUser],
   );
 
   const logout = useCallback(() => {
@@ -188,8 +119,8 @@ export function AuthGate({ children }: { children: ReactNode }) {
   }, [router]);
 
   const api = useMemo<EmailAuthApi>(
-    () => ({ session, ready, requestCode, verifyCode, logout }),
-    [session, ready, requestCode, verifyCode, logout],
+    () => ({ session, ready, requestAccess, logout }),
+    [session, ready, requestAccess, logout],
   );
 
   if (!ready || (!session && !login)) {

@@ -10,7 +10,7 @@
 
 **Оборудование без сканера** (`/stock`): таблица qty-строк со статусами `available` → `reserved` → `checked_out`, плюс `needs_repair` / `in_repair` и история переходов. Группы/варианты (например «Телевизор» → TV 32/40/50). Импорт Excel/CSV: **название + количество** без code — система сама выдаёт стабильный SKU (`TV-32` и т.п.) и ставит `reserved`. Пример: [`examples/mapper-equipment-name-qty.csv`](examples/mapper-equipment-name-qty.csv).
 
-Интерфейс на русском, английском и иврите (иврит справа налево). **Вход по email** (`/login`): OTP-код; на GitHub Pages код показывается на экране (mock, без SMTP). Демо-адреса: `alexey@led.local` (склад), `dmitry@led.local` (менеджер). После входа — полный UI: Excel-импорт (mapper) и Google Calendar Connect как раньше. Справочник `/people` — имя, **email**, роль; email попадает в allowlist входа. Подробнее: [`docs/email-auth.md`](docs/email-auth.md).
+Интерфейс на русском, английском и иврите (иврит справа налево). **Вход по email** (`/login`): заявка → одобрение на `/access-requests` → постоянный allowlist. Всегда: `starchenkogin@gmail.com` (нельзя отозвать); по умолчанию: `ledvision2026.il@gmail.com` (можно отозвать). Управляют доступом только эти два адреса. После входа — Excel-импорт и Google Calendar как раньше. Подробнее: [`docs/email-auth.md`](docs/email-auth.md).
 
 **Общий учёт** — один файл SQLite на сервере. Его видят все браузеры, которые открыли этот сервер. На GitHub Pages сервера нет, поэтому там у каждого браузера своя копия в IndexedDB. Общий файл живёт в Docker: каталог `data` монтируется в контейнер, и его можно скопировать на другой компьютер вместе с проектом.
 
@@ -18,7 +18,7 @@
 
 - [`docs/architecture-plan.md`](docs/architecture-plan.md) — архитектура, стек, API-границы, модель данных, roadmap (включая секцию «Решения MVP»)
 - [`docs/mvp-decisions.md`](docs/mvp-decisions.md) — краткая фиксация пяти решений заказчика (2026-10-07)
-- [`docs/email-auth.md`](docs/email-auth.md) — вход по email (OTP allowlist + mock на Pages, Resend позже)
+- [`docs/email-auth.md`](docs/email-auth.md) — вход по email (заявка → approve → allowlist)
 
 ## Решение по доставке
 

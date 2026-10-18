@@ -1,57 +1,66 @@
 # Авторизация по email (LED Warehouse)
 
-Документ фиксирует research, выбранный MVP и путь к «настоящему» email без поломки mapper / Google Calendar.
-
 Связано: [architecture-plan.md](./architecture-plan.md), сайт [Pages](https://GIN1104.github.io/led-warehouse/).
 
 ---
 
-## 1. Research: magic link / OTP / passwordless
+## Вердикт UX
 
-| Вариант | Pages (static SPA) | Docker/BFF | Секреты | Скорость MVP |
-|---------|--------------------|------------|---------|--------------|
-| **Password + cookie session** | Нужен backend | Ок | hashing на сервере | медленно |
-| **Magic link (Resend/SMTP)** | Нужен провайдер или BFF | Ок | API key | средне |
-| **Email OTP (код 6 цифр)** | Мок кода на клиенте возможен | Ок | API key только для реальной доставки | **быстро** |
-| **Firebase / Supabase Auth** | Работает со SPA | Ок | project keys | внешняя зависимость |
-| **Google Sign-In как единственный вход** | GIS | Ок | Client ID уже есть | путает с Calendar OAuth |
+**Заявка → одобрение → постоянный allowlist.**
 
-### Вердикт MVP
+1. `/login`: email → если уже допущен → сразу сессия; иначе `access_request` pending.
+2. Админы allowlist на `/access-requests`: Одобрить / Отклонить / Отозвать / ручное добавление.
+3. После approve повторно не спрашиваем, пока не revoke.
 
-**Email OTP + allowlist из справочника People.**
-
-На **GitHub Pages** (нет Node API):
-
-1. Пользователь вводит email.
-2. Email в allowlist: поле `users.email` **или** bootstrap-адреса демо-сотрудников.
-3. OTP в браузере (sessionStorage), код **показывается на экране** (mock).
-4. Сессия в `localStorage` (`led-warehouse:email-auth`).
-5. Без сессии → `/login`.
-
-На **Docker / `npm run dev`**: тот же клиент; Route Handler `/api/v1/auth/otp` при `RESEND_API_KEY` шлёт письмо, иначе `{ mode: "mock", code }`.
+OTP mock (BFF `/api/v1/auth/otp` + Resend) — запасной путь в Docker; основной UX — заявка/allowlist.
 
 ---
 
-## 2. Что не ломаем
+## Политика allowlist
+
+| Email | Правило |
+|-------|---------|
+| `starchenkogin@gmail.com` | **Permanent**: всегда разрешён, с любого устройства, **revoke запрещён** (hardcoded) |
+| `ledvision2026.il@gmail.com` | В allowlist **по умолчанию** (seed migrate), **можно отозвать** |
+| Все остальные | Заявка pending → approve/reject; после approve — постоянный допуск до revoke |
+
+**Кто управляет** (approve / reject / revoke / ручное добавление): только  
+`starchenkogin@gmail.com` и `ledvision2026.il@gmail.com`.  
+Остальные approved-пользователи входят в приложение, но не меняют доступ.
+
+Seed `alexey@led.local` / `dmitry@led.local` остаются в People для демо «кто работает», но **не** дают вход без approve.
+
+---
+
+## Что не ломаем
 
 | Интеграция | Как остаётся |
 |------------|--------------|
-| Excel import (mapper, HE glossary, reserved) | После логина, без session cookie |
-| Google Calendar Connect | Отдельный GIS-токен; logout email его не трогает |
-| Mapper HTTP / ledger API | Без cookie, как раньше |
+| Excel mapper / HE glossary | После логина, без cookie session |
+| Google Calendar GIS | Токен `led-warehouse:google-*`; logout email не трогает |
+| Mapper HTTP / ledger | Без cookie |
 
 ---
 
-## 3. People и bootstrap
+## Модель
 
-- Колонка `users.email`.
-- Seed: `alexey@led.local`, `dmitry@led.local`.
-- На `/people` email редактируется → allowlist.
+- `access_requests`: email, status (`pending`|`approved`|`rejected`), created_at, decided_by?, decided_at?
+- `allowed_emails`: email PK, approved_at, approved_by, revoked_at (NULL = активен)
+- Permanent owner **не обязан** быть строкой в таблице — проверка hardcoded
 
-## 4. Что нужно от пользователя
+---
 
-| Когда | Что |
-|-------|-----|
-| **Сейчас** | Ничего (mock OTP) |
-| Реальные письма (Docker) | `RESEND_API_KEY` (+ опционально `AUTH_FROM_EMAIL`) в env, не в git |
-| **Не просим** | Пароль Google; Client Secret в репо |
+## Ключи браузера
+
+| Ключ | Назначение |
+|------|------------|
+| `led-warehouse:email-auth` | Сессия входа |
+| `lw_user` | Кто работает |
+| `led-warehouse:google-*` | Calendar OAuth |
+| IndexedDB / SQLite | заявки + allowlist |
+
+---
+
+## Безопасность MVP
+
+На Pages данные в локальной БД браузера — gate для команды. Permanent owner гарантирует вход владельца с любого устройства при свежей БД.
