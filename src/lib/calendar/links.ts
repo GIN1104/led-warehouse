@@ -2,6 +2,23 @@ export type TextPart = { kind: "text"; text: string } | { kind: "link"; text: st
 
 const URL_PATTERN = /https?:\/\/[^\s<>"']+/gi;
 
+/** Имя файла из URL Drive/прямого .xlsx (для подписи ссылки в карточке дня). */
+export function driveLinkFileName(href: string): string | undefined {
+  try {
+    const url = new URL(href);
+    const path = decodeURIComponent(url.pathname);
+    const base = path.split("/").filter(Boolean).pop() ?? "";
+    if (!base) return undefined;
+    if (/\.(xlsx|xls|csv)$/i.test(base)) return base;
+    // query ?title= / ?name= иногда в шаринге
+    const titled = url.searchParams.get("title") ?? url.searchParams.get("name");
+    if (titled && /\.(xlsx|xls|csv)$/i.test(titled)) return titled;
+  } catch {
+    return undefined;
+  }
+  return undefined;
+}
+
 /** Делит текст на обычные куски и ссылки http(s). Хвост вроде точки остаётся текстом. */
 export function linkify(value: string): TextPart[] {
   const parts: TextPart[] = [];

@@ -85,6 +85,8 @@ docker compose up --build
 3. Нажмите **Подключить Google** → разрешите доступ к Calendar.
 4. Client Secret и пароль Google **не нужны**. `NEXT_PUBLIC_GOOGLE_CLIENT_ID` вшивается в Pages через GitHub Actions.
 
+Excel на Drive (`LED Warehouse / Excel`): имена файлов **`ДД-ММ-ГГГГ`** в начале (`18-10-2026.xlsx` или `18-10-2026 Событие.xlsx`). См. `src/lib/google/drive-filename.ts`.
+
 Локально: скопируйте `.env.example` → `.env.local` и `npm run dev` (порт 3000 совпадает с origin в Console).
 
 
