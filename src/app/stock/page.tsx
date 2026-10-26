@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useMemo, useState, type FormEvent } from "react";
 import { useI18n } from "@/components/i18n";
 import { useWarehouse } from "@/components/warehouse";
@@ -9,6 +10,7 @@ import { formatDateTime } from "@/lib/dates";
 import { EQUIPMENT_STATUSES, EQUIPMENT_TRANSITIONS, type EquipmentStatus } from "@/lib/domain/equipment-status";
 import { driveManualHint } from "@/lib/google/drive-sync";
 import { translateError, type MessageKey } from "@/lib/i18n/messages";
+import { orderHref } from "@/lib/paths";
 import {
   addSkuVariant,
   createProductFamily,
@@ -22,8 +24,10 @@ import {
   importEquipmentReserved,
   listEquipmentHistory,
   listEquipmentItems,
+  listEquipmentSkuAggregates,
   setEquipmentStatus,
   sortEquipmentItems,
+  transitionEquipmentQty,
   updateEquipmentItem,
   type EquipmentItemRow,
   type EquipmentSortKey,
@@ -31,6 +35,8 @@ import {
 import { applyMovement, type MovementType } from "@/lib/services/ledger";
 import { parseMapperFile } from "@/lib/services/mapper-excel";
 import { listLocationBalances, listLocations, listMovements, listSkuSummaries } from "@/lib/services/queries";
+
+const REPAIR_STATUSES: readonly EquipmentStatus[] = ["needs_repair", "in_repair"];
 
 function statusTone(status: EquipmentStatus): "neutral" | "ok" | "warn" | "alert" {
   if (status === "available") return "ok";
@@ -58,12 +64,15 @@ export default function StockPage() {
   const [showMovements, setShowMovements] = useState(false);
   const [variantFamilyId, setVariantFamilyId] = useState("");
   const [drafts, setDrafts] = useState<Record<string, { qty: string; name: string }>>({});
+  const [repairDraft, setRepairDraft] = useState<{ itemId: string; to: EquipmentStatus; qty: string } | null>(null);
   void revision;
 
   const items = useMemo(() => {
     const rows = listEquipmentItems(db, { status: statusFilter, query });
     return sortEquipmentItems(rows, sortKey, sortDir);
   }, [db, statusFilter, query, sortKey, sortDir, revision]);
+
+  const aggregates = useMemo(() => listEquipmentSkuAggregates(db, { query }), [db, query, revision]);
 
   const familyTree = useMemo(() => listFamilyTree(db), [db, revision]);
   const realFamilies = familyTree.filter((node) => node.id !== "__uncategorized__");
@@ -228,10 +237,40 @@ export default function StockPage() {
   }
 
   function onStatus(itemId: string, to: EquipmentStatus) {
+    const row = items.find((item) => item.id === itemId);
+    if (REPAIR_STATUSES.includes(to) && row && row.qty > 1) {
+      setRepairDraft({ itemId, to, qty: "1" });
+      return;
+    }
     try {
       assertCan(session.role, "stock.write");
       setEquipmentStatus(db, itemId, to, session.id);
+      setRepairDraft(null);
       void refresh().then(() => setFlash({ ok: t("eq.statusChanged") }));
+    } catch (error) {
+      setFlash({ error: translateError(lang, error) });
+    }
+  }
+
+  function onRepairApply() {
+    if (!repairDraft) return;
+    const row = items.find((item) => item.id === repairDraft.itemId);
+    if (!row) {
+      setRepairDraft(null);
+      return;
+    }
+    try {
+      assertCan(session.role, "stock.write");
+      const qty = Number(repairDraft.qty);
+      const result = transitionEquipmentQty(db, repairDraft.itemId, repairDraft.to, qty, session.id);
+      setRepairDraft(null);
+      void refresh().then(() => {
+        setFlash({
+          ok: result.split
+            ? t("eq.partialOk", { moved: result.moved.qty, remain: result.source.qty })
+            : t("eq.statusChanged"),
+        });
+      });
     } catch (error) {
       setFlash({ error: translateError(lang, error) });
     }
@@ -269,6 +308,79 @@ export default function StockPage() {
       <PageHeader eyebrow={t("stock.eyebrow")} title={t("stock.title")} description={t("stock.description")} />
       {!allowed ? <p className="mb-4 text-sm text-ink/60">{t("stock.switch", { name: warehouse })}</p> : null}
       <Flash error={flash.error} ok={flash.ok} />
+
+      <Panel className="mb-4">
+        <h2 className="mb-1 font-medium">{t("eq.summaryTitle")}</h2>
+        <p className="mb-3 text-sm leading-6 text-ink/70">{t("eq.summaryHelp")}</p>
+        {aggregates.length === 0 ? (
+          <p className="text-sm text-ink/60">{t("eq.summaryEmpty")}</p>
+        ) : (
+          <div className="overflow-x-auto rounded-md border border-line bg-paper/60">
+            <table className="w-full min-w-[720px] text-start text-sm">
+              <thead className="bg-sand text-xs tracking-wide text-ink/50 uppercase">
+                <tr>
+                  <th className="px-3 py-2 font-medium">{t("stock.code")}</th>
+                  <th className="px-3 py-2 font-medium">{t("stock.name")}</th>
+                  <th className="px-3 py-2 font-medium">{t("eq.summaryTotal")}</th>
+                  <th className="px-3 py-2 font-medium">{t("eq.summaryOnHand")}</th>
+                  <th className="px-3 py-2 font-medium">{t("eq.summaryInUse")}</th>
+                  <th className="px-3 py-2 font-medium">{t("eq.summaryInRepair")}</th>
+                  <th className="px-3 py-2 font-medium">{t("eq.summaryDeployments")}</th>
+                </tr>
+              </thead>
+              <tbody>
+                {aggregates.map((agg) => (
+                  <tr key={agg.skuId} className="border-t border-line align-top">
+                    <td className="px-3 py-2 font-mono text-xs">{agg.skuCode}</td>
+                    <td className="px-3 py-2">{agg.skuName}</td>
+                    <td className="px-3 py-2">
+                      {agg.total} {agg.unit}
+                    </td>
+                    <td className="px-3 py-2">
+                      <Badge tone="ok">
+                        {agg.onHand} {agg.unit}
+                      </Badge>
+                    </td>
+                    <td className="px-3 py-2">
+                      <Badge tone={agg.inUse > 0 ? "warn" : "neutral"}>
+                        {agg.inUse} {agg.unit}
+                      </Badge>
+                    </td>
+                    <td className="px-3 py-2">
+                      <Badge tone={agg.inRepair > 0 ? "alert" : "neutral"}>
+                        {agg.inRepair} {agg.unit}
+                      </Badge>
+                    </td>
+                    <td className="px-3 py-2">
+                      {agg.deployments.length === 0 ? (
+                        <span className="text-ink/40">—</span>
+                      ) : (
+                        <ul className="flex flex-col gap-1">
+                          {agg.deployments.map((dep) => (
+                            <li key={dep.itemId} className="text-xs leading-5">
+                              {dep.qty} {agg.unit}
+                              {" · "}
+                              {t(`eq.status.${dep.status}` as MessageKey)}
+                              {" · "}
+                              {dep.orderId ? (
+                                <Link href={orderHref(dep.orderId)} className="text-copper hover:underline">
+                                  {dep.label || t("eq.openOrder")}
+                                </Link>
+                              ) : (
+                                <span>{dep.label}</span>
+                              )}
+                            </li>
+                          ))}
+                        </ul>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </Panel>
 
       <Panel className="mb-4">
         <h2 className="mb-1 font-medium">{t("eq.hierarchyTitle")}</h2>
@@ -608,45 +720,85 @@ export default function StockPage() {
                     <td className="px-3 py-2">
                       <Badge tone={statusTone(row.status)}>{t(`eq.status.${row.status}` as MessageKey)}</Badge>
                     </td>
-                    <td className="px-3 py-2">{row.customerName || "—"}</td>
+                    <td className="px-3 py-2">
+                      {row.orderId ? (
+                        <Link href={orderHref(row.orderId)} className="text-copper hover:underline">
+                          {row.customerName || t("eq.openOrder")}
+                        </Link>
+                      ) : (
+                        row.customerName || "—"
+                      )}
+                    </td>
                     <td className="px-3 py-2">{row.locationName || "—"}</td>
                     <td className="px-3 py-2 text-ink/50">{formatDateTime(row.updatedAt)}</td>
                     <td className="px-3 py-2">
                       {allowed ? (
-                        <div className="flex flex-wrap gap-1">
-                          {dirty ? (
+                        <div className="flex flex-col gap-2">
+                          <div className="flex flex-wrap gap-1">
+                            {dirty ? (
+                              <button
+                                type="button"
+                                className={buttonClass("primary", "px-2 py-1 text-xs")}
+                                onClick={() => void saveRow(row)}
+                              >
+                                {t("eq.save")}
+                              </button>
+                            ) : null}
+                            {next.map((status) => (
+                              <button
+                                key={status}
+                                type="button"
+                                className={buttonClass("ghost", "px-2 py-1 text-xs")}
+                                onClick={() => onStatus(row.id, status)}
+                              >
+                                {t(`eq.action.${status}` as MessageKey)}
+                              </button>
+                            ))}
                             <button
-                              type="button"
-                              className={buttonClass("primary", "px-2 py-1 text-xs")}
-                              onClick={() => void saveRow(row)}
-                            >
-                              {t("eq.save")}
-                            </button>
-                          ) : null}
-                          {next.map((status) => (
-                            <button
-                              key={status}
                               type="button"
                               className={buttonClass("ghost", "px-2 py-1 text-xs")}
-                              onClick={() => onStatus(row.id, status)}
+                              onClick={() => setHistoryId(historyId === row.id ? null : row.id)}
                             >
-                              {t(`eq.action.${status}` as MessageKey)}
+                              {t("eq.history")}
                             </button>
-                          ))}
-                          <button
-                            type="button"
-                            className={buttonClass("ghost", "px-2 py-1 text-xs")}
-                            onClick={() => setHistoryId(historyId === row.id ? null : row.id)}
-                          >
-                            {t("eq.history")}
-                          </button>
-                          <button
-                            type="button"
-                            className={buttonClass("danger", "px-2 py-1 text-xs")}
-                            onClick={() => void onDelete(row)}
-                          >
-                            {t("eq.delete")}
-                          </button>
+                            <button
+                              type="button"
+                              className={buttonClass("danger", "px-2 py-1 text-xs")}
+                              onClick={() => void onDelete(row)}
+                            >
+                              {t("eq.delete")}
+                            </button>
+                          </div>
+                          {repairDraft?.itemId === row.id ? (
+                            <div className="rounded-md border border-line bg-paper/80 p-2">
+                              <p className="mb-2 text-xs text-ink/60">{t("eq.repairQtyHelp")}</p>
+                              <div className="flex flex-wrap items-end gap-2">
+                                <Field label={`${t("eq.repairQty")} (${t(`eq.action.${repairDraft.to}` as MessageKey)})`}>
+                                  <input
+                                    type="number"
+                                    min={1}
+                                    max={row.qty}
+                                    step={1}
+                                    className={`${controlClass} w-24`}
+                                    value={repairDraft.qty}
+                                    onChange={(event) =>
+                                      setRepairDraft({ ...repairDraft, qty: event.target.value })
+                                    }
+                                  />
+                                </Field>
+                                <button type="button" className={buttonClass("primary", "px-2 py-1 text-xs")} onClick={onRepairApply}>
+                                  {t("eq.repairApply")}
+                                </button>
+                                <button
+                                  type="button"
+                                  className={buttonClass("ghost", "px-2 py-1 text-xs")}
+                                  onClick={() => setRepairDraft(null)}
+                                >
+                                  {t("eq.repairCancel")}
+                                </button>
+                              </div>
+                            </div>
+                          ) : null}
                         </div>
                       ) : null}
                     </td>
