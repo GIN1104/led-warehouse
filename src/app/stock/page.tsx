@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { Fragment, useMemo, useState, type FormEvent } from "react";
 import { EquipmentKitsPanel } from "@/components/equipment-kits";
+import { KitSummaryNest } from "@/components/kit-summary-nest";
 import { useI18n } from "@/components/i18n";
 import { useWarehouse } from "@/components/warehouse";
 import { Badge, Field, Flash, PageHeader, Panel, buttonClass, controlClass } from "@/components/ui";
@@ -42,6 +43,7 @@ import {
   type EquipmentSkuAggregate,
   type EquipmentSortKey,
 } from "@/lib/services/equipment";
+import { listKitSubtypesBySkuId } from "@/lib/services/kits";
 import { applyMovement, type MovementType } from "@/lib/services/ledger";
 import { parseMapperFile } from "@/lib/services/mapper-excel";
 import { listLocationBalances, listLocations, listMovements, listSkuSummaries } from "@/lib/services/queries";
@@ -117,6 +119,7 @@ export default function StockPage() {
   }, [db, statusFilter, query, sortKey, sortDir, revision]);
 
   const familyAggregates = useMemo(() => listEquipmentFamilyAggregates(db, { query }), [db, query, revision]);
+  const kitBySku = useMemo(() => listKitSubtypesBySkuId(db), [db, revision]);
 
   const familyTree = useMemo(() => listFamilyTree(db), [db, revision]);
   const realFamilies = familyTree.filter((node) => node.id !== "__uncategorized__");
@@ -766,8 +769,10 @@ export default function StockPage() {
                     ) : (
                       family.skus.map((agg, skuIndex) => {
                         const draft = bucketDraftFor(agg);
+                        const kitNest = kitBySku.get(agg.skuId);
                         return (
-                          <tr key={agg.skuId} className="border-t border-line align-middle">
+                          <Fragment key={agg.skuId}>
+                          <tr className="border-t border-line align-middle">
                             <td className={summaryCellClass}>
                               {allowed ? (
                                 <span className="inline-flex h-10 items-center gap-1 ps-4">
@@ -1010,6 +1015,16 @@ export default function StockPage() {
                               </div>
                             </td>
                           </tr>
+                          {kitNest ? (
+                            <KitSummaryNest
+                              db={db}
+                              subtype={kitNest}
+                              allowed={allowed}
+                              refresh={refresh}
+                              onFlash={setFlash}
+                            />
+                          ) : null}
+                          </Fragment>
                         );
                       })
                     )}

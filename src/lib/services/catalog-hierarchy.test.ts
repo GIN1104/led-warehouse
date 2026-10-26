@@ -68,17 +68,24 @@ describe("иерархия групп и SKU", () => {
     addSkuVariant(db, { familyId: processors.id, name: "CPU X" }, "wh");
     addSkuVariant(db, { familyId: sprites.id, name: "Sprite 1" }, "wh");
 
-    expect(listFamilyTree(db).map((row) => row.name)).toEqual(["Кубики", "Процессоры", "Спрайты"]);
+    const namesOf = (ids: string[]) =>
+      listFamilyTree(db)
+        .filter((row) => ids.includes(row.id))
+        .map((row) => row.name);
+
+    expect(namesOf([cubes.id, processors.id, sprites.id])).toEqual(["Кубики", "Процессоры", "Спрайты"]);
 
     moveFamily(db, processors.id, "up");
-    expect(listFamilyTree(db).map((row) => row.name)).toEqual(["Процессоры", "Кубики", "Спрайты"]);
+    expect(namesOf([cubes.id, processors.id, sprites.id])).toEqual(["Процессоры", "Кубики", "Спрайты"]);
 
     moveFamily(db, sprites.id, "up");
     moveFamily(db, sprites.id, "up");
-    expect(listFamilyTree(db).map((row) => row.name)).toEqual(["Спрайты", "Процессоры", "Кубики"]);
+    expect(namesOf([cubes.id, processors.id, sprites.id])).toEqual(["Спрайты", "Процессоры", "Кубики"]);
 
-    const summary = listEquipmentFamilyAggregates(db).map((row) => row.familyName);
-    expect(summary.slice(0, 3)).toEqual(["Спрайты", "Процессоры", "Кубики"]);
+    const summary = listEquipmentFamilyAggregates(db)
+      .filter((row) => [cubes.id, processors.id, sprites.id].includes(row.familyId))
+      .map((row) => row.familyName);
+    expect(summary).toEqual(["Спрайты", "Процессоры", "Кубики"]);
   });
 
   it("угадывает группу: кабинет → Кабинеты, не отдельная группа", () => {

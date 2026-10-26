@@ -6,6 +6,7 @@ import type { Sql } from "@/lib/db/sql";
 const INSERT_ORDER = [
   "users",
   "locations",
+  "product_families",
   "skus",
   "rental_orders",
   "stock_balances",

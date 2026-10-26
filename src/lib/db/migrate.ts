@@ -1,6 +1,6 @@
 import { normalizeEquipmentName } from "@/lib/domain/sku-code";
 import type { Sql } from "@/lib/db/sql";
-import { fixKitLeptopTypo, seedDefaultKitsIfEmpty } from "@/lib/services/kits";
+import { ensureKitsLinkedToCatalog, fixKitLeptopTypo, seedDefaultKitsIfEmpty } from "@/lib/services/kits";
 import { ensureDefaultRoleStockEdit } from "@/lib/services/people";
 
 export const MIGRATION_SQL = `
@@ -18,7 +18,10 @@ CREATE TABLE IF NOT EXISTS skus (
   category TEXT NOT NULL,
   unit TEXT NOT NULL DEFAULT 'шт',
   track_mode TEXT NOT NULL DEFAULT 'quantity',
-  description TEXT NOT NULL DEFAULT ''
+  description TEXT NOT NULL DEFAULT '',
+  family_id TEXT REFERENCES product_families(id),
+  name_key TEXT,
+  sort_order INTEGER NOT NULL DEFAULT 0
 );
 
 CREATE TABLE IF NOT EXISTS locations (
@@ -223,7 +226,8 @@ CREATE TABLE IF NOT EXISTS kit_groups (
   id TEXT PRIMARY KEY,
   name TEXT NOT NULL,
   sort_order INTEGER NOT NULL DEFAULT 0,
-  created_at INTEGER NOT NULL
+  created_at INTEGER NOT NULL,
+  family_id TEXT REFERENCES product_families(id)
 );
 
 CREATE TABLE IF NOT EXISTS kit_subtypes (
@@ -231,7 +235,8 @@ CREATE TABLE IF NOT EXISTS kit_subtypes (
   group_id TEXT NOT NULL REFERENCES kit_groups(id),
   name TEXT NOT NULL,
   sort_order INTEGER NOT NULL DEFAULT 0,
-  created_at INTEGER NOT NULL
+  created_at INTEGER NOT NULL,
+  sku_id TEXT REFERENCES skus(id)
 );
 
 CREATE TABLE IF NOT EXISTS kit_units (
@@ -388,10 +393,19 @@ CREATE INDEX IF NOT EXISTS idx_kit_subtypes_group ON kit_subtypes(group_id);
 CREATE INDEX IF NOT EXISTS idx_kit_units_subtype ON kit_units(subtype_id);
 CREATE INDEX IF NOT EXISTS idx_kit_items_unit ON kit_checklist_items(unit_id);
 `);
+  if (!columnExists(db, "kit_groups", "family_id")) {
+    db.exec(`ALTER TABLE kit_groups ADD COLUMN family_id TEXT REFERENCES product_families(id)`);
+  }
+  if (!columnExists(db, "kit_subtypes", "sku_id")) {
+    db.exec(`ALTER TABLE kit_subtypes ADD COLUMN sku_id TEXT REFERENCES skus(id)`);
+  }
+  db.exec(`CREATE INDEX IF NOT EXISTS idx_kit_groups_family ON kit_groups(family_id)`);
+  db.exec(`CREATE INDEX IF NOT EXISTS idx_kit_subtypes_sku ON kit_subtypes(sku_id)`);
   backfillSkuHierarchy(db);
   ensureDefaultRoleStockEdit(db);
   fixKitLeptopTypo(db);
   seedDefaultKitsIfEmpty(db);
+  ensureKitsLinkedToCatalog(db);
   db.run(`INSERT INTO ledger_meta (key, value) VALUES ('revision', '0') ON CONFLICT(key) DO NOTHING`);
   db.run(`UPDATE users SET name = 'Дмитрий' WHERE id = 'user_manager' AND name = 'Мария'`);
   db.run(
