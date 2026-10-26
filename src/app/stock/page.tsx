@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo, useState, type FormEvent } from "react";
+import { Fragment, useMemo, useState, type FormEvent } from "react";
 import { useI18n } from "@/components/i18n";
 import { useWarehouse } from "@/components/warehouse";
 import { Badge, Field, Flash, PageHeader, Panel, buttonClass, controlClass } from "@/components/ui";
@@ -22,14 +22,16 @@ import {
   addEquipmentItem,
   deleteEquipmentItem,
   importEquipmentReserved,
+  listEquipmentFamilyAggregates,
   listEquipmentHistory,
   listEquipmentItems,
-  listEquipmentSkuAggregates,
+  setEquipmentSkuBuckets,
   setEquipmentStatus,
   sortEquipmentItems,
   transitionEquipmentQty,
   updateEquipmentItem,
   type EquipmentItemRow,
+  type EquipmentSkuAggregate,
   type EquipmentSortKey,
 } from "@/lib/services/equipment";
 import { applyMovement, type MovementType } from "@/lib/services/ledger";
@@ -65,6 +67,9 @@ export default function StockPage() {
   const [variantFamilyId, setVariantFamilyId] = useState("");
   const [drafts, setDrafts] = useState<Record<string, { qty: string; name: string }>>({});
   const [repairDraft, setRepairDraft] = useState<{ itemId: string; to: EquipmentStatus; qty: string } | null>(null);
+  const [bucketDrafts, setBucketDrafts] = useState<
+    Record<string, { total: string; onHand: string; inUse: string; inRepair: string }>
+  >({});
   void revision;
 
   const items = useMemo(() => {
@@ -72,7 +77,7 @@ export default function StockPage() {
     return sortEquipmentItems(rows, sortKey, sortDir);
   }, [db, statusFilter, query, sortKey, sortDir, revision]);
 
-  const aggregates = useMemo(() => listEquipmentSkuAggregates(db, { query }), [db, query, revision]);
+  const familyAggregates = useMemo(() => listEquipmentFamilyAggregates(db, { query }), [db, query, revision]);
 
   const familyTree = useMemo(() => listFamilyTree(db), [db, revision]);
   const realFamilies = familyTree.filter((node) => node.id !== "__uncategorized__");
@@ -81,6 +86,100 @@ export default function StockPage() {
 
   function draftFor(row: EquipmentItemRow) {
     return drafts[row.id] ?? { qty: String(row.qty), name: row.skuName };
+  }
+
+  function bucketDraftFor(agg: EquipmentSkuAggregate) {
+    return (
+      bucketDrafts[agg.skuId] ?? {
+        total: String(agg.total),
+        onHand: String(agg.onHand),
+        inUse: String(agg.inUse),
+        inRepair: String(agg.inRepair),
+      }
+    );
+  }
+
+  function setBucketDraft(
+    agg: EquipmentSkuAggregate,
+    patch: Partial<{ total: string; onHand: string; inUse: string; inRepair: string }>,
+  ) {
+    setBucketDrafts((prev) => ({
+      ...prev,
+      [agg.skuId]: {
+        total: prev[agg.skuId]?.total ?? String(agg.total),
+        onHand: prev[agg.skuId]?.onHand ?? String(agg.onHand),
+        inUse: prev[agg.skuId]?.inUse ?? String(agg.inUse),
+        inRepair: prev[agg.skuId]?.inRepair ?? String(agg.inRepair),
+        ...patch,
+      },
+    }));
+  }
+
+  async function saveBuckets(agg: EquipmentSkuAggregate, draftOverride?: Partial<{ total: string; onHand: string; inUse: string; inRepair: string }>) {
+    const draft = { ...bucketDraftFor(agg), ...draftOverride };
+    const inUse = Number(draft.inUse);
+    const inRepair = Number(draft.inRepair);
+    let onHand = Number(draft.onHand);
+    const total = Number(draft.total);
+
+    // Если меняли «всего» — пересчитываем склад: всего = склад + работа + ремонт
+    if (draftOverride?.total !== undefined && draftOverride.onHand === undefined) {
+      onHand = total - inUse - inRepair;
+      if (onHand < 0) {
+        setFlash({ error: t("eq.summaryTotalLow") });
+        setBucketDrafts((prev) => ({
+          ...prev,
+          [agg.skuId]: {
+            total: String(agg.total),
+            onHand: String(agg.onHand),
+            inUse: String(agg.inUse),
+            inRepair: String(agg.inRepair),
+          },
+        }));
+        return;
+      }
+    } else if (draftOverride?.onHand !== undefined || draftOverride?.inUse !== undefined || draftOverride?.inRepair !== undefined) {
+      // Корзины заданы явно — всего = сумма
+      onHand = Number(draft.onHand);
+    }
+
+    if (
+      onHand === agg.onHand &&
+      inUse === agg.inUse &&
+      inRepair === agg.inRepair &&
+      onHand + inUse + inRepair === agg.total
+    ) {
+      setBucketDrafts((prev) => {
+        if (!prev[agg.skuId]) return prev;
+        const next = { ...prev };
+        delete next[agg.skuId];
+        return next;
+      });
+      return;
+    }
+
+    try {
+      assertCan(session.role, "stock.write");
+      setEquipmentSkuBuckets(db, agg.skuId, { onHand, inUse, inRepair }, session.id);
+      setBucketDrafts((prev) => {
+        const next = { ...prev };
+        delete next[agg.skuId];
+        return next;
+      });
+      await refresh();
+      setFlash({ ok: t("eq.summarySaved") });
+    } catch (error) {
+      setFlash({ error: translateError(lang, error) });
+      setBucketDrafts((prev) => ({
+        ...prev,
+        [agg.skuId]: {
+          total: String(agg.total),
+          onHand: String(agg.onHand),
+          inUse: String(agg.inUse),
+          inRepair: String(agg.inRepair),
+        },
+      }));
+    }
   }
 
   function setDraft(id: string, patch: Partial<{ qty: string; name: string }>, row: EquipmentItemRow) {
@@ -312,11 +411,11 @@ export default function StockPage() {
       <Panel className="mb-4">
         <h2 className="mb-1 font-medium">{t("eq.summaryTitle")}</h2>
         <p className="mb-3 text-sm leading-6 text-ink/70">{t("eq.summaryHelp")}</p>
-        {aggregates.length === 0 ? (
+        {familyAggregates.length === 0 ? (
           <p className="text-sm text-ink/60">{t("eq.summaryEmpty")}</p>
         ) : (
           <div className="overflow-x-auto rounded-md border border-line bg-paper/60">
-            <table className="w-full min-w-[720px] text-start text-sm">
+            <table className="w-full min-w-[860px] text-start text-sm">
               <thead className="bg-sand text-xs tracking-wide text-ink/50 uppercase">
                 <tr>
                   <th className="px-3 py-2 font-medium">{t("stock.code")}</th>
@@ -329,52 +428,189 @@ export default function StockPage() {
                 </tr>
               </thead>
               <tbody>
-                {aggregates.map((agg) => (
-                  <tr key={agg.skuId} className="border-t border-line align-top">
-                    <td className="px-3 py-2 font-mono text-xs">{agg.skuCode}</td>
-                    <td className="px-3 py-2">{agg.skuName}</td>
-                    <td className="px-3 py-2">
-                      {agg.total} {agg.unit}
-                    </td>
-                    <td className="px-3 py-2">
-                      <Badge tone="ok">
-                        {agg.onHand} {agg.unit}
-                      </Badge>
-                    </td>
-                    <td className="px-3 py-2">
-                      <Badge tone={agg.inUse > 0 ? "warn" : "neutral"}>
-                        {agg.inUse} {agg.unit}
-                      </Badge>
-                    </td>
-                    <td className="px-3 py-2">
-                      <Badge tone={agg.inRepair > 0 ? "alert" : "neutral"}>
-                        {agg.inRepair} {agg.unit}
-                      </Badge>
-                    </td>
-                    <td className="px-3 py-2">
-                      {agg.deployments.length === 0 ? (
-                        <span className="text-ink/40">—</span>
-                      ) : (
-                        <ul className="flex flex-col gap-1">
-                          {agg.deployments.map((dep) => (
-                            <li key={dep.itemId} className="text-xs leading-5">
-                              {dep.qty} {agg.unit}
-                              {" · "}
-                              {t(`eq.status.${dep.status}` as MessageKey)}
-                              {" · "}
-                              {dep.orderId ? (
-                                <Link href={orderHref(dep.orderId)} className="text-copper hover:underline">
-                                  {dep.label || t("eq.openOrder")}
-                                </Link>
+                {familyAggregates.map((family) => (
+                  <Fragment key={family.familyId}>
+                    <tr className="border-t border-line bg-sand/80">
+                      <td colSpan={2} className="px-3 py-2 font-medium">
+                        {family.familyName}
+                      </td>
+                      <td className="px-3 py-2 text-xs text-ink/60">
+                        {t("eq.summaryGroupTotal")}: {family.total}
+                      </td>
+                      <td className="px-3 py-2 text-xs text-ink/60">{family.onHand}</td>
+                      <td className="px-3 py-2 text-xs text-ink/60">{family.inUse}</td>
+                      <td className="px-3 py-2 text-xs text-ink/60">{family.inRepair}</td>
+                      <td className="px-3 py-2" />
+                    </tr>
+                    {family.skus.length === 0 ? (
+                      <tr className="border-t border-line">
+                        <td colSpan={7} className="px-3 py-2 ps-8 text-xs text-ink/50">
+                          {t("eq.summaryNoVariants")}
+                        </td>
+                      </tr>
+                    ) : (
+                      family.skus.map((agg) => {
+                        const draft = bucketDraftFor(agg);
+                        const dirty =
+                          Number(draft.total) !== agg.total ||
+                          Number(draft.onHand) !== agg.onHand ||
+                          Number(draft.inUse) !== agg.inUse ||
+                          Number(draft.inRepair) !== agg.inRepair;
+                        return (
+                          <tr key={agg.skuId} className="border-t border-line align-top">
+                            <td className="px-3 py-2 ps-8 font-mono text-xs">{agg.skuCode}</td>
+                            <td className="px-3 py-2">{agg.skuName}</td>
+                            <td className="px-3 py-2">
+                              {allowed ? (
+                                <input
+                                  type="number"
+                                  min={0}
+                                  step={1}
+                                  className={`${controlClass} w-20`}
+                                  value={draft.total}
+                                  aria-label={t("eq.summaryTotal")}
+                                  onChange={(event) => setBucketDraft(agg, { total: event.target.value })}
+                                  onBlur={(event) => void saveBuckets(agg, { total: event.target.value })}
+                                  onKeyDown={(event) => {
+                                    if (event.key === "Enter") {
+                                      event.preventDefault();
+                                      (event.target as HTMLInputElement).blur();
+                                    }
+                                  }}
+                                />
                               ) : (
-                                <span>{dep.label}</span>
+                                agg.total
                               )}
-                            </li>
-                          ))}
-                        </ul>
-                      )}
-                    </td>
-                  </tr>
+                            </td>
+                            <td className="px-3 py-2">
+                              {allowed ? (
+                                <input
+                                  type="number"
+                                  min={0}
+                                  step={1}
+                                  className={`${controlClass} w-20`}
+                                  value={draft.onHand}
+                                  aria-label={t("eq.summaryOnHand")}
+                                  onChange={(event) => {
+                                    const onHand = event.target.value;
+                                    const inUse = Number(draft.inUse) || 0;
+                                    const inRepair = Number(draft.inRepair) || 0;
+                                    setBucketDraft(agg, {
+                                      onHand,
+                                      total: String((Number(onHand) || 0) + inUse + inRepair),
+                                    });
+                                  }}
+                                  onBlur={(event) => void saveBuckets(agg, { onHand: event.target.value })}
+                                  onKeyDown={(event) => {
+                                    if (event.key === "Enter") {
+                                      event.preventDefault();
+                                      (event.target as HTMLInputElement).blur();
+                                    }
+                                  }}
+                                />
+                              ) : (
+                                <Badge tone="ok">{agg.onHand}</Badge>
+                              )}
+                            </td>
+                            <td className="px-3 py-2">
+                              {allowed ? (
+                                <input
+                                  type="number"
+                                  min={0}
+                                  step={1}
+                                  className={`${controlClass} w-20`}
+                                  value={draft.inUse}
+                                  aria-label={t("eq.summaryInUse")}
+                                  onChange={(event) => {
+                                    const inUse = event.target.value;
+                                    const onHand = Number(draft.onHand) || 0;
+                                    const inRepair = Number(draft.inRepair) || 0;
+                                    setBucketDraft(agg, {
+                                      inUse,
+                                      total: String(onHand + (Number(inUse) || 0) + inRepair),
+                                    });
+                                  }}
+                                  onBlur={(event) => void saveBuckets(agg, { inUse: event.target.value })}
+                                  onKeyDown={(event) => {
+                                    if (event.key === "Enter") {
+                                      event.preventDefault();
+                                      (event.target as HTMLInputElement).blur();
+                                    }
+                                  }}
+                                />
+                              ) : (
+                                <Badge tone={agg.inUse > 0 ? "warn" : "neutral"}>{agg.inUse}</Badge>
+                              )}
+                            </td>
+                            <td className="px-3 py-2">
+                              {allowed ? (
+                                <div className="flex items-center gap-1">
+                                  <input
+                                    type="number"
+                                    min={0}
+                                    step={1}
+                                    className={`${controlClass} w-20`}
+                                    value={draft.inRepair}
+                                    aria-label={t("eq.summaryInRepair")}
+                                    onChange={(event) => {
+                                      const inRepair = event.target.value;
+                                      const onHand = Number(draft.onHand) || 0;
+                                      const inUse = Number(draft.inUse) || 0;
+                                      setBucketDraft(agg, {
+                                        inRepair,
+                                        total: String(onHand + inUse + (Number(inRepair) || 0)),
+                                      });
+                                    }}
+                                    onBlur={(event) => void saveBuckets(agg, { inRepair: event.target.value })}
+                                    onKeyDown={(event) => {
+                                      if (event.key === "Enter") {
+                                        event.preventDefault();
+                                        (event.target as HTMLInputElement).blur();
+                                      }
+                                    }}
+                                  />
+                                  {dirty ? (
+                                    <button
+                                      type="button"
+                                      className={buttonClass("primary", "px-2 py-1 text-xs")}
+                                      onClick={() => void saveBuckets(agg)}
+                                    >
+                                      {t("eq.save")}
+                                    </button>
+                                  ) : null}
+                                </div>
+                              ) : (
+                                <Badge tone={agg.inRepair > 0 ? "alert" : "neutral"}>{agg.inRepair}</Badge>
+                              )}
+                            </td>
+                            <td className="px-3 py-2">
+                              {agg.deployments.length === 0 ? (
+                                <span className="text-ink/40">—</span>
+                              ) : (
+                                <ul className="flex flex-col gap-1">
+                                  {agg.deployments.map((dep) => (
+                                    <li key={dep.itemId} className="text-xs leading-5">
+                                      {dep.qty} {agg.unit}
+                                      {" · "}
+                                      {t(`eq.status.${dep.status}` as MessageKey)}
+                                      {" · "}
+                                      {dep.orderId ? (
+                                        <Link href={orderHref(dep.orderId)} className="text-copper hover:underline">
+                                          {dep.label || t("eq.openOrder")}
+                                        </Link>
+                                      ) : (
+                                        <span>{dep.label}</span>
+                                      )}
+                                    </li>
+                                  ))}
+                                </ul>
+                              )}
+                            </td>
+                          </tr>
+                        );
+                      })
+                    )}
+                  </Fragment>
                 ))}
               </tbody>
             </table>

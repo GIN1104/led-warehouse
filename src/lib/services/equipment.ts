@@ -517,6 +517,10 @@ export type EquipmentSkuAggregate = {
   skuCode: string;
   skuName: string;
   unit: string;
+  familyId: string | null;
+  familyName: string;
+  familySortOrder: number;
+  skuSortOrder: number;
   total: number;
   /** available — доступно для заказа */
   onHand: number;
@@ -528,6 +532,27 @@ export type EquipmentSkuAggregate = {
   deployments: EquipmentDeploymentLink[];
 };
 
+/** Группа → подгруппы (SKU) со сводкой qty. */
+export type EquipmentFamilyAggregate = {
+  familyId: string;
+  familyName: string;
+  sortOrder: number;
+  total: number;
+  onHand: number;
+  inUse: number;
+  inRepair: number;
+  skus: EquipmentSkuAggregate[];
+};
+
+export type EquipmentSkuBuckets = {
+  onHand: number;
+  inUse: number;
+  inRepair: number;
+};
+
+const IN_USE_STATUSES: readonly EquipmentStatus[] = ["reserved", "checked_out"];
+const REPAIR_STATUSES: readonly EquipmentStatus[] = ["needs_repair", "in_repair"];
+
 function deploymentLabel(row: EquipmentItemRow): string {
   if (row.customerName.trim()) return row.customerName.trim();
   if (row.externalRef?.trim()) return row.externalRef.trim();
@@ -535,30 +560,106 @@ function deploymentLabel(row: EquipmentItemRow): string {
   return row.note.trim() || row.status;
 }
 
+function emptyByStatus(): Record<EquipmentStatus, number> {
+  return {
+    available: 0,
+    reserved: 0,
+    checked_out: 0,
+    needs_repair: 0,
+    in_repair: 0,
+  };
+}
+
+function skuMeta(db: Sql): Map<
+  string,
+  {
+    skuId: string;
+    skuCode: string;
+    skuName: string;
+    unit: string;
+    familyId: string | null;
+    familyName: string;
+    familySortOrder: number;
+    skuSortOrder: number;
+  }
+> {
+  const rows = db.all<{
+    skuId: string;
+    skuCode: string;
+    skuName: string;
+    unit: string;
+    familyId: string | null;
+    familyName: string | null;
+    familySortOrder: number | null;
+    skuSortOrder: number;
+  }>(
+    `SELECT s.id AS skuId, s.code AS skuCode, s.name AS skuName, s.unit AS unit,
+            s.family_id AS familyId, f.name AS familyName,
+            COALESCE(f.sort_order, 9999) AS familySortOrder,
+            COALESCE(s.sort_order, 0) AS skuSortOrder
+     FROM skus s
+     LEFT JOIN product_families f ON f.id = s.family_id
+     ORDER BY COALESCE(f.sort_order, 9999) ASC, COALESCE(s.sort_order, 0) ASC, s.code ASC`,
+  );
+  return new Map(
+    rows.map((row) => [
+      row.skuId,
+      {
+        ...row,
+        familyName: row.familyName?.trim() || "Без группы",
+        familySortOrder: row.familySortOrder ?? 9999,
+      },
+    ]),
+  );
+}
+
 /** Сводка по каждой позиции (SKU): qty по статусам + ссылки на заказы «в работе». */
 export function listEquipmentSkuAggregates(db: Sql, filter: { query?: string } = {}): EquipmentSkuAggregate[] {
+  const meta = skuMeta(db);
   const rows = listEquipmentItems(db, { query: filter.query });
   const map = new Map<string, EquipmentSkuAggregate>();
+  const q = filter.query?.trim().toLowerCase() ?? "";
+
+  for (const [skuId, info] of meta) {
+    if (q && !info.skuCode.toLowerCase().includes(q) && !info.skuName.toLowerCase().includes(q) && !info.familyName.toLowerCase().includes(q)) {
+      continue;
+    }
+    map.set(skuId, {
+      skuId: info.skuId,
+      skuCode: info.skuCode,
+      skuName: info.skuName,
+      unit: info.unit,
+      familyId: info.familyId,
+      familyName: info.familyName,
+      familySortOrder: info.familySortOrder,
+      skuSortOrder: info.skuSortOrder,
+      total: 0,
+      onHand: 0,
+      inUse: 0,
+      inRepair: 0,
+      byStatus: emptyByStatus(),
+      deployments: [],
+    });
+  }
 
   for (const row of rows) {
     let agg = map.get(row.skuId);
     if (!agg) {
+      const info = meta.get(row.skuId);
       agg = {
         skuId: row.skuId,
         skuCode: row.skuCode,
         skuName: row.skuName,
         unit: row.unit,
+        familyId: info?.familyId ?? null,
+        familyName: info?.familyName ?? "Без группы",
+        familySortOrder: info?.familySortOrder ?? 9999,
+        skuSortOrder: info?.skuSortOrder ?? 0,
         total: 0,
         onHand: 0,
         inUse: 0,
         inRepair: 0,
-        byStatus: {
-          available: 0,
-          reserved: 0,
-          checked_out: 0,
-          needs_repair: 0,
-          in_repair: 0,
-        },
+        byStatus: emptyByStatus(),
         deployments: [],
       };
       map.set(row.skuId, agg);
@@ -583,7 +684,228 @@ export function listEquipmentSkuAggregates(db: Sql, filter: { query?: string } =
     }
   }
 
-  return [...map.values()].sort((a, b) => a.skuCode.localeCompare(b.skuCode, "ru"));
+  return [...map.values()].sort((a, b) => {
+    if (a.familySortOrder !== b.familySortOrder) return a.familySortOrder - b.familySortOrder;
+    if (a.familyName !== b.familyName) return a.familyName.localeCompare(b.familyName, "ru");
+    if (a.skuSortOrder !== b.skuSortOrder) return a.skuSortOrder - b.skuSortOrder;
+    return a.skuCode.localeCompare(b.skuCode, "ru");
+  });
+}
+
+/** Сводка группа → подгруппы (SKU) с qty/статусами. */
+export function listEquipmentFamilyAggregates(db: Sql, filter: { query?: string } = {}): EquipmentFamilyAggregate[] {
+  const skus = listEquipmentSkuAggregates(db, filter);
+  const map = new Map<string, EquipmentFamilyAggregate>();
+  for (const sku of skus) {
+    const key = sku.familyId ?? "__uncategorized__";
+    let family = map.get(key);
+    if (!family) {
+      family = {
+        familyId: key,
+        familyName: sku.familyName,
+        sortOrder: sku.familySortOrder,
+        total: 0,
+        onHand: 0,
+        inUse: 0,
+        inRepair: 0,
+        skus: [],
+      };
+      map.set(key, family);
+    }
+    family.skus.push(sku);
+    family.total += sku.total;
+    family.onHand += sku.onHand;
+    family.inUse += sku.inUse;
+    family.inRepair += sku.inRepair;
+  }
+  // Пустые группы без SKU всё равно показать (для создания подгрупп)
+  for (const family of db.all<{ id: string; name: string; sortOrder: number }>(
+    `SELECT id, name, sort_order AS sortOrder FROM product_families ORDER BY sort_order ASC, name ASC`,
+  )) {
+    if (map.has(family.id)) continue;
+    if (filter.query?.trim()) {
+      const q = filter.query.trim().toLowerCase();
+      if (!family.name.toLowerCase().includes(q)) continue;
+    }
+    map.set(family.id, {
+      familyId: family.id,
+      familyName: family.name,
+      sortOrder: family.sortOrder,
+      total: 0,
+      onHand: 0,
+      inUse: 0,
+      inRepair: 0,
+      skus: [],
+    });
+  }
+  return [...map.values()].sort((a, b) => {
+    if (a.sortOrder !== b.sortOrder) return a.sortOrder - b.sortOrder;
+    return a.familyName.localeCompare(b.familyName, "ru");
+  });
+}
+
+type RawItem = {
+  id: string;
+  qty: number;
+  status: EquipmentStatus;
+  orderId: string | null;
+};
+
+function listSkuRawItems(db: Sql, skuId: string): RawItem[] {
+  return db.all<RawItem>(
+    `SELECT id, qty, status, order_id AS orderId FROM equipment_items WHERE sku_id = ? ORDER BY updated_at ASC`,
+    [skuId],
+  );
+}
+
+function reduceItemsQty(
+  db: Sql,
+  items: RawItem[],
+  amount: number,
+  actor: string,
+  now: number,
+  note: string,
+): number {
+  let left = amount;
+  for (const item of items) {
+    if (left <= 0) break;
+    if (item.qty <= 0) continue;
+    const take = Math.min(item.qty, left);
+    const remain = item.qty - take;
+    if (remain === 0) {
+      db.run(`DELETE FROM equipment_status_history WHERE item_id = ?`, [item.id]);
+      db.run(`DELETE FROM equipment_items WHERE id = ?`, [item.id]);
+    } else {
+      db.run(`UPDATE equipment_items SET qty = ?, updated_at = ?, created_by = ? WHERE id = ?`, [
+        remain,
+        now,
+        actor,
+        item.id,
+      ]);
+      writeHistory(db, item.id, item.status, item.status, actor, `${note}: qty → ${remain}`, now);
+      item.qty = remain;
+    }
+    left -= take;
+  }
+  return amount - left;
+}
+
+function bumpOrCreateStatus(
+  db: Sql,
+  skuId: string,
+  status: EquipmentStatus,
+  amount: number,
+  actor: string,
+  now: number,
+  note: string,
+  preferNoOrder = true,
+): void {
+  if (amount <= 0) return;
+  const items = listSkuRawItems(db, skuId).filter((row) => row.status === status);
+  const target = preferNoOrder
+    ? items.find((row) => !row.orderId) ?? items[0]
+    : items[0];
+  if (target) {
+    const next = target.qty + amount;
+    db.run(`UPDATE equipment_items SET qty = ?, updated_at = ?, created_by = ? WHERE id = ?`, [
+      next,
+      now,
+      actor,
+      target.id,
+    ]);
+    writeHistory(db, target.id, status, status, actor, `${note}: qty → ${next}`, now);
+    return;
+  }
+  const id = newId();
+  db.run(
+    `INSERT INTO equipment_items
+      (id, sku_id, qty, status, location_id, note, source, external_ref, order_id, customer_name, created_at, updated_at, created_by)
+     VALUES (?, ?, ?, ?, NULL, ?, 'manual', NULL, NULL, '', ?, ?, ?)`,
+    [id, skuId, amount, status, note, now, now, actor],
+  );
+  writeHistory(db, id, null, status, actor, note, now);
+}
+
+/**
+ * Задать qty-корзины SKU: на складе / в работе / в ремонте.
+ * Всего = сумма корзин. Уменьшение снимает qty со строк корзины;
+ * увеличение дописывает в available / reserved / in_repair.
+ */
+export function setEquipmentSkuBuckets(
+  db: Sql,
+  skuId: string,
+  buckets: EquipmentSkuBuckets,
+  actor: string,
+): EquipmentSkuAggregate {
+  const sku = db.get<{ id: string }>(`SELECT id FROM skus WHERE id = ?`, [skuId]);
+  if (!sku) throw new DomainError("Номенклатура не найдена");
+
+  const onHand = buckets.onHand;
+  const inUse = buckets.inUse;
+  const inRepair = buckets.inRepair;
+  for (const [label, value] of [
+    ["на складе", onHand],
+    ["в работе", inUse],
+    ["в ремонте", inRepair],
+  ] as const) {
+    if (!Number.isInteger(value) || value < 0) {
+      throw new DomainError(`Количество «${label}» должно быть целым и ≥ 0`);
+    }
+  }
+
+  db.transaction(() => {
+    const now = Date.now();
+    let items = listSkuRawItems(db, skuId);
+    const sum = (statuses: readonly EquipmentStatus[]) =>
+      items.filter((row) => statuses.includes(row.status)).reduce((acc, row) => acc + row.qty, 0);
+
+    const curOnHand = sum(["available"]);
+    const curInUse = sum(IN_USE_STATUSES);
+    const curRepair = sum(REPAIR_STATUSES);
+
+    if (curOnHand > onHand) {
+      const available = items
+        .filter((row) => row.status === "available")
+        .sort((a, b) => a.qty - b.qty);
+      reduceItemsQty(db, available, curOnHand - onHand, actor, now, "сводка: склад");
+      items = listSkuRawItems(db, skuId);
+    }
+    if (curInUse > inUse) {
+      const inUseRows = items
+        .filter((row) => IN_USE_STATUSES.includes(row.status))
+        .sort((a, b) => {
+          const ao = a.orderId ? 1 : 0;
+          const bo = b.orderId ? 1 : 0;
+          if (ao !== bo) return ao - bo;
+          return a.qty - b.qty;
+        });
+      reduceItemsQty(db, inUseRows, curInUse - inUse, actor, now, "сводка: в работе");
+      items = listSkuRawItems(db, skuId);
+    }
+    if (curRepair > inRepair) {
+      const repairRows = items
+        .filter((row) => REPAIR_STATUSES.includes(row.status))
+        .sort((a, b) => a.qty - b.qty);
+      reduceItemsQty(db, repairRows, curRepair - inRepair, actor, now, "сводка: ремонт");
+    }
+
+    items = listSkuRawItems(db, skuId);
+    const afterOnHand = items.filter((row) => row.status === "available").reduce((acc, row) => acc + row.qty, 0);
+    const afterInUse = items
+      .filter((row) => IN_USE_STATUSES.includes(row.status))
+      .reduce((acc, row) => acc + row.qty, 0);
+    const afterRepair = items
+      .filter((row) => REPAIR_STATUSES.includes(row.status))
+      .reduce((acc, row) => acc + row.qty, 0);
+
+    bumpOrCreateStatus(db, skuId, "available", onHand - afterOnHand, actor, now, "сводка: склад");
+    bumpOrCreateStatus(db, skuId, "reserved", inUse - afterInUse, actor, now, "сводка: в работе");
+    bumpOrCreateStatus(db, skuId, "in_repair", inRepair - afterRepair, actor, now, "сводка: ремонт");
+  });
+
+  const agg = listEquipmentSkuAggregates(db).find((row) => row.skuId === skuId);
+  if (!agg) throw new DomainError("Номенклатура не найдена");
+  return agg;
 }
 
 export type EquipmentSortKey = "code" | "name" | "qty" | "status" | "customer" | "updated";
