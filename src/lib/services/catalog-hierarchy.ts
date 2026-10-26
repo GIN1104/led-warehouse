@@ -27,6 +27,72 @@ function takenCodes(db: Sql): Set<string> {
   return new Set(db.all<{ code: string }>(`SELECT code FROM skus`).map((row) => row.code.toUpperCase()));
 }
 
+/** Подсказки родительской группы по названию SKU (RU/EN). */
+const FAMILY_NAME_HINTS: readonly { pattern: RegExp; family: string }[] = [
+  { pattern: /кабинет|cabinet|\bcab\b/i, family: "Кабинеты" },
+  { pattern: /контроллер|controller|novastar|\bnova\b/i, family: "Контроллеры" },
+  { pattern: /кабел|cable|powercon|ethercon/i, family: "Кабели" },
+  { pattern: /кейс|flight\s*case|\bcase\b/i, family: "Кейсы" },
+  { pattern: /телевизор|\btv\b|screen|экран/i, family: "Телевизор" },
+  { pattern: /процессор|processor|\bcpu\b/i, family: "Процессоры" },
+  { pattern: /спрайт|sprite/i, family: "Спрайты" },
+  { pattern: /кубик|cube/i, family: "Кубики" },
+];
+
+/** Угадать каноническое имя группы по названию позиции. */
+export function guessFamilyName(skuName: string): string | null {
+  const name = skuName.trim();
+  if (!name) return null;
+  for (const hint of FAMILY_NAME_HINTS) {
+    if (hint.pattern.test(name)) return hint.family;
+  }
+  return null;
+}
+
+function familyNameStem(name: string): string {
+  return name
+    .trim()
+    .toLowerCase()
+    .replace(/[ыи]$/u, "")
+    .replace(/\s+/g, " ");
+}
+
+/**
+ * Подобрать существующую группу или имя для создания:
+ * 1) явная category / familyId
+ * 2) совпадение со stem существующей группы («Кабинет…» → «Кабинеты»)
+ * 3) keyword-hint (кабинет → Кабинеты)
+ */
+export function resolveFamilyForSkuName(
+  db: Sql,
+  skuName: string,
+  options?: { category?: string; familyId?: string },
+): ProductFamilyRow | null {
+  if (options?.familyId && options.familyId !== "__uncategorized__") {
+    const byId = db.get<ProductFamilyRow>(
+      `SELECT id, name, sort_order AS sortOrder, created_at AS createdAt FROM product_families WHERE id = ?`,
+      [options.familyId],
+    );
+    if (byId) return byId;
+  }
+  const category = options?.category?.trim() ?? "";
+  if (category.length >= 2) return findOrCreateFamily(db, category);
+
+  const families = listProductFamilies(db);
+  const lower = skuName.trim().toLowerCase();
+  for (const family of families) {
+    const stem = familyNameStem(family.name);
+    if (stem.length >= 4 && (lower.includes(stem) || stem.includes(familyNameStem(skuName.split(/\s+/)[0] ?? "")))) {
+      return family;
+    }
+  }
+  const guessed = guessFamilyName(skuName);
+  if (!guessed) return null;
+  const existing = families.find((row) => row.name.toLowerCase() === guessed.toLowerCase());
+  if (existing) return existing;
+  return findOrCreateFamily(db, guessed);
+}
+
 /** Найти или создать группу (семейство) оборудования. */
 export function findOrCreateFamily(db: Sql, name: string): ProductFamilyRow {
   const trimmed = name.trim();
@@ -100,9 +166,9 @@ export function listFamilyTree(db: Sql): FamilyTreeNode[] {
  */
 export function findOrCreateSkuByName(
   db: Sql,
-  input: { name: string; category?: string; code?: string; unit?: string },
+  input: { name: string; category?: string; familyId?: string; code?: string; unit?: string },
   actor: string,
-): { id: string; code: string; name: string; created: boolean } {
+): { id: string; code: string; name: string; created: boolean; familyId?: string | null } {
   const name = canonicalizeEquipmentName(input.name.trim());
   if (name.length < 2) throw new DomainError("Укажите название");
   const nameKey = normalizeEquipmentName(name);
@@ -125,15 +191,12 @@ export function findOrCreateSkuByName(
     }
   }
 
-  let familyId: string | null = null;
-  let category = (input.category ?? "").trim();
-  if (category.length >= 2) {
-    const family = findOrCreateFamily(db, category);
-    familyId = family.id;
-    category = family.name;
-  } else {
-    category = "Прочее";
-  }
+  const resolved = resolveFamilyForSkuName(db, name, {
+    category: input.category,
+    familyId: input.familyId,
+  });
+  const familyId: string | null = resolved?.id ?? null;
+  const category = resolved?.name ?? "Прочее";
 
   const code = input.code?.trim().toUpperCase() || generateStableSkuCode(name, takenCodes(db));
   if (!/^[A-Z0-9][A-Z0-9-]{1,31}$/.test(code)) {
@@ -164,7 +227,87 @@ export function findOrCreateSkuByName(
     throw error;
   }
   void actor;
-  return { id, code, name, created: true };
+  return { id, code, name, created: true, familyId };
+}
+
+/** Переименовать группу; category у дочерних SKU синхронизируется. */
+export function renameProductFamily(db: Sql, familyId: string, name: string, actor: string): ProductFamilyRow {
+  void actor;
+  const trimmed = name.trim();
+  if (trimmed.length < 2) throw new DomainError("Укажите название группы");
+  const current = db.get<ProductFamilyRow>(
+    `SELECT id, name, sort_order AS sortOrder, created_at AS createdAt FROM product_families WHERE id = ?`,
+    [familyId],
+  );
+  if (!current) throw new DomainError("Группа не найдена");
+  const clash = db.get<{ id: string }>(
+    `SELECT id FROM product_families WHERE lower(name) = lower(?) AND id != ?`,
+    [trimmed, familyId],
+  );
+  if (clash) throw new DomainError("Группа с таким названием уже есть");
+  db.transaction(() => {
+    db.run(`UPDATE product_families SET name = ? WHERE id = ?`, [trimmed, familyId]);
+    db.run(`UPDATE skus SET category = ? WHERE family_id = ?`, [trimmed, familyId]);
+  });
+  return { ...current, name: trimmed };
+}
+
+/** Переименовать SKU (вариант). */
+export function renameSku(db: Sql, skuId: string, name: string, actor: string): FamilySkuRow {
+  void actor;
+  const display = canonicalizeEquipmentName(name.trim());
+  if (display.length < 1) throw new DomainError("Укажите название");
+  const nameKey = normalizeEquipmentName(display);
+  if (!nameKey) throw new DomainError("Укажите название");
+  const current = db.get<{ id: string }>(`SELECT id FROM skus WHERE id = ?`, [skuId]);
+  if (!current) throw new DomainError("Номенклатура не найдена");
+  const clash = db.get<{ id: string }>(`SELECT id FROM skus WHERE name_key = ? AND id != ?`, [nameKey, skuId]);
+  if (clash) throw new DomainError("Номенклатура с таким названием уже есть");
+  db.run(`UPDATE skus SET name = ?, name_key = ? WHERE id = ?`, [display, nameKey, skuId]);
+  const row = db.get<FamilySkuRow>(
+    `SELECT id, code, name, COALESCE(name_key, '') AS nameKey, category,
+            family_id AS familyId, COALESCE(sort_order, 0) AS sortOrder, unit
+     FROM skus WHERE id = ?`,
+    [skuId],
+  );
+  if (!row) throw new DomainError("Номенклатура не найдена");
+  return row;
+}
+
+/** Перенести SKU в другую группу (или снять группу). */
+export function assignSkuToFamily(db: Sql, skuId: string, familyId: string | null, actor: string): FamilySkuRow {
+  void actor;
+  const sku = db.get<{ id: string }>(`SELECT id FROM skus WHERE id = ?`, [skuId]);
+  if (!sku) throw new DomainError("Номенклатура не найдена");
+  let category = "Прочее";
+  let targetId: string | null = familyId;
+  if (familyId && familyId !== "__uncategorized__") {
+    const family = db.get<{ id: string; name: string }>(`SELECT id, name FROM product_families WHERE id = ?`, [familyId]);
+    if (!family) throw new DomainError("Группа не найдена");
+    category = family.name;
+    targetId = family.id;
+  } else {
+    targetId = null;
+  }
+  const maxSort = (
+    targetId
+      ? db.get<{ value: number }>(`SELECT COALESCE(MAX(sort_order), -1) AS value FROM skus WHERE family_id = ?`, [targetId])
+      : db.get<{ value: number }>(`SELECT COALESCE(MAX(sort_order), -1) AS value FROM skus WHERE family_id IS NULL`)
+  )?.value ?? -1;
+  db.run(`UPDATE skus SET family_id = ?, category = ?, sort_order = ? WHERE id = ?`, [
+    targetId,
+    category,
+    maxSort + 1,
+    skuId,
+  ]);
+  const row = db.get<FamilySkuRow>(
+    `SELECT id, code, name, COALESCE(name_key, '') AS nameKey, category,
+            family_id AS familyId, COALESCE(sort_order, 0) AS sortOrder, unit
+     FROM skus WHERE id = ?`,
+    [skuId],
+  );
+  if (!row) throw new DomainError("Номенклатура не найдена");
+  return row;
 }
 
 /** Добавить вариант (SKU) в группу с авто-code. */
@@ -177,7 +320,7 @@ export function addSkuVariant(
   if (!family) throw new DomainError("Группа не найдена");
   const created = findOrCreateSkuByName(
     db,
-    { name: input.name, category: family.name, code: input.code, unit: input.unit },
+    { name: input.name, category: family.name, familyId: family.id, code: input.code, unit: input.unit },
     actor,
   );
   db.run(`UPDATE skus SET family_id = ?, category = ? WHERE id = ?`, [family.id, family.name, created.id]);

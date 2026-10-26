@@ -2,11 +2,15 @@ import { describe, expect, it } from "vitest";
 import { createDb } from "@/lib/db/memory";
 import {
   addSkuVariant,
+  assignSkuToFamily,
   createProductFamily,
   findOrCreateSkuByName,
+  guessFamilyName,
   listFamilyTree,
   moveFamily,
   moveSkuInFamily,
+  renameProductFamily,
+  renameSku,
 } from "@/lib/services/catalog-hierarchy";
 import { listEquipmentFamilyAggregates } from "@/lib/services/equipment";
 
@@ -71,5 +75,31 @@ describe("иерархия групп и SKU", () => {
 
     const summary = listEquipmentFamilyAggregates(db).map((row) => row.familyName);
     expect(summary.slice(0, 3)).toEqual(["Спрайты", "Процессоры", "Кубики"]);
+  });
+
+  it("угадывает группу: кабинет → Кабинеты, не отдельная группа", () => {
+    expect(guessFamilyName("Кабинет LED P3.9 1000×500")).toBe("Кабинеты");
+    const db = setup();
+    createProductFamily(db, "Кабинеты", "wh");
+    const created = findOrCreateSkuByName(db, { name: "Кабинет LED P3.9 1000×500" }, "wh");
+    expect(created.created).toBe(true);
+    const tree = listFamilyTree(db);
+    const cabinets = tree.find((row) => row.name === "Кабинеты");
+    expect(cabinets?.skus.some((sku) => sku.id === created.id)).toBe(true);
+    expect(tree.some((row) => row.name === "Кабинет LED P3.9 1000×500")).toBe(false);
+  });
+
+  it("переименовывает группу и SKU, переносит в другую группу", () => {
+    const db = setup();
+    const cabinets = createProductFamily(db, "Кабинеты", "wh");
+    const cables = createProductFamily(db, "Кабели", "wh");
+    const sku = addSkuVariant(db, { familyId: cabinets.id, name: "Кабинет LED P3.9 1000×500" }, "wh");
+    renameProductFamily(db, cabinets.id, "LED Кабинеты", "wh");
+    expect(listFamilyTree(db).find((row) => row.id === cabinets.id)?.name).toBe("LED Кабинеты");
+    renameSku(db, sku.id, "Кабинет P3.9 1м", "wh");
+    assignSkuToFamily(db, sku.id, cables.id, "wh");
+    const tree = listFamilyTree(db);
+    expect(tree.find((row) => row.id === cables.id)?.skus.map((s) => s.name)).toContain("Кабинет P3.9 1м");
+    expect(tree.find((row) => row.id === cabinets.id)?.skus).toHaveLength(0);
   });
 });

@@ -13,10 +13,14 @@ import { translateError, type MessageKey } from "@/lib/i18n/messages";
 import { orderHref } from "@/lib/paths";
 import {
   addSkuVariant,
+  assignSkuToFamily,
   createProductFamily,
   listFamilyTree,
+  listProductFamilies,
   moveFamily,
   moveSkuInFamily,
+  renameProductFamily,
+  renameSku,
 } from "@/lib/services/catalog-hierarchy";
 import {
   addEquipmentItem,
@@ -70,6 +74,8 @@ export default function StockPage() {
   const [bucketDrafts, setBucketDrafts] = useState<
     Record<string, { total: string; onHand: string; inUse: string; inRepair: string }>
   >({});
+  const [familyNameDrafts, setFamilyNameDrafts] = useState<Record<string, string>>({});
+  const [skuNameDrafts, setSkuNameDrafts] = useState<Record<string, string>>({});
   void revision;
 
   const items = useMemo(() => {
@@ -397,6 +403,73 @@ export default function StockPage() {
   }
 
   const movableFamilies = familyAggregates.filter((family) => family.familyId !== "__uncategorized__");
+  const productFamilies = useMemo(() => listProductFamilies(db), [db, revision]);
+
+  async function saveFamilyName(familyId: string, name: string, currentName: string) {
+    if (familyId === "__uncategorized__") return;
+    const trimmed = name.trim();
+    if (!trimmed || trimmed === currentName) {
+      setFamilyNameDrafts((prev) => {
+        if (!prev[familyId]) return prev;
+        const next = { ...prev };
+        delete next[familyId];
+        return next;
+      });
+      return;
+    }
+    try {
+      assertCan(session.role, "stock.write");
+      renameProductFamily(db, familyId, trimmed, session.id);
+      setFamilyNameDrafts((prev) => {
+        const next = { ...prev };
+        delete next[familyId];
+        return next;
+      });
+      await refresh();
+      setFlash({ ok: t("eq.familyRenamed") });
+    } catch (error) {
+      setFlash({ error: translateError(lang, error) });
+      setFamilyNameDrafts((prev) => ({ ...prev, [familyId]: currentName }));
+    }
+  }
+
+  async function saveSkuName(skuId: string, name: string, currentName: string) {
+    const trimmed = name.trim();
+    if (!trimmed || trimmed === currentName) {
+      setSkuNameDrafts((prev) => {
+        if (!prev[skuId]) return prev;
+        const next = { ...prev };
+        delete next[skuId];
+        return next;
+      });
+      return;
+    }
+    try {
+      assertCan(session.role, "stock.write");
+      renameSku(db, skuId, trimmed, session.id);
+      setSkuNameDrafts((prev) => {
+        const next = { ...prev };
+        delete next[skuId];
+        return next;
+      });
+      await refresh();
+      setFlash({ ok: t("eq.skuRenamed") });
+    } catch (error) {
+      setFlash({ error: translateError(lang, error) });
+      setSkuNameDrafts((prev) => ({ ...prev, [skuId]: currentName }));
+    }
+  }
+
+  async function onAssignFamily(skuId: string, familyId: string) {
+    try {
+      assertCan(session.role, "stock.write");
+      assignSkuToFamily(db, skuId, familyId || null, session.id);
+      await refresh();
+      setFlash({ ok: t("eq.skuMoved") });
+    } catch (error) {
+      setFlash({ error: translateError(lang, error) });
+    }
+  }
 
   function onMovement(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -485,11 +558,30 @@ export default function StockPage() {
                         ) : null}
                       </td>
                       <td colSpan={2} className="px-3 py-2 font-medium">
-                        {family.familyName}
+                        {canMoveFamily ? (
+                          <input
+                            className={`${controlClass} min-w-[12rem] font-medium`}
+                            value={familyNameDrafts[family.familyId] ?? family.familyName}
+                            aria-label={t("eq.familyName")}
+                            onChange={(event) =>
+                              setFamilyNameDrafts((prev) => ({ ...prev, [family.familyId]: event.target.value }))
+                            }
+                            onBlur={(event) => void saveFamilyName(family.familyId, event.target.value, family.familyName)}
+                            onKeyDown={(event) => {
+                              if (event.key === "Enter") {
+                                event.preventDefault();
+                                (event.target as HTMLInputElement).blur();
+                              }
+                            }}
+                          />
+                        ) : (
+                          family.familyName
+                        )}
+                        <span className="ms-2 text-xs font-normal text-ink/50">
+                          {t("eq.summaryGroupTotal")}: {family.total}
+                        </span>
                       </td>
-                      <td className="px-3 py-2 text-xs text-ink/60">
-                        {t("eq.summaryGroupTotal")}: {family.total}
-                      </td>
+                      <td className="px-3 py-2 text-xs text-ink/60">{family.total}</td>
                       <td className="px-3 py-2 text-xs text-ink/60">{family.onHand}</td>
                       <td className="px-3 py-2 text-xs text-ink/60">{family.inUse}</td>
                       <td className="px-3 py-2 text-xs text-ink/60">{family.inRepair}</td>
@@ -538,7 +630,42 @@ export default function StockPage() {
                               ) : null}
                             </td>
                             <td className="px-3 py-2 ps-4 font-mono text-xs">{agg.skuCode}</td>
-                            <td className="px-3 py-2">{agg.skuName}</td>
+                            <td className="px-3 py-2">
+                              {allowed ? (
+                                <div className="flex min-w-[14rem] flex-col gap-1">
+                                  <input
+                                    className={controlClass}
+                                    value={skuNameDrafts[agg.skuId] ?? agg.skuName}
+                                    aria-label={t("stock.name")}
+                                    onChange={(event) =>
+                                      setSkuNameDrafts((prev) => ({ ...prev, [agg.skuId]: event.target.value }))
+                                    }
+                                    onBlur={(event) => void saveSkuName(agg.skuId, event.target.value, agg.skuName)}
+                                    onKeyDown={(event) => {
+                                      if (event.key === "Enter") {
+                                        event.preventDefault();
+                                        (event.target as HTMLInputElement).blur();
+                                      }
+                                    }}
+                                  />
+                                  <select
+                                    className={controlClass}
+                                    value={agg.familyId ?? ""}
+                                    aria-label={t("eq.summaryAssignGroup")}
+                                    onChange={(event) => void onAssignFamily(agg.skuId, event.target.value)}
+                                  >
+                                    <option value="">{t("eq.uncategorized")}</option>
+                                    {productFamilies.map((item) => (
+                                      <option key={item.id} value={item.id}>
+                                        {item.name}
+                                      </option>
+                                    ))}
+                                  </select>
+                                </div>
+                              ) : (
+                                agg.skuName
+                              )}
+                            </td>
                             <td className="px-3 py-2">
                               {allowed ? (
                                 <input
