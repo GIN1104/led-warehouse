@@ -5,8 +5,10 @@ import {
   createProductFamily,
   findOrCreateSkuByName,
   listFamilyTree,
+  moveFamily,
   moveSkuInFamily,
 } from "@/lib/services/catalog-hierarchy";
+import { listEquipmentFamilyAggregates } from "@/lib/services/equipment";
 
 function setup() {
   const db = createDb();
@@ -47,5 +49,27 @@ describe("иерархия групп и SKU", () => {
     const node = tree.find((row) => row.id === family.id);
     expect(node?.skus.map((sku) => sku.code)).toEqual(["TV-50", "TV-32"]);
     void a;
+  });
+
+  it("меняет порядок групп и сохраняет sort_order для сводки", () => {
+    const db = setup();
+    const cubes = createProductFamily(db, "Кубики", "wh");
+    const processors = createProductFamily(db, "Процессоры", "wh");
+    const sprites = createProductFamily(db, "Спрайты", "wh");
+    addSkuVariant(db, { familyId: cubes.id, name: "Cube A" }, "wh");
+    addSkuVariant(db, { familyId: processors.id, name: "CPU X" }, "wh");
+    addSkuVariant(db, { familyId: sprites.id, name: "Sprite 1" }, "wh");
+
+    expect(listFamilyTree(db).map((row) => row.name)).toEqual(["Кубики", "Процессоры", "Спрайты"]);
+
+    moveFamily(db, processors.id, "up");
+    expect(listFamilyTree(db).map((row) => row.name)).toEqual(["Процессоры", "Кубики", "Спрайты"]);
+
+    moveFamily(db, sprites.id, "up");
+    moveFamily(db, sprites.id, "up");
+    expect(listFamilyTree(db).map((row) => row.name)).toEqual(["Спрайты", "Процессоры", "Кубики"]);
+
+    const summary = listEquipmentFamilyAggregates(db).map((row) => row.familyName);
+    expect(summary.slice(0, 3)).toEqual(["Спрайты", "Процессоры", "Кубики"]);
   });
 });
