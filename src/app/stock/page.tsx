@@ -375,6 +375,29 @@ export default function StockPage() {
     }
   }
 
+  function onReorderFamily(familyId: string, direction: "up" | "down") {
+    if (familyId === "__uncategorized__") return;
+    try {
+      assertCan(session.role, "stock.write");
+      moveFamily(db, familyId, direction);
+      void refresh().then(() => setFlash({ ok: t("eq.orderSaved") }));
+    } catch (error) {
+      setFlash({ error: translateError(lang, error) });
+    }
+  }
+
+  function onReorderSku(skuId: string, direction: "up" | "down") {
+    try {
+      assertCan(session.role, "stock.write");
+      moveSkuInFamily(db, skuId, direction);
+      void refresh().then(() => setFlash({ ok: t("eq.orderSaved") }));
+    } catch (error) {
+      setFlash({ error: translateError(lang, error) });
+    }
+  }
+
+  const movableFamilies = familyAggregates.filter((family) => family.familyId !== "__uncategorized__");
+
   function onMovement(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const form = new FormData(event.currentTarget);
@@ -415,9 +438,10 @@ export default function StockPage() {
           <p className="text-sm text-ink/60">{t("eq.summaryEmpty")}</p>
         ) : (
           <div className="overflow-x-auto rounded-md border border-line bg-paper/60">
-            <table className="w-full min-w-[860px] text-start text-sm">
+            <table className="w-full min-w-[920px] text-start text-sm">
               <thead className="bg-sand text-xs tracking-wide text-ink/50 uppercase">
                 <tr>
+                  <th className="px-3 py-2 font-medium">{t("eq.summaryOrder")}</th>
                   <th className="px-3 py-2 font-medium">{t("stock.code")}</th>
                   <th className="px-3 py-2 font-medium">{t("stock.name")}</th>
                   <th className="px-3 py-2 font-medium">{t("eq.summaryTotal")}</th>
@@ -428,9 +452,38 @@ export default function StockPage() {
                 </tr>
               </thead>
               <tbody>
-                {familyAggregates.map((family) => (
+                {familyAggregates.map((family) => {
+                  const familyIndex = movableFamilies.findIndex((row) => row.familyId === family.familyId);
+                  const canMoveFamily = family.familyId !== "__uncategorized__" && allowed;
+                  return (
                   <Fragment key={family.familyId}>
                     <tr className="border-t border-line bg-sand/80">
+                      <td className="px-3 py-2">
+                        {canMoveFamily ? (
+                          <span className="flex gap-1">
+                            <button
+                              type="button"
+                              className={buttonClass("ghost", "px-2 py-0.5 text-xs")}
+                              disabled={familyIndex <= 0}
+                              aria-label={t("eq.moveUp")}
+                              title={t("eq.moveUp")}
+                              onClick={() => onReorderFamily(family.familyId, "up")}
+                            >
+                              ↑
+                            </button>
+                            <button
+                              type="button"
+                              className={buttonClass("ghost", "px-2 py-0.5 text-xs")}
+                              disabled={familyIndex < 0 || familyIndex >= movableFamilies.length - 1}
+                              aria-label={t("eq.moveDown")}
+                              title={t("eq.moveDown")}
+                              onClick={() => onReorderFamily(family.familyId, "down")}
+                            >
+                              ↓
+                            </button>
+                          </span>
+                        ) : null}
+                      </td>
                       <td colSpan={2} className="px-3 py-2 font-medium">
                         {family.familyName}
                       </td>
@@ -444,12 +497,12 @@ export default function StockPage() {
                     </tr>
                     {family.skus.length === 0 ? (
                       <tr className="border-t border-line">
-                        <td colSpan={7} className="px-3 py-2 ps-8 text-xs text-ink/50">
+                        <td colSpan={8} className="px-3 py-2 ps-8 text-xs text-ink/50">
                           {t("eq.summaryNoVariants")}
                         </td>
                       </tr>
                     ) : (
-                      family.skus.map((agg) => {
+                      family.skus.map((agg, skuIndex) => {
                         const draft = bucketDraftFor(agg);
                         const dirty =
                           Number(draft.total) !== agg.total ||
@@ -458,7 +511,33 @@ export default function StockPage() {
                           Number(draft.inRepair) !== agg.inRepair;
                         return (
                           <tr key={agg.skuId} className="border-t border-line align-top">
-                            <td className="px-3 py-2 ps-8 font-mono text-xs">{agg.skuCode}</td>
+                            <td className="px-3 py-2">
+                              {allowed ? (
+                                <span className="flex gap-1 ps-4">
+                                  <button
+                                    type="button"
+                                    className={buttonClass("ghost", "px-2 py-0.5 text-xs")}
+                                    disabled={skuIndex <= 0}
+                                    aria-label={t("eq.moveUp")}
+                                    title={t("eq.moveUp")}
+                                    onClick={() => onReorderSku(agg.skuId, "up")}
+                                  >
+                                    ↑
+                                  </button>
+                                  <button
+                                    type="button"
+                                    className={buttonClass("ghost", "px-2 py-0.5 text-xs")}
+                                    disabled={skuIndex >= family.skus.length - 1}
+                                    aria-label={t("eq.moveDown")}
+                                    title={t("eq.moveDown")}
+                                    onClick={() => onReorderSku(agg.skuId, "down")}
+                                  >
+                                    ↓
+                                  </button>
+                                </span>
+                              ) : null}
+                            </td>
+                            <td className="px-3 py-2 ps-4 font-mono text-xs">{agg.skuCode}</td>
                             <td className="px-3 py-2">{agg.skuName}</td>
                             <td className="px-3 py-2">
                               {allowed ? (
@@ -611,7 +690,8 @@ export default function StockPage() {
                       })
                     )}
                   </Fragment>
-                ))}
+                  );
+                })}
               </tbody>
             </table>
           </div>
