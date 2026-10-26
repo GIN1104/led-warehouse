@@ -23,7 +23,7 @@ describe("sql.js", () => {
     seedIfEmpty(db);
 
     const before = getDashboard(db);
-    expect(before.skuCount).toBe(6);
+    expect(before.skuCount).toBe(7); // + Laptop из seed комплектов
     expect(before.shortageUnits).toBeGreaterThan(0);
 
     const created = createOrder(

@@ -1,11 +1,13 @@
 import { describe, expect, it } from "vitest";
 import { createDb } from "@/lib/db/memory";
+import { listEquipmentFamilyAggregates } from "@/lib/services/equipment";
 import {
   addKitChecklistItem,
   createKitGroup,
   createKitSubtype,
   createKitUnit,
   fixKitLeptopTypo,
+  listKitSubtypesBySkuId,
   listKitTree,
   removeKitChecklistItem,
   removeKitGroup,
@@ -13,26 +15,30 @@ import {
 } from "@/lib/services/kits";
 
 describe("комплекты (kits)", () => {
-  it("строит иерархию группа → подтип → экземпляр → checklist", () => {
+  it("строит иерархию и линкует SKU в сводку", () => {
     const db = createDb();
-    // migrate уже сеет демо — очистим для чистого теста
     for (const row of listKitTree(db)) removeKitGroup(db, row.id);
 
     const group = createKitGroup(db, "Компьютер");
+    expect(group.familyId).toBeTruthy();
     const subtype = createKitSubtype(db, group.id, "Laptop");
+    expect(subtype.skuId).toBeTruthy();
+    expect(subtype.name).toBe("Laptop");
     const unit = createKitUnit(db, subtype.id, "№1");
     addKitChecklistItem(db, unit.id, { label: "HDMI", qty: 2 });
     addKitChecklistItem(db, unit.id, { label: "DVI-HDMI", qty: 1 });
 
     const tree = listKitTree(db);
-    expect(tree).toHaveLength(1);
-    expect(tree[0]?.name).toBe("Компьютер");
-    expect(tree[0]?.subtypes[0]?.name).toBe("Laptop");
-    expect(tree[0]?.subtypes[0]?.units[0]?.label).toBe("№1");
     expect(tree[0]?.subtypes[0]?.units[0]?.items.map((i) => `${i.label}×${i.qty}`)).toEqual([
       "HDMI×2",
       "DVI-HDMI×1",
     ]);
+
+    const bySku = listKitSubtypesBySkuId(db);
+    expect(bySku.get(subtype.skuId!)?.name).toBe("Laptop");
+    const summary = listEquipmentFamilyAggregates(db);
+    const family = summary.find((f) => f.familyName === "Компьютер");
+    expect(family?.skus.some((s) => s.skuName === "Laptop" && s.skuId === subtype.skuId)).toBe(true);
   });
 
   it("удаляет строку комплектации и каскадит группу", () => {
@@ -52,27 +58,39 @@ describe("комплекты (kits)", () => {
 
   it("seedDefaultKitsIfEmpty кладёт Computer/Laptop №1–3 один раз", () => {
     const db = createDb();
-    // migrate уже вызвал seed — дерево не пустое
     const before = listKitTree(db);
     expect(before.some((g) => g.name === "Компьютер")).toBe(true);
     seedDefaultKitsIfEmpty(db);
     expect(listKitTree(db)).toHaveLength(before.length);
 
     const laptop = before.find((g) => g.name === "Компьютер")?.subtypes.find((s) => s.name === "Laptop");
+    expect(laptop?.skuId).toBeTruthy();
     expect(laptop?.units.map((u) => u.label)).toEqual(["№1", "№2", "№3"]);
     expect(laptop?.units[0]?.items.some((i) => i.label === "HDMI" && i.qty === 2)).toBe(true);
+
+    const summary = listEquipmentFamilyAggregates(db);
+    expect(summary.some((f) => f.familyName === "Компьютер" && f.skus.some((s) => s.skuName === "Laptop"))).toBe(
+      true,
+    );
   });
 
-  it("fixKitLeptopTypo меняет LEPTOP/Leptop на Laptop", () => {
+  it("fixKitLeptopTypo чинит LEPTOP в kits и в сводке (skus)", () => {
     const db = createDb();
-    for (const row of listKitTree(db)) removeKitGroup(db, row.id);
-    const group = createKitGroup(db, "Компьютер");
-    createKitSubtype(db, group.id, "LEPTOP");
-    createKitSubtype(db, group.id, "Leptop bag");
+    const laptopSku = db.get<{ id: string }>(`SELECT id FROM skus WHERE name = 'Laptop'`);
+    expect(laptopSku).toBeTruthy();
+    db.run(`UPDATE skus SET name = 'LEPTOP', name_key = 'leptop_typo_tmp' WHERE id = ?`, [laptopSku!.id]);
+    db.run(`UPDATE kit_subtypes SET name = 'LEPTOP' WHERE sku_id = ?`, [laptopSku!.id]);
+    db.run(`UPDATE product_families SET name = 'Leptop group' WHERE name = 'Компьютер'`);
+
     expect(fixKitLeptopTypo(db)).toBeGreaterThanOrEqual(2);
-    const names = listKitTree(db)[0]?.subtypes.map((s) => s.name) ?? [];
-    expect(names).toContain("Laptop");
-    expect(names).toContain("Laptop bag");
-    expect(names.some((n) => /leptop/i.test(n))).toBe(false);
+    expect(db.get<{ name: string }>(`SELECT name FROM skus WHERE id = ?`, [laptopSku!.id])?.name).toBe("Laptop");
+    expect(db.get<{ name: string }>(`SELECT name FROM kit_subtypes WHERE sku_id = ?`, [laptopSku!.id])?.name).toBe(
+      "Laptop",
+    );
+    expect(
+      db.get<{ name: string }>(`SELECT name FROM product_families WHERE id = (
+        SELECT family_id FROM kit_groups WHERE name = 'Компьютер' OR name LIKE 'Laptop%' LIMIT 1
+      )`)?.name,
+    ).not.toMatch(/leptop/i);
   });
 });
