@@ -47,8 +47,10 @@ import { parseMapperFile } from "@/lib/services/mapper-excel";
 import { listLocationBalances, listLocations, listMovements, listSkuSummaries } from "@/lib/services/queries";
 
 const REPAIR_STATUSES: readonly EquipmentStatus[] = ["needs_repair", "in_repair"];
-const SUMMARY_SCROLL_ID = "eq-summary-scroll";
+/** Под sticky-шапкой приложения (h-14) — липнем к viewport, не к карточке. */
+const SUMMARY_STICKY_TOP = "top-14";
 const qtyInputClass = `${controlClass} h-10 w-20 shrink-0 tabular-nums`;
+const summaryCellClass = "px-3 py-2 align-middle";
 
 function statusTone(status: EquipmentStatus): "neutral" | "ok" | "warn" | "alert" {
   if (status === "available") return "ok";
@@ -57,22 +59,18 @@ function statusTone(status: EquipmentStatus): "neutral" | "ok" | "warn" | "alert
   return "alert";
 }
 
-function captureSummaryFocus(): { skuId: string; field: string; scrollTop: number } | null {
+function captureSummaryFocus(): { skuId: string; field: string; scrollY: number } | null {
   const active = document.activeElement;
-  if (!(active instanceof HTMLElement)) return null;
+  if (!(active instanceof HTMLElement)) return { skuId: "", field: "", scrollY: window.scrollY };
   const skuId = active.getAttribute("data-sku-id");
   const field = active.getAttribute("data-field");
-  const scroller = document.getElementById(SUMMARY_SCROLL_ID);
-  if (!skuId || !field) {
-    return scroller ? { skuId: "", field: "", scrollTop: scroller.scrollTop } : null;
-  }
-  return { skuId, field, scrollTop: scroller?.scrollTop ?? 0 };
+  if (!skuId || !field) return { skuId: "", field: "", scrollY: window.scrollY };
+  return { skuId, field, scrollY: window.scrollY };
 }
 
-function restoreSummaryFocus(snap: { skuId: string; field: string; scrollTop: number } | null): void {
+function restoreSummaryFocus(snap: { skuId: string; field: string; scrollY: number } | null): void {
   if (!snap) return;
-  const scroller = document.getElementById(SUMMARY_SCROLL_ID);
-  if (scroller) scroller.scrollTop = snap.scrollTop;
+  window.scrollTo(0, snap.scrollY);
   if (!snap.skuId || !snap.field) return;
   const el = document.querySelector<HTMLElement>(
     `[data-sku-id="${CSS.escape(snap.skuId)}"][data-field="${CSS.escape(snap.field)}"]`,
@@ -611,10 +609,7 @@ export default function StockPage() {
         {familyAggregates.length === 0 ? (
           <p className="text-sm text-ink/60">{t("eq.summaryEmpty")}</p>
         ) : (
-          <div
-            id={SUMMARY_SCROLL_ID}
-            className="max-h-[min(70vh,42rem)] overflow-auto rounded-md border border-line bg-paper/60"
-          >
+          <div className="rounded-md border border-line bg-paper/60">
             <table className="w-full min-w-[920px] table-fixed text-start text-sm">
               <colgroup>
                 <col className="w-[5.5rem]" />
@@ -626,16 +621,18 @@ export default function StockPage() {
                 <col className="w-[6.5rem]" />
                 <col className="w-[11rem]" />
               </colgroup>
-              <thead className="sticky top-0 z-10 text-xs tracking-wide text-ink/50 uppercase shadow-[0_1px_0_0_var(--color-line,rgba(0,0,0,0.08))]">
+              <thead
+                className={`sticky ${SUMMARY_STICKY_TOP} z-20 text-xs tracking-wide text-ink/50 uppercase shadow-[0_1px_0_0_var(--color-line,rgba(0,0,0,0.08))]`}
+              >
                 <tr>
-                  <th className="bg-sand px-3 py-2 font-medium">{t("eq.summaryOrder")}</th>
-                  <th className="bg-sand px-3 py-2 font-medium">{t("stock.code")}</th>
-                  <th className="bg-sand px-3 py-2 font-medium">{t("stock.name")}</th>
-                  <th className="bg-sand px-3 py-2 font-medium">{t("eq.summaryTotal")}</th>
-                  <th className="bg-sand px-3 py-2 font-medium">{t("eq.summaryOnHand")}</th>
-                  <th className="bg-sand px-3 py-2 font-medium">{t("eq.summaryInUse")}</th>
-                  <th className="bg-sand px-3 py-2 font-medium">{t("eq.summaryInRepair")}</th>
-                  <th className="bg-sand px-3 py-2 font-medium">{t("eq.summaryDeployments")}</th>
+                  <th className="bg-sand px-3 py-2.5 font-medium">{t("eq.summaryOrder")}</th>
+                  <th className="bg-sand px-3 py-2.5 font-medium">{t("stock.code")}</th>
+                  <th className="bg-sand px-3 py-2.5 font-medium">{t("stock.name")}</th>
+                  <th className="bg-sand px-3 py-2.5 font-medium">{t("eq.summaryTotal")}</th>
+                  <th className="bg-sand px-3 py-2.5 font-medium">{t("eq.summaryOnHand")}</th>
+                  <th className="bg-sand px-3 py-2.5 font-medium">{t("eq.summaryInUse")}</th>
+                  <th className="bg-sand px-3 py-2.5 font-medium">{t("eq.summaryInRepair")}</th>
+                  <th className="bg-sand px-3 py-2.5 font-medium">{t("eq.summaryDeployments")}</th>
                 </tr>
               </thead>
               <tbody>
@@ -645,9 +642,9 @@ export default function StockPage() {
                   return (
                   <Fragment key={family.familyId}>
                     <tr className="border-t border-line bg-sand/80">
-                      <td className="px-3 py-2">
+                      <td className={summaryCellClass}>
                         {canMoveFamily ? (
-                          <span className="flex gap-1">
+                          <span className="inline-flex h-10 items-center gap-1">
                             <button
                               type="button"
                               className={buttonClass("ghost", "px-2 py-0.5 text-xs")}
@@ -671,41 +668,43 @@ export default function StockPage() {
                           </span>
                         ) : null}
                       </td>
-                      <td colSpan={2} className="px-3 py-2 font-medium">
-                        {canMoveFamily ? (
-                          <input
-                            className={`${controlClass} min-w-[12rem] font-medium`}
-                            value={familyNameDrafts[family.familyId] ?? family.familyName}
-                            aria-label={t("eq.familyName")}
-                            onChange={(event) =>
-                              setFamilyNameDrafts((prev) => ({ ...prev, [family.familyId]: event.target.value }))
-                            }
-                            onBlur={(event) => void saveFamilyName(family.familyId, event.target.value, family.familyName)}
-                            onKeyDown={(event) => {
-                              if (event.key === "Enter") {
-                                event.preventDefault();
-                                (event.target as HTMLInputElement).blur();
+                      <td colSpan={2} className={`${summaryCellClass} font-medium`}>
+                        <div className="flex min-w-0 items-center gap-2">
+                          {canMoveFamily ? (
+                            <input
+                              className={`${controlClass} h-10 min-w-[10rem] flex-1 font-medium`}
+                              value={familyNameDrafts[family.familyId] ?? family.familyName}
+                              aria-label={t("eq.familyName")}
+                              onChange={(event) =>
+                                setFamilyNameDrafts((prev) => ({ ...prev, [family.familyId]: event.target.value }))
                               }
-                            }}
-                          />
-                        ) : (
-                          family.familyName
-                        )}
-                        <span className="ms-2 text-xs font-normal text-ink/50">
-                          {t("eq.summaryGroupTotal")}: {family.total}
-                        </span>
+                              onBlur={(event) => void saveFamilyName(family.familyId, event.target.value, family.familyName)}
+                              onKeyDown={(event) => {
+                                if (event.key === "Enter") {
+                                  event.preventDefault();
+                                  (event.target as HTMLInputElement).blur();
+                                }
+                              }}
+                            />
+                          ) : (
+                            <span className="truncate">{family.familyName}</span>
+                          )}
+                          <span className="shrink-0 text-xs font-normal whitespace-nowrap text-ink/50">
+                            {t("eq.summaryGroupTotal")}: {family.total}
+                          </span>
+                        </div>
                       </td>
-                      <td className="px-3 py-2 text-xs text-ink/60">{family.total}</td>
-                      <td className="px-3 py-2 text-xs text-ink/60">{family.onHand}</td>
-                      <td className="px-3 py-2 text-xs text-ink/60">{family.inUse}</td>
-                      <td className="px-3 py-2 text-xs text-ink/60">{family.inRepair}</td>
-                      <td className="px-3 py-2">
+                      <td className={`${summaryCellClass} text-xs tabular-nums text-ink/60`}>{family.total}</td>
+                      <td className={`${summaryCellClass} text-xs tabular-nums text-ink/60`}>{family.onHand}</td>
+                      <td className={`${summaryCellClass} text-xs tabular-nums text-ink/60`}>{family.inUse}</td>
+                      <td className={`${summaryCellClass} text-xs tabular-nums text-ink/60`}>{family.inRepair}</td>
+                      <td className={summaryCellClass}>
                         {canMoveFamily ? (
-                          <div className="flex flex-wrap items-center gap-1">
+                          <div className="flex h-10 flex-wrap items-center gap-1">
                             {addingFamilyId === family.familyId ? (
                               <>
                                 <input
-                                  className={`${controlClass} min-w-[8rem]`}
+                                  className={`${controlClass} h-10 min-w-[8rem]`}
                                   value={addDrafts[family.familyId] ?? ""}
                                   placeholder={t("eq.variantPlaceholder")}
                                   aria-label={t("eq.variantName")}
@@ -723,14 +722,14 @@ export default function StockPage() {
                                 />
                                 <button
                                   type="button"
-                                  className={buttonClass("primary", "px-2 py-1 text-xs")}
+                                  className={buttonClass("primary", "h-10 px-2 text-xs")}
                                   onClick={() => void onAddInFamily(family.familyId)}
                                 >
                                   {t("eq.addInGroup")}
                                 </button>
                                 <button
                                   type="button"
-                                  className={buttonClass("ghost", "px-2 py-1 text-xs")}
+                                  className={buttonClass("ghost", "h-10 px-2 text-xs")}
                                   onClick={() => setAddingFamilyId(null)}
                                 >
                                   {t("eq.repairCancel")}
@@ -739,7 +738,7 @@ export default function StockPage() {
                             ) : (
                               <button
                                 type="button"
-                                className={buttonClass("ghost", "px-2 py-1 text-xs")}
+                                className={buttonClass("ghost", "h-10 px-2 text-xs")}
                                 onClick={() => setAddingFamilyId(family.familyId)}
                               >
                                 {t("eq.addInGroup")}
@@ -748,7 +747,7 @@ export default function StockPage() {
                             {family.skus.length === 0 ? (
                               <button
                                 type="button"
-                                className={buttonClass("danger", "px-2 py-1 text-xs")}
+                                className={buttonClass("danger", "h-10 px-2 text-xs")}
                                 onClick={() => void onDeleteEmptyFamily(family.familyId, family.familyName)}
                               >
                                 {t("eq.deleteFamily")}
@@ -769,9 +768,9 @@ export default function StockPage() {
                         const draft = bucketDraftFor(agg);
                         return (
                           <tr key={agg.skuId} className="border-t border-line align-middle">
-                            <td className="px-3 py-2">
+                            <td className={summaryCellClass}>
                               {allowed ? (
-                                <span className="flex gap-1 ps-4">
+                                <span className="inline-flex h-10 items-center gap-1 ps-4">
                                   <button
                                     type="button"
                                     className={buttonClass("ghost", "px-2 py-0.5 text-xs")}
@@ -795,12 +794,12 @@ export default function StockPage() {
                                 </span>
                               ) : null}
                             </td>
-                            <td className="px-3 py-2 ps-4 font-mono text-xs">{agg.skuCode}</td>
-                            <td className="px-3 py-2 align-top">
+                            <td className={`${summaryCellClass} ps-4 font-mono text-xs tabular-nums`}>{agg.skuCode}</td>
+                            <td className={summaryCellClass}>
                               {allowed ? (
-                                <div className="flex min-h-[4.25rem] min-w-0 flex-col gap-1">
+                                <div className="flex h-10 min-w-0 items-center gap-2">
                                   <input
-                                    className={`${controlClass} h-10 w-full min-w-0`}
+                                    className={`${controlClass} h-10 min-w-0 flex-1`}
                                     value={skuNameDrafts[agg.skuId] ?? agg.skuName}
                                     aria-label={t("stock.name")}
                                     onChange={(event) =>
@@ -814,50 +813,48 @@ export default function StockPage() {
                                       }
                                     }}
                                   />
-                                  <div className="flex min-h-[2rem] flex-wrap items-center gap-1">
-                                    {editingGroupSkuId === agg.skuId ? (
-                                      <>
-                                        <select
-                                          className={`${controlClass} h-8 min-w-[8rem] py-0 text-xs`}
-                                          value={agg.familyId ?? ""}
-                                          aria-label={t("eq.summaryAssignGroup")}
-                                          autoFocus
-                                          onChange={(event) => void onAssignFamily(agg.skuId, event.target.value)}
-                                          onKeyDown={(event) => {
-                                            if (event.key === "Escape") setEditingGroupSkuId(null);
-                                          }}
-                                        >
-                                          <option value="">{t("eq.uncategorized")}</option>
-                                          {productFamilies.map((item) => (
-                                            <option key={item.id} value={item.id}>
-                                              {item.name}
-                                            </option>
-                                          ))}
-                                        </select>
-                                        <button
-                                          type="button"
-                                          className={buttonClass("ghost", "px-2 py-1 text-xs")}
-                                          onClick={() => setEditingGroupSkuId(null)}
-                                        >
-                                          {t("eq.repairCancel")}
-                                        </button>
-                                      </>
-                                    ) : (
+                                  {editingGroupSkuId === agg.skuId ? (
+                                    <>
+                                      <select
+                                        className={`${controlClass} h-10 w-auto min-w-[7rem] shrink-0 py-0 text-xs`}
+                                        value={agg.familyId ?? ""}
+                                        aria-label={t("eq.summaryAssignGroup")}
+                                        autoFocus
+                                        onChange={(event) => void onAssignFamily(agg.skuId, event.target.value)}
+                                        onKeyDown={(event) => {
+                                          if (event.key === "Escape") setEditingGroupSkuId(null);
+                                        }}
+                                      >
+                                        <option value="">{t("eq.uncategorized")}</option>
+                                        {productFamilies.map((item) => (
+                                          <option key={item.id} value={item.id}>
+                                            {item.name}
+                                          </option>
+                                        ))}
+                                      </select>
                                       <button
                                         type="button"
-                                        className={buttonClass("ghost", "px-2 py-0.5 text-xs self-start text-ink/60")}
-                                        onClick={() => setEditingGroupSkuId(agg.skuId)}
+                                        className={buttonClass("ghost", "h-10 shrink-0 px-2 text-xs")}
+                                        onClick={() => setEditingGroupSkuId(null)}
                                       >
-                                        {t("eq.editGroup")}
+                                        {t("eq.repairCancel")}
                                       </button>
-                                    )}
-                                  </div>
+                                    </>
+                                  ) : (
+                                    <button
+                                      type="button"
+                                      className={buttonClass("ghost", "h-10 shrink-0 px-2 text-xs text-ink/60")}
+                                      onClick={() => setEditingGroupSkuId(agg.skuId)}
+                                    >
+                                      {t("eq.editGroup")}
+                                    </button>
+                                  )}
                                 </div>
                               ) : (
-                                agg.skuName
+                                <span className="line-clamp-1">{agg.skuName}</span>
                               )}
                             </td>
-                            <td className="px-3 py-2">
+                            <td className={summaryCellClass}>
                               {allowed ? (
                                 <input
                                   type="number"
@@ -881,7 +878,7 @@ export default function StockPage() {
                                 agg.total
                               )}
                             </td>
-                            <td className="px-3 py-2">
+                            <td className={summaryCellClass}>
                               {allowed ? (
                                 <input
                                   type="number"
@@ -913,7 +910,7 @@ export default function StockPage() {
                                 <Badge tone="ok">{agg.onHand}</Badge>
                               )}
                             </td>
-                            <td className="px-3 py-2">
+                            <td className={summaryCellClass}>
                               {allowed ? (
                                 <input
                                   type="number"
@@ -945,7 +942,7 @@ export default function StockPage() {
                                 <Badge tone={agg.inUse > 0 ? "warn" : "neutral"}>{agg.inUse}</Badge>
                               )}
                             </td>
-                            <td className="px-3 py-2">
+                            <td className={summaryCellClass}>
                               {allowed ? (
                                 <input
                                   type="number"
@@ -977,14 +974,14 @@ export default function StockPage() {
                                 <Badge tone={agg.inRepair > 0 ? "alert" : "neutral"}>{agg.inRepair}</Badge>
                               )}
                             </td>
-                            <td className="px-3 py-2">
-                              <div className="flex flex-col gap-1">
+                            <td className={summaryCellClass}>
+                              <div className="flex min-h-10 items-center gap-2">
                                 {agg.deployments.length === 0 ? (
                                   <span className="text-ink/40">—</span>
                                 ) : (
-                                  <ul className="flex flex-col gap-1">
-                                    {agg.deployments.map((dep) => (
-                                      <li key={dep.itemId} className="text-xs leading-5">
+                                  <ul className="min-w-0 flex-1 truncate text-xs leading-5">
+                                    {agg.deployments.map((dep, i) => (
+                                      <li key={dep.itemId} className={i === 0 ? "truncate" : "sr-only"}>
                                         {dep.qty} {agg.unit}
                                         {" · "}
                                         {t(`eq.status.${dep.status}` as MessageKey)}
@@ -996,6 +993,7 @@ export default function StockPage() {
                                         ) : (
                                           <span>{dep.label}</span>
                                         )}
+                                        {agg.deployments.length > 1 ? ` +${agg.deployments.length - 1}` : ""}
                                       </li>
                                     ))}
                                   </ul>
@@ -1003,7 +1001,7 @@ export default function StockPage() {
                                 {allowed ? (
                                   <button
                                     type="button"
-                                    className={buttonClass("danger", "px-2 py-1 text-xs self-start")}
+                                    className={buttonClass("danger", "h-10 shrink-0 px-2 text-xs")}
                                     onClick={() => void onDeleteSku(agg.skuId, agg.skuName)}
                                   >
                                     {t("eq.delete")}
