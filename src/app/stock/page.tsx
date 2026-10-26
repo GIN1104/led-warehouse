@@ -15,6 +15,9 @@ import {
   addSkuVariant,
   assignSkuToFamily,
   createProductFamily,
+  deleteProductFamily,
+  deleteSku,
+  getSkuDeletePreview,
   listFamilyTree,
   listProductFamilies,
   moveFamily,
@@ -76,6 +79,8 @@ export default function StockPage() {
   >({});
   const [familyNameDrafts, setFamilyNameDrafts] = useState<Record<string, string>>({});
   const [skuNameDrafts, setSkuNameDrafts] = useState<Record<string, string>>({});
+  const [addDrafts, setAddDrafts] = useState<Record<string, string>>({});
+  const [addingFamilyId, setAddingFamilyId] = useState<string | null>(null);
   void revision;
 
   const items = useMemo(() => {
@@ -471,6 +476,63 @@ export default function StockPage() {
     }
   }
 
+  async function onAddInFamily(familyId: string) {
+    if (familyId === "__uncategorized__") return;
+    const name = (addDrafts[familyId] ?? "").trim();
+    if (!name) {
+      setFlash({ error: t("err.name") });
+      return;
+    }
+    try {
+      assertCan(session.role, "stock.write");
+      addSkuVariant(db, { familyId, name }, session.id);
+      setAddDrafts((prev) => {
+        const next = { ...prev };
+        delete next[familyId];
+        return next;
+      });
+      setAddingFamilyId(null);
+      await refresh();
+      setFlash({ ok: t("eq.variantAdded") });
+    } catch (error) {
+      setFlash({ error: translateError(lang, error) });
+    }
+  }
+
+  async function onDeleteSku(skuId: string, skuName: string) {
+    try {
+      assertCan(session.role, "stock.write");
+      const preview = getSkuDeletePreview(db, skuId);
+      if (preview.inOrders) {
+        window.alert(t("eq.deleteSkuInOrders", { name: skuName, count: preview.orderLineCount }));
+        return;
+      }
+      const qtyHint =
+        preview.equipmentQty > 0 ? t("eq.deleteSkuQtyHint", { qty: preview.equipmentQty }) : "";
+      if (!window.confirm(`${t("eq.deleteSkuConfirm", { name: skuName })}${qtyHint ? `\n${qtyHint}` : ""}`)) {
+        return;
+      }
+      deleteSku(db, skuId, session.id);
+      await refresh();
+      setFlash({ ok: t("eq.skuDeleted") });
+    } catch (error) {
+      setFlash({ error: translateError(lang, error) });
+    }
+  }
+
+  async function onDeleteEmptyFamily(familyId: string, familyName: string) {
+    if (familyId === "__uncategorized__") return;
+    if (!window.confirm(t("eq.deleteFamilyConfirm", { name: familyName }))) return;
+    try {
+      assertCan(session.role, "stock.write");
+      deleteProductFamily(db, familyId, session.id);
+      await refresh();
+      setFlash({ ok: t("eq.familyDeleted") });
+    } catch (error) {
+      setFlash({ error: translateError(lang, error) });
+    }
+  }
+
   function onMovement(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const form = new FormData(event.currentTarget);
@@ -585,7 +647,64 @@ export default function StockPage() {
                       <td className="px-3 py-2 text-xs text-ink/60">{family.onHand}</td>
                       <td className="px-3 py-2 text-xs text-ink/60">{family.inUse}</td>
                       <td className="px-3 py-2 text-xs text-ink/60">{family.inRepair}</td>
-                      <td className="px-3 py-2" />
+                      <td className="px-3 py-2">
+                        {canMoveFamily ? (
+                          <div className="flex flex-wrap items-center gap-1">
+                            {addingFamilyId === family.familyId ? (
+                              <>
+                                <input
+                                  className={`${controlClass} min-w-[8rem]`}
+                                  value={addDrafts[family.familyId] ?? ""}
+                                  placeholder={t("eq.variantPlaceholder")}
+                                  aria-label={t("eq.variantName")}
+                                  autoFocus
+                                  onChange={(event) =>
+                                    setAddDrafts((prev) => ({ ...prev, [family.familyId]: event.target.value }))
+                                  }
+                                  onKeyDown={(event) => {
+                                    if (event.key === "Enter") {
+                                      event.preventDefault();
+                                      void onAddInFamily(family.familyId);
+                                    }
+                                    if (event.key === "Escape") setAddingFamilyId(null);
+                                  }}
+                                />
+                                <button
+                                  type="button"
+                                  className={buttonClass("primary", "px-2 py-1 text-xs")}
+                                  onClick={() => void onAddInFamily(family.familyId)}
+                                >
+                                  {t("eq.addInGroup")}
+                                </button>
+                                <button
+                                  type="button"
+                                  className={buttonClass("ghost", "px-2 py-1 text-xs")}
+                                  onClick={() => setAddingFamilyId(null)}
+                                >
+                                  {t("eq.repairCancel")}
+                                </button>
+                              </>
+                            ) : (
+                              <button
+                                type="button"
+                                className={buttonClass("ghost", "px-2 py-1 text-xs")}
+                                onClick={() => setAddingFamilyId(family.familyId)}
+                              >
+                                {t("eq.addInGroup")}
+                              </button>
+                            )}
+                            {family.skus.length === 0 ? (
+                              <button
+                                type="button"
+                                className={buttonClass("danger", "px-2 py-1 text-xs")}
+                                onClick={() => void onDeleteEmptyFamily(family.familyId, family.familyName)}
+                              >
+                                {t("eq.deleteFamily")}
+                              </button>
+                            ) : null}
+                          </div>
+                        ) : null}
+                      </td>
                     </tr>
                     {family.skus.length === 0 ? (
                       <tr className="border-t border-line">
@@ -790,27 +909,38 @@ export default function StockPage() {
                               )}
                             </td>
                             <td className="px-3 py-2">
-                              {agg.deployments.length === 0 ? (
-                                <span className="text-ink/40">—</span>
-                              ) : (
-                                <ul className="flex flex-col gap-1">
-                                  {agg.deployments.map((dep) => (
-                                    <li key={dep.itemId} className="text-xs leading-5">
-                                      {dep.qty} {agg.unit}
-                                      {" · "}
-                                      {t(`eq.status.${dep.status}` as MessageKey)}
-                                      {" · "}
-                                      {dep.orderId ? (
-                                        <Link href={orderHref(dep.orderId)} className="text-copper hover:underline">
-                                          {dep.label || t("eq.openOrder")}
-                                        </Link>
-                                      ) : (
-                                        <span>{dep.label}</span>
-                                      )}
-                                    </li>
-                                  ))}
-                                </ul>
-                              )}
+                              <div className="flex flex-col gap-1">
+                                {agg.deployments.length === 0 ? (
+                                  <span className="text-ink/40">—</span>
+                                ) : (
+                                  <ul className="flex flex-col gap-1">
+                                    {agg.deployments.map((dep) => (
+                                      <li key={dep.itemId} className="text-xs leading-5">
+                                        {dep.qty} {agg.unit}
+                                        {" · "}
+                                        {t(`eq.status.${dep.status}` as MessageKey)}
+                                        {" · "}
+                                        {dep.orderId ? (
+                                          <Link href={orderHref(dep.orderId)} className="text-copper hover:underline">
+                                            {dep.label || t("eq.openOrder")}
+                                          </Link>
+                                        ) : (
+                                          <span>{dep.label}</span>
+                                        )}
+                                      </li>
+                                    ))}
+                                  </ul>
+                                )}
+                                {allowed ? (
+                                  <button
+                                    type="button"
+                                    className={buttonClass("danger", "px-2 py-1 text-xs self-start")}
+                                    onClick={() => void onDeleteSku(agg.skuId, agg.skuName)}
+                                  >
+                                    {t("eq.delete")}
+                                  </button>
+                                ) : null}
+                              </div>
                             </td>
                           </tr>
                         );

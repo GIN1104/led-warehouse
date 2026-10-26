@@ -310,6 +310,73 @@ export function assignSkuToFamily(db: Sql, skuId: string, familyId: string | nul
   return row;
 }
 
+export type SkuDeletePreview = {
+  skuId: string;
+  name: string;
+  equipmentQty: number;
+  orderLineCount: number;
+  inOrders: boolean;
+};
+
+/** Что мешает/сопутствует удалению SKU. */
+export function getSkuDeletePreview(db: Sql, skuId: string): SkuDeletePreview {
+  const sku = db.get<{ id: string; name: string }>(`SELECT id, name FROM skus WHERE id = ?`, [skuId]);
+  if (!sku) throw new DomainError("Номенклатура не найдена");
+  const equipmentQty =
+    db.get<{ value: number }>(`SELECT COALESCE(SUM(qty), 0) AS value FROM equipment_items WHERE sku_id = ?`, [skuId])
+      ?.value ?? 0;
+  const orderLineCount =
+    db.get<{ value: number }>(`SELECT COUNT(*) AS value FROM rental_lines WHERE sku_id = ?`, [skuId])?.value ?? 0;
+  return {
+    skuId: sku.id,
+    name: sku.name,
+    equipmentQty,
+    orderLineCount,
+    inOrders: orderLineCount > 0,
+  };
+}
+
+/**
+ * Удалить SKU: каскад qty-строк оборудования, остатков и движений.
+ * Если позиция есть в заказах (rental_lines) — отказ (сначала уберите из заказов).
+ */
+export function deleteSku(db: Sql, skuId: string, actor: string): void {
+  void actor;
+  const preview = getSkuDeletePreview(db, skuId);
+  if (preview.inOrders) {
+    throw new DomainError(
+      `Нельзя удалить: позиция «${preview.name}» есть в заказах (${preview.orderLineCount}). Перенесите или закройте заказы.`,
+    );
+  }
+  db.transaction(() => {
+    const itemIds = db.all<{ id: string }>(`SELECT id FROM equipment_items WHERE sku_id = ?`, [skuId]).map((row) => row.id);
+    for (const itemId of itemIds) {
+      db.run(`DELETE FROM equipment_status_history WHERE item_id = ?`, [itemId]);
+    }
+    db.run(`DELETE FROM equipment_items WHERE sku_id = ?`, [skuId]);
+    db.run(`DELETE FROM stock_balances WHERE sku_id = ?`, [skuId]);
+    db.run(`DELETE FROM stock_movements WHERE sku_id = ?`, [skuId]);
+    db.run(`DELETE FROM shortage_signals WHERE sku_id = ?`, [skuId]);
+    db.run(`DELETE FROM external_hires WHERE sku_id = ?`, [skuId]);
+    db.run(`UPDATE scan_events SET sku_id = NULL WHERE sku_id = ?`, [skuId]);
+    db.run(`UPDATE alerts SET sku_id = NULL WHERE sku_id = ?`, [skuId]);
+    db.run(`DELETE FROM skus WHERE id = ?`, [skuId]);
+  });
+}
+
+/** Удалить пустую группу (без SKU). */
+export function deleteProductFamily(db: Sql, familyId: string, actor: string): void {
+  void actor;
+  const family = db.get<{ id: string }>(`SELECT id FROM product_families WHERE id = ?`, [familyId]);
+  if (!family) throw new DomainError("Группа не найдена");
+  const skuCount =
+    db.get<{ value: number }>(`SELECT COUNT(*) AS value FROM skus WHERE family_id = ?`, [familyId])?.value ?? 0;
+  if (skuCount > 0) {
+    throw new DomainError("Сначала удалите или перенесите все позиции группы");
+  }
+  db.run(`DELETE FROM product_families WHERE id = ?`, [familyId]);
+}
+
 /** Добавить вариант (SKU) в группу с авто-code. */
 export function addSkuVariant(
   db: Sql,
