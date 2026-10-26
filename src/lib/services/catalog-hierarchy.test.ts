@@ -4,7 +4,10 @@ import {
   addSkuVariant,
   assignSkuToFamily,
   createProductFamily,
+  deleteProductFamily,
+  deleteSku,
   findOrCreateSkuByName,
+  getSkuDeletePreview,
   guessFamilyName,
   listFamilyTree,
   moveFamily,
@@ -12,7 +15,8 @@ import {
   renameProductFamily,
   renameSku,
 } from "@/lib/services/catalog-hierarchy";
-import { listEquipmentFamilyAggregates } from "@/lib/services/equipment";
+import { addEquipmentItem, listEquipmentFamilyAggregates } from "@/lib/services/equipment";
+import { createOrder } from "@/lib/services/ledger";
 
 function setup() {
   const db = createDb();
@@ -101,5 +105,40 @@ describe("иерархия групп и SKU", () => {
     const tree = listFamilyTree(db);
     expect(tree.find((row) => row.id === cables.id)?.skus.map((s) => s.name)).toContain("Кабинет P3.9 1м");
     expect(tree.find((row) => row.id === cabinets.id)?.skus).toHaveLength(0);
+  });
+
+  it("добавляет и удаляет SKU внутри группы; блокирует удаление при заказах", () => {
+    const db = setup();
+    db.run(`INSERT INTO locations (id, name, kind, parent_id) VALUES ('loc', 'Склад', 'warehouse', NULL)`);
+    const family = createProductFamily(db, "Кабинеты", "wh");
+    const sku = addSkuVariant(db, { familyId: family.id, name: "Кабинет LED P3.9 1000×500" }, "wh");
+    addEquipmentItem(db, { skuId: sku.id, qty: 4, status: "available" }, "wh");
+    expect(getSkuDeletePreview(db, sku.id).equipmentQty).toBe(4);
+
+    const order = createOrder(
+      db,
+      {
+        customerName: "Тест",
+        startDate: "2026-11-01",
+        endDate: "2026-11-02",
+        notes: "",
+        lines: [{ skuId: sku.id, qty: 1 }],
+      },
+      "wh",
+    );
+    expect(getSkuDeletePreview(db, sku.id).inOrders).toBe(true);
+    expect(() => deleteSku(db, sku.id, "wh")).toThrow(/заказах/);
+    void order;
+
+    // другой SKU без заказов — удаляется с каскадом qty
+    const spare = addSkuVariant(db, { familyId: family.id, name: "Кабинет spare" }, "wh");
+    addEquipmentItem(db, { skuId: spare.id, qty: 2 }, "wh");
+    deleteSku(db, spare.id, "wh");
+    expect(listFamilyTree(db).find((row) => row.id === family.id)?.skus.map((s) => s.id)).toEqual([sku.id]);
+
+    const empty = createProductFamily(db, "Пустая", "wh");
+    deleteProductFamily(db, empty.id, "wh");
+    expect(listFamilyTree(db).some((row) => row.id === empty.id)).toBe(false);
+    expect(() => deleteProductFamily(db, family.id, "wh")).toThrow(/перенесите/);
   });
 });
