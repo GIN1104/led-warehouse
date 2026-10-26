@@ -46,12 +46,37 @@ import { parseMapperFile } from "@/lib/services/mapper-excel";
 import { listLocationBalances, listLocations, listMovements, listSkuSummaries } from "@/lib/services/queries";
 
 const REPAIR_STATUSES: readonly EquipmentStatus[] = ["needs_repair", "in_repair"];
+const SUMMARY_SCROLL_ID = "eq-summary-scroll";
+const qtyInputClass = `${controlClass} h-10 w-20 shrink-0 tabular-nums`;
 
 function statusTone(status: EquipmentStatus): "neutral" | "ok" | "warn" | "alert" {
   if (status === "available") return "ok";
   if (status === "reserved") return "warn";
   if (status === "checked_out") return "neutral";
   return "alert";
+}
+
+function captureSummaryFocus(): { skuId: string; field: string; scrollTop: number } | null {
+  const active = document.activeElement;
+  if (!(active instanceof HTMLElement)) return null;
+  const skuId = active.getAttribute("data-sku-id");
+  const field = active.getAttribute("data-field");
+  const scroller = document.getElementById(SUMMARY_SCROLL_ID);
+  if (!skuId || !field) {
+    return scroller ? { skuId: "", field: "", scrollTop: scroller.scrollTop } : null;
+  }
+  return { skuId, field, scrollTop: scroller?.scrollTop ?? 0 };
+}
+
+function restoreSummaryFocus(snap: { skuId: string; field: string; scrollTop: number } | null): void {
+  if (!snap) return;
+  const scroller = document.getElementById(SUMMARY_SCROLL_ID);
+  if (scroller) scroller.scrollTop = snap.scrollTop;
+  if (!snap.skuId || !snap.field) return;
+  const el = document.querySelector<HTMLElement>(
+    `[data-sku-id="${CSS.escape(snap.skuId)}"][data-field="${CSS.escape(snap.field)}"]`,
+  );
+  el?.focus({ preventScroll: true });
 }
 
 export default function StockPage() {
@@ -170,6 +195,7 @@ export default function StockPage() {
       return;
     }
 
+    const focusSnap = captureSummaryFocus();
     try {
       assertCan(session.role, "stock.write");
       setEquipmentSkuBuckets(db, agg.skuId, { onHand, inUse, inRepair }, session.id);
@@ -178,8 +204,9 @@ export default function StockPage() {
         delete next[agg.skuId];
         return next;
       });
+      // Без flash ok — иначе шапка Flash сдвигает таблицу при каждом qty.
       await refresh();
-      setFlash({ ok: t("eq.summarySaved") });
+      requestAnimationFrame(() => restoreSummaryFocus(focusSnap));
     } catch (error) {
       setFlash({ error: translateError(lang, error) });
       setBucketDrafts((prev) => ({
@@ -191,6 +218,7 @@ export default function StockPage() {
           inRepair: String(agg.inRepair),
         },
       }));
+      requestAnimationFrame(() => restoreSummaryFocus(focusSnap));
     }
   }
 
@@ -574,18 +602,31 @@ export default function StockPage() {
         {familyAggregates.length === 0 ? (
           <p className="text-sm text-ink/60">{t("eq.summaryEmpty")}</p>
         ) : (
-          <div className="overflow-x-auto rounded-md border border-line bg-paper/60">
-            <table className="w-full min-w-[920px] text-start text-sm">
-              <thead className="bg-sand text-xs tracking-wide text-ink/50 uppercase">
+          <div
+            id={SUMMARY_SCROLL_ID}
+            className="max-h-[min(70vh,42rem)] overflow-auto rounded-md border border-line bg-paper/60"
+          >
+            <table className="w-full min-w-[920px] table-fixed text-start text-sm">
+              <colgroup>
+                <col className="w-[5.5rem]" />
+                <col className="w-[7rem]" />
+                <col />
+                <col className="w-[6.5rem]" />
+                <col className="w-[6.5rem]" />
+                <col className="w-[6.5rem]" />
+                <col className="w-[6.5rem]" />
+                <col className="w-[11rem]" />
+              </colgroup>
+              <thead className="sticky top-0 z-10 text-xs tracking-wide text-ink/50 uppercase shadow-[0_1px_0_0_var(--color-line,rgba(0,0,0,0.08))]">
                 <tr>
-                  <th className="px-3 py-2 font-medium">{t("eq.summaryOrder")}</th>
-                  <th className="px-3 py-2 font-medium">{t("stock.code")}</th>
-                  <th className="px-3 py-2 font-medium">{t("stock.name")}</th>
-                  <th className="px-3 py-2 font-medium">{t("eq.summaryTotal")}</th>
-                  <th className="px-3 py-2 font-medium">{t("eq.summaryOnHand")}</th>
-                  <th className="px-3 py-2 font-medium">{t("eq.summaryInUse")}</th>
-                  <th className="px-3 py-2 font-medium">{t("eq.summaryInRepair")}</th>
-                  <th className="px-3 py-2 font-medium">{t("eq.summaryDeployments")}</th>
+                  <th className="bg-sand px-3 py-2 font-medium">{t("eq.summaryOrder")}</th>
+                  <th className="bg-sand px-3 py-2 font-medium">{t("stock.code")}</th>
+                  <th className="bg-sand px-3 py-2 font-medium">{t("stock.name")}</th>
+                  <th className="bg-sand px-3 py-2 font-medium">{t("eq.summaryTotal")}</th>
+                  <th className="bg-sand px-3 py-2 font-medium">{t("eq.summaryOnHand")}</th>
+                  <th className="bg-sand px-3 py-2 font-medium">{t("eq.summaryInUse")}</th>
+                  <th className="bg-sand px-3 py-2 font-medium">{t("eq.summaryInRepair")}</th>
+                  <th className="bg-sand px-3 py-2 font-medium">{t("eq.summaryDeployments")}</th>
                 </tr>
               </thead>
               <tbody>
@@ -717,13 +758,8 @@ export default function StockPage() {
                     ) : (
                       family.skus.map((agg, skuIndex) => {
                         const draft = bucketDraftFor(agg);
-                        const dirty =
-                          Number(draft.total) !== agg.total ||
-                          Number(draft.onHand) !== agg.onHand ||
-                          Number(draft.inUse) !== agg.inUse ||
-                          Number(draft.inRepair) !== agg.inRepair;
                         return (
-                          <tr key={agg.skuId} className="border-t border-line align-top">
+                          <tr key={agg.skuId} className="border-t border-line align-middle">
                             <td className="px-3 py-2">
                               {allowed ? (
                                 <span className="flex gap-1 ps-4">
@@ -751,11 +787,11 @@ export default function StockPage() {
                               ) : null}
                             </td>
                             <td className="px-3 py-2 ps-4 font-mono text-xs">{agg.skuCode}</td>
-                            <td className="px-3 py-2">
+                            <td className="px-3 py-2 align-top">
                               {allowed ? (
-                                <div className="flex min-w-[14rem] flex-col gap-1">
+                                <div className="flex min-h-[4.25rem] min-w-0 flex-col gap-1">
                                   <input
-                                    className={controlClass}
+                                    className={`${controlClass} h-10 w-full min-w-0`}
                                     value={skuNameDrafts[agg.skuId] ?? agg.skuName}
                                     aria-label={t("stock.name")}
                                     onChange={(event) =>
@@ -769,42 +805,44 @@ export default function StockPage() {
                                       }
                                     }}
                                   />
-                                  {editingGroupSkuId === agg.skuId ? (
-                                    <div className="flex flex-wrap items-center gap-1">
-                                      <select
-                                        className={`${controlClass} min-w-[8rem]`}
-                                        value={agg.familyId ?? ""}
-                                        aria-label={t("eq.summaryAssignGroup")}
-                                        autoFocus
-                                        onChange={(event) => void onAssignFamily(agg.skuId, event.target.value)}
-                                        onKeyDown={(event) => {
-                                          if (event.key === "Escape") setEditingGroupSkuId(null);
-                                        }}
-                                      >
-                                        <option value="">{t("eq.uncategorized")}</option>
-                                        {productFamilies.map((item) => (
-                                          <option key={item.id} value={item.id}>
-                                            {item.name}
-                                          </option>
-                                        ))}
-                                      </select>
+                                  <div className="flex min-h-[2rem] flex-wrap items-center gap-1">
+                                    {editingGroupSkuId === agg.skuId ? (
+                                      <>
+                                        <select
+                                          className={`${controlClass} h-8 min-w-[8rem] py-0 text-xs`}
+                                          value={agg.familyId ?? ""}
+                                          aria-label={t("eq.summaryAssignGroup")}
+                                          autoFocus
+                                          onChange={(event) => void onAssignFamily(agg.skuId, event.target.value)}
+                                          onKeyDown={(event) => {
+                                            if (event.key === "Escape") setEditingGroupSkuId(null);
+                                          }}
+                                        >
+                                          <option value="">{t("eq.uncategorized")}</option>
+                                          {productFamilies.map((item) => (
+                                            <option key={item.id} value={item.id}>
+                                              {item.name}
+                                            </option>
+                                          ))}
+                                        </select>
+                                        <button
+                                          type="button"
+                                          className={buttonClass("ghost", "px-2 py-1 text-xs")}
+                                          onClick={() => setEditingGroupSkuId(null)}
+                                        >
+                                          {t("eq.repairCancel")}
+                                        </button>
+                                      </>
+                                    ) : (
                                       <button
                                         type="button"
-                                        className={buttonClass("ghost", "px-2 py-1 text-xs")}
-                                        onClick={() => setEditingGroupSkuId(null)}
+                                        className={buttonClass("ghost", "px-2 py-0.5 text-xs self-start text-ink/60")}
+                                        onClick={() => setEditingGroupSkuId(agg.skuId)}
                                       >
-                                        {t("eq.repairCancel")}
+                                        {t("eq.editGroup")}
                                       </button>
-                                    </div>
-                                  ) : (
-                                    <button
-                                      type="button"
-                                      className={buttonClass("ghost", "px-2 py-0.5 text-xs self-start text-ink/60")}
-                                      onClick={() => setEditingGroupSkuId(agg.skuId)}
-                                    >
-                                      {t("eq.editGroup")}
-                                    </button>
-                                  )}
+                                    )}
+                                  </div>
                                 </div>
                               ) : (
                                 agg.skuName
@@ -816,7 +854,9 @@ export default function StockPage() {
                                   type="number"
                                   min={0}
                                   step={1}
-                                  className={`${controlClass} w-20`}
+                                  className={qtyInputClass}
+                                  data-sku-id={agg.skuId}
+                                  data-field="total"
                                   value={draft.total}
                                   aria-label={t("eq.summaryTotal")}
                                   onChange={(event) => setBucketDraft(agg, { total: event.target.value })}
@@ -838,7 +878,9 @@ export default function StockPage() {
                                   type="number"
                                   min={0}
                                   step={1}
-                                  className={`${controlClass} w-20`}
+                                  className={qtyInputClass}
+                                  data-sku-id={agg.skuId}
+                                  data-field="onHand"
                                   value={draft.onHand}
                                   aria-label={t("eq.summaryOnHand")}
                                   onChange={(event) => {
@@ -868,7 +910,9 @@ export default function StockPage() {
                                   type="number"
                                   min={0}
                                   step={1}
-                                  className={`${controlClass} w-20`}
+                                  className={qtyInputClass}
+                                  data-sku-id={agg.skuId}
+                                  data-field="inUse"
                                   value={draft.inUse}
                                   aria-label={t("eq.summaryInUse")}
                                   onChange={(event) => {
@@ -894,41 +938,32 @@ export default function StockPage() {
                             </td>
                             <td className="px-3 py-2">
                               {allowed ? (
-                                <div className="flex items-center gap-1">
-                                  <input
-                                    type="number"
-                                    min={0}
-                                    step={1}
-                                    className={`${controlClass} w-20`}
-                                    value={draft.inRepair}
-                                    aria-label={t("eq.summaryInRepair")}
-                                    onChange={(event) => {
-                                      const inRepair = event.target.value;
-                                      const onHand = Number(draft.onHand) || 0;
-                                      const inUse = Number(draft.inUse) || 0;
-                                      setBucketDraft(agg, {
-                                        inRepair,
-                                        total: String(onHand + inUse + (Number(inRepair) || 0)),
-                                      });
-                                    }}
-                                    onBlur={(event) => void saveBuckets(agg, { inRepair: event.target.value })}
-                                    onKeyDown={(event) => {
-                                      if (event.key === "Enter") {
-                                        event.preventDefault();
-                                        (event.target as HTMLInputElement).blur();
-                                      }
-                                    }}
-                                  />
-                                  {dirty ? (
-                                    <button
-                                      type="button"
-                                      className={buttonClass("primary", "px-2 py-1 text-xs")}
-                                      onClick={() => void saveBuckets(agg)}
-                                    >
-                                      {t("eq.save")}
-                                    </button>
-                                  ) : null}
-                                </div>
+                                <input
+                                  type="number"
+                                  min={0}
+                                  step={1}
+                                  className={qtyInputClass}
+                                  data-sku-id={agg.skuId}
+                                  data-field="inRepair"
+                                  value={draft.inRepair}
+                                  aria-label={t("eq.summaryInRepair")}
+                                  onChange={(event) => {
+                                    const inRepair = event.target.value;
+                                    const onHand = Number(draft.onHand) || 0;
+                                    const inUse = Number(draft.inUse) || 0;
+                                    setBucketDraft(agg, {
+                                      inRepair,
+                                      total: String(onHand + inUse + (Number(inRepair) || 0)),
+                                    });
+                                  }}
+                                  onBlur={(event) => void saveBuckets(agg, { inRepair: event.target.value })}
+                                  onKeyDown={(event) => {
+                                    if (event.key === "Enter") {
+                                      event.preventDefault();
+                                      (event.target as HTMLInputElement).blur();
+                                    }
+                                  }}
+                                />
                               ) : (
                                 <Badge tone={agg.inRepair > 0 ? "alert" : "neutral"}>{agg.inRepair}</Badge>
                               )}
