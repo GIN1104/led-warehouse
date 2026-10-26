@@ -7,12 +7,15 @@ import {
   importEquipmentReserved,
   listEquipmentHistory,
   listEquipmentItems,
+  listEquipmentFamilyAggregates,
   listEquipmentSkuAggregates,
+  setEquipmentSkuBuckets,
   setEquipmentStatus,
   sortEquipmentItems,
   transitionEquipmentQty,
   updateEquipmentItem,
 } from "@/lib/services/equipment";
+import { addSkuVariant, createProductFamily } from "@/lib/services/catalog-hierarchy";
 import { parseMapperCsv } from "@/lib/services/mapper-sheet";
 
 function setup() {
@@ -220,5 +223,45 @@ describe("оборудование: статусы и импорт", () => {
     expect(cab!.deployments).toHaveLength(1);
     expect(cab!.deployments[0]?.orderId).toBe(order.orderId);
     expect(cab!.deployments[0]?.label).toBe("Сцена Про");
+  });
+
+  it("сводка редактирует корзины: всего = склад + работа + ремонт", () => {
+    const db = setup();
+    addEquipmentItem(db, { skuId: "CAB-P25", qty: 80, status: "available" }, "wh");
+    const updated = setEquipmentSkuBuckets(db, "CAB-P25", { onHand: 30, inUse: 48, inRepair: 2 }, "wh");
+    expect(updated.total).toBe(80);
+    expect(updated.onHand).toBe(30);
+    expect(updated.inUse).toBe(48);
+    expect(updated.inRepair).toBe(2);
+    expect(updated.onHand + updated.inUse + updated.inRepair).toBe(updated.total);
+
+    const again = setEquipmentSkuBuckets(db, "CAB-P25", { onHand: 28, inUse: 48, inRepair: 4 }, "wh");
+    expect(again.onHand).toBe(28);
+    expect(again.inRepair).toBe(4);
+    expect(again.total).toBe(80);
+  });
+
+  it("сводка отклоняет отрицательные qty", () => {
+    const db = setup();
+    expect(() => setEquipmentSkuBuckets(db, "CAB-P25", { onHand: -1, inUse: 0, inRepair: 0 }, "wh")).toThrow(
+      /≥ 0/,
+    );
+  });
+
+  it("группирует сводку: группа → подгруппы", () => {
+    const db = setup();
+    const family = createProductFamily(db, "Телевизор", "wh");
+    const tv32 = addSkuVariant(db, { familyId: family.id, name: 'TV 32"' }, "wh");
+    const tv40 = addSkuVariant(db, { familyId: family.id, name: 'TV 40"' }, "wh");
+    addEquipmentItem(db, { skuId: tv32.id, qty: 5, status: "available" }, "wh");
+    addEquipmentItem(db, { skuId: tv40.id, qty: 3, status: "reserved" }, "wh");
+
+    const groups = listEquipmentFamilyAggregates(db);
+    const tv = groups.find((row) => row.familyId === family.id);
+    expect(tv).toBeTruthy();
+    expect(tv!.skus.map((s) => s.skuCode).sort()).toEqual(["TV-32", "TV-40"]);
+    expect(tv!.total).toBe(8);
+    expect(tv!.onHand).toBe(5);
+    expect(tv!.inUse).toBe(3);
   });
 });
