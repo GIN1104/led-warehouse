@@ -1,6 +1,6 @@
 import { normalizeEquipmentName } from "@/lib/domain/sku-code";
 import type { Sql } from "@/lib/db/sql";
-import { seedDefaultKitsIfEmpty } from "@/lib/services/kits";
+import { fixKitLeptopTypo, seedDefaultKitsIfEmpty } from "@/lib/services/kits";
 import { ensureDefaultRoleStockEdit } from "@/lib/services/people";
 
 export const MIGRATION_SQL = `
@@ -390,6 +390,7 @@ CREATE INDEX IF NOT EXISTS idx_kit_items_unit ON kit_checklist_items(unit_id);
 `);
   backfillSkuHierarchy(db);
   ensureDefaultRoleStockEdit(db);
+  fixKitLeptopTypo(db);
   seedDefaultKitsIfEmpty(db);
   db.run(`INSERT INTO ledger_meta (key, value) VALUES ('revision', '0') ON CONFLICT(key) DO NOTHING`);
   db.run(`UPDATE users SET name = 'Дмитрий' WHERE id = 'user_manager' AND name = 'Мария'`);

@@ -5,6 +5,7 @@ import {
   createKitGroup,
   createKitSubtype,
   createKitUnit,
+  fixKitLeptopTypo,
   listKitTree,
   removeKitChecklistItem,
   removeKitGroup,
@@ -60,5 +61,18 @@ describe("комплекты (kits)", () => {
     const laptop = before.find((g) => g.name === "Компьютер")?.subtypes.find((s) => s.name === "Laptop");
     expect(laptop?.units.map((u) => u.label)).toEqual(["№1", "№2", "№3"]);
     expect(laptop?.units[0]?.items.some((i) => i.label === "HDMI" && i.qty === 2)).toBe(true);
+  });
+
+  it("fixKitLeptopTypo меняет LEPTOP/Leptop на Laptop", () => {
+    const db = createDb();
+    for (const row of listKitTree(db)) removeKitGroup(db, row.id);
+    const group = createKitGroup(db, "Компьютер");
+    createKitSubtype(db, group.id, "LEPTOP");
+    createKitSubtype(db, group.id, "Leptop bag");
+    expect(fixKitLeptopTypo(db)).toBeGreaterThanOrEqual(2);
+    const names = listKitTree(db)[0]?.subtypes.map((s) => s.name) ?? [];
+    expect(names).toContain("Laptop");
+    expect(names).toContain("Laptop bag");
+    expect(names.some((n) => /leptop/i.test(n))).toBe(false);
   });
 });
