@@ -1,10 +1,11 @@
 "use client";
 
-import { useState, type FormEvent } from "react";
+import { useMemo, useState, type FormEvent } from "react";
 import { useI18n } from "@/components/i18n";
 import { Field, Panel, buttonClass, controlClass } from "@/components/ui";
 import type { Sql } from "@/lib/db/sql";
 import { translateError } from "@/lib/i18n/messages";
+import { listProductFamilies } from "@/lib/services/catalog-hierarchy";
 import {
   createKitGroup,
   createKitSubtype,
@@ -21,10 +22,12 @@ type Props = {
   onFlash: (flash: { error?: string; ok?: string }) => void;
 };
 
-/** Создание структуры комплектов. Иерархия №1/checklist видна в «Всё оборудование». */
+/** Создание комплекта под любой группой оборудования. Nested — в «Всё оборудование». */
 export function EquipmentKitsPanel({ db, allowed, revision, refresh, onFlash }: Props) {
   const { t, lang } = useI18n();
   const tree = listKitTree(db);
+  const families = useMemo(() => listProductFamilies(db), [db, revision]);
+  const [familyMode, setFamilyMode] = useState<"existing" | "new">("existing");
   void revision;
 
   async function run(action: () => void, okKey: "kits.saved" | "kits.deleted") {
@@ -41,9 +44,14 @@ export function EquipmentKitsPanel({ db, allowed, revision, refresh, onFlash }: 
     event.preventDefault();
     if (!allowed) return;
     const form = event.currentTarget;
-    const name = String(new FormData(form).get("name") ?? "");
+    const data = new FormData(form);
     await run(() => {
-      createKitGroup(db, name);
+      if (familyMode === "existing") {
+        const familyId = String(data.get("familyId") ?? "");
+        createKitGroup(db, { familyId });
+      } else {
+        createKitGroup(db, { name: String(data.get("name") ?? "") });
+      }
     }, "kits.saved");
     form.reset();
   }
@@ -54,21 +62,55 @@ export function EquipmentKitsPanel({ db, allowed, revision, refresh, onFlash }: 
       <p className="mb-3 text-sm leading-6 text-ink/70">{t("kits.createHelp")}</p>
 
       {allowed ? (
-        <form onSubmit={(event) => void onCreateGroup(event)} className="mb-4 flex flex-wrap items-end gap-2">
-          <div className="min-w-[12rem] flex-1">
-            <Field label={t("kits.groupName")}>
+        <form onSubmit={(event) => void onCreateGroup(event)} className="mb-4 flex flex-col gap-3">
+          <div className="flex flex-wrap gap-3 text-sm">
+            <label className="inline-flex items-center gap-2">
               <input
-                name="name"
-                required
-                className={controlClass}
-                placeholder={t("kits.groupPlaceholder")}
-                maxLength={80}
+                type="radio"
+                name="mode"
+                checked={familyMode === "existing"}
+                onChange={() => setFamilyMode("existing")}
               />
-            </Field>
+              {t("kits.attachExisting")}
+            </label>
+            <label className="inline-flex items-center gap-2">
+              <input type="radio" name="mode" checked={familyMode === "new"} onChange={() => setFamilyMode("new")} />
+              {t("kits.createNewFamily")}
+            </label>
           </div>
-          <button type="submit" className={buttonClass("primary")}>
-            {t("kits.groupCreate")}
-          </button>
+          <div className="flex flex-wrap items-end gap-2">
+            {familyMode === "existing" ? (
+              <div className="min-w-[14rem] flex-1">
+                <Field label={t("kits.pickFamily")}>
+                  <select name="familyId" required className={controlClass} defaultValue="">
+                    <option value="" disabled>
+                      {t("kits.pickFamilyPlaceholder")}
+                    </option>
+                    {families.map((family) => (
+                      <option key={family.id} value={family.id}>
+                        {family.name}
+                      </option>
+                    ))}
+                  </select>
+                </Field>
+              </div>
+            ) : (
+              <div className="min-w-[12rem] flex-1">
+                <Field label={t("kits.groupName")}>
+                  <input
+                    name="name"
+                    required
+                    className={controlClass}
+                    placeholder={t("kits.groupPlaceholder")}
+                    maxLength={80}
+                  />
+                </Field>
+              </div>
+            )}
+            <button type="submit" className={buttonClass("primary")}>
+              {t("kits.groupCreate")}
+            </button>
+          </div>
         </form>
       ) : null}
 

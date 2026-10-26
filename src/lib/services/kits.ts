@@ -51,6 +51,36 @@ function replaceLeptop(value: string): string {
   return value.replace(/leptop/gi, "Laptop");
 }
 
+/** Код SKU: LEPTOP → LAPTOP (и любой leptop внутри). */
+function replaceLeptopCode(code: string): string {
+  return code.replace(/leptop/gi, "LAPTOP").toUpperCase();
+}
+
+function preferredSkuCode(name: string): string {
+  const cleaned = name
+    .trim()
+    .replace(/leptop/gi, "Laptop")
+    .replace(/[^a-zA-Z0-9]+/g, "-")
+    .replace(/^-|-$/g, "")
+    .toUpperCase()
+    .slice(0, 32);
+  return cleaned.length >= 2 ? cleaned : "KIT";
+}
+
+function uniqueSkuCode(db: Sql, prefer: string, exceptId?: string): string {
+  const base = replaceLeptopCode(prefer).slice(0, 32);
+  const taken = (code: string) => {
+    const row = db.get<{ id: string }>(`SELECT id FROM skus WHERE upper(code) = ?`, [code]);
+    return row != null && row.id !== exceptId;
+  };
+  if (!taken(base)) return base;
+  for (let i = 2; i < 100; i += 1) {
+    const candidate = `${base.slice(0, 28)}-${i}`.slice(0, 32);
+    if (!taken(candidate)) return candidate;
+  }
+  return `KIT-${newId().replace(/-/g, "").slice(0, 8)}`.toUpperCase();
+}
+
 export function listKitTree(db: Sql): KitGroup[] {
   const groups = db.all<{ id: string; name: string; sortOrder: number; familyId: string | null }>(
     `SELECT id, name, sort_order AS sortOrder, family_id AS familyId
@@ -125,18 +155,59 @@ function linkSubtypeSku(db: Sql, subtypeId: string, groupId: string, name: strin
   if (!group) throw new DomainError("Комплект не найден");
   let familyId = group.familyId;
   if (!familyId) familyId = linkGroupFamily(db, groupId, group.name);
-  const sku = addSkuVariant(db, { familyId, name }, "kit-sync");
+  const cleanName = replaceLeptop(name);
+  const code = uniqueSkuCode(db, preferredSkuCode(cleanName));
+  const sku = addSkuVariant(db, { familyId, name: cleanName, code }, "kit-sync");
+  // если SKU уже был с кривым code — починим
+  if (/leptop/i.test(sku.code) || /leptop/i.test(sku.name)) {
+    const nextCode = uniqueSkuCode(db, preferredSkuCode(replaceLeptop(sku.name)), sku.id);
+    const nextName = replaceLeptop(sku.name);
+    db.run(`UPDATE skus SET code = ?, name = ?, name_key = ? WHERE id = ?`, [
+      nextCode,
+      nextName,
+      normalizeEquipmentName(nextName),
+      sku.id,
+    ]);
+    sku.code = nextCode;
+    sku.name = nextName;
+  }
   db.run(`UPDATE kit_subtypes SET sku_id = ?, name = ? WHERE id = ?`, [sku.id, sku.name, subtypeId]);
   return sku.id;
 }
 
-export function createKitGroup(db: Sql, name: string): KitGroup {
-  const next = replaceLeptop(assertLabel(name, "название комплекта"));
+export function createKitGroup(
+  db: Sql,
+  input: string | { name?: string; familyId?: string },
+): KitGroup {
+  const opts = typeof input === "string" ? { name: input } : input;
   const max =
     db.get<{ value: number }>(`SELECT COALESCE(MAX(sort_order), -1) AS value FROM kit_groups`)?.value ?? -1;
   const id = `kitg_${newId().replace(/-/g, "").slice(0, 12)}`;
   const now = Date.now();
-  const familyId = findOrCreateFamily(db, next).id;
+
+  let familyId: string;
+  let next: string;
+  if (opts.familyId) {
+    const family = db.get<{ id: string; name: string }>(`SELECT id, name FROM product_families WHERE id = ?`, [
+      opts.familyId,
+    ]);
+    if (!family) throw new DomainError("Группа не найдена");
+    familyId = family.id;
+    next = replaceLeptop(assertLabel(opts.name?.trim() || family.name, "название комплекта"));
+  } else {
+    next = replaceLeptop(assertLabel(opts.name ?? "", "название комплекта"));
+    familyId = findOrCreateFamily(db, next).id;
+  }
+
+  // один kit_group на family — если уже есть, вернём существующий
+  const existing = db.get<{ id: string; name: string; sortOrder: number; familyId: string | null }>(
+    `SELECT id, name, sort_order AS sortOrder, family_id AS familyId FROM kit_groups WHERE family_id = ?`,
+    [familyId],
+  );
+  if (existing) {
+    return { ...existing, subtypes: listKitTree(db).find((g) => g.id === existing.id)?.subtypes ?? [] };
+  }
+
   db.run(`INSERT INTO kit_groups (id, name, sort_order, created_at, family_id) VALUES (?, ?, ?, ?, ?)`, [
     id,
     next,
@@ -162,7 +233,19 @@ export function createKitSubtype(db: Sql, groupId: string, name: string): KitSub
   const id = `kits_${newId().replace(/-/g, "").slice(0, 12)}`;
   let familyId = group.familyId;
   if (!familyId) familyId = linkGroupFamily(db, groupId, group.name);
-  const sku = addSkuVariant(db, { familyId, name: next }, "kit-sync");
+  const code = uniqueSkuCode(db, preferredSkuCode(next));
+  const sku = addSkuVariant(db, { familyId, name: next, code }, "kit-sync");
+  if (/leptop/i.test(sku.code)) {
+    const nextCode = uniqueSkuCode(db, preferredSkuCode(next), sku.id);
+    db.run(`UPDATE skus SET code = ?, name = ?, name_key = ? WHERE id = ?`, [
+      nextCode,
+      next,
+      normalizeEquipmentName(next),
+      sku.id,
+    ]);
+    sku.code = nextCode;
+    sku.name = next;
+  }
   db.run(
     `INSERT INTO kit_subtypes (id, group_id, name, sort_order, created_at, sku_id) VALUES (?, ?, ?, ?, ?, ?)`,
     [id, groupId, sku.name, max + 1, Date.now(), sku.id],
@@ -241,7 +324,7 @@ export function removeKitGroup(db: Sql, groupId: string): void {
   db.run(`DELETE FROM kit_groups WHERE id = ?`, [groupId]);
 }
 
-/** LEPTOP/Leptop → Laptop в комплектах и в сводке (product_families / skus). */
+/** LEPTOP/Leptop → Laptop в комплектах и в сводке (name + code SKU). */
 export function fixKitLeptopTypo(db: Sql): number {
   let fixed = 0;
   const kitTables: { table: string; column: string }[] = [
@@ -273,13 +356,21 @@ export function fixKitLeptopTypo(db: Sql): number {
     fixed += 1;
   }
 
-  const skus = db.all<{ id: string; name: string }>(
-    `SELECT id, name FROM skus WHERE lower(name) LIKE '%leptop%' OR lower(code) LIKE '%leptop%'`,
+  // Важно: в сводке колонка «код» — skus.code. Раньше чинили только name → юзер всё ещё видел LEPTOP.
+  const skus = db.all<{ id: string; name: string; code: string }>(
+    `SELECT id, name, code FROM skus WHERE lower(name) LIKE '%leptop%' OR lower(code) LIKE '%leptop%'`,
   );
   for (const row of skus) {
     const nextName = replaceLeptop(row.name);
+    const nextCode = uniqueSkuCode(db, replaceLeptopCode(row.code) || preferredSkuCode(nextName), row.id);
     const nameKey = normalizeEquipmentName(nextName);
-    db.run(`UPDATE skus SET name = ?, name_key = ? WHERE id = ?`, [nextName, nameKey, row.id]);
+    if (nextName === row.name && nextCode === row.code.toUpperCase()) continue;
+    db.run(`UPDATE skus SET name = ?, code = ?, name_key = ? WHERE id = ?`, [
+      nextName,
+      nextCode,
+      nameKey,
+      row.id,
+    ]);
     fixed += 1;
   }
   return fixed;
