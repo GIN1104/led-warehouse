@@ -8,6 +8,9 @@ const nextConfig: NextConfig = {
   trailingSlash: true,
   images: { unoptimized: true },
   agentRules: false,
+  experimental: {
+    agentUpgrade: "security",
+  },
   serverExternalPackages: ["better-sqlite3"],
   allowedDevOrigins: ["127.0.0.1", "localhost"],
   ...(basePath ? { basePath } : {}),
