@@ -188,8 +188,32 @@ export function removeKitGroup(db: Sql, groupId: string): void {
   db.run(`DELETE FROM kit_groups WHERE id = ?`, [groupId]);
 }
 
-/** Демо-иерархия Computer → Laptop → №1/2/3 с checklist, если таблица пуста. */
+/** Исправляет опечатку LEPTOP/Leptop → Laptop в уже сохранённых комплектах. */
+export function fixKitLeptopTypo(db: Sql): number {
+  let fixed = 0;
+  const tables: { table: string; column: string }[] = [
+    { table: "kit_groups", column: "name" },
+    { table: "kit_subtypes", column: "name" },
+    { table: "kit_units", column: "label" },
+    { table: "kit_checklist_items", column: "label" },
+  ];
+  for (const { table, column } of tables) {
+    const rows = db.all<{ id: string; value: string }>(
+      `SELECT id, ${column} AS value FROM ${table} WHERE lower(${column}) LIKE '%leptop%'`,
+    );
+    for (const row of rows) {
+      const next = row.value.replace(/leptop/gi, "Laptop");
+      if (next === row.value) continue;
+      db.run(`UPDATE ${table} SET ${column} = ? WHERE id = ?`, [next, row.id]);
+      fixed += 1;
+    }
+  }
+  return fixed;
+}
+
+/** Демо-иерархия Компьютер → Laptop → №1/2/3 с checklist, если таблица пуста. */
 export function seedDefaultKitsIfEmpty(db: Sql): void {
+  fixKitLeptopTypo(db);
   const count = db.get<{ value: number }>(`SELECT COUNT(*) AS value FROM kit_groups`);
   if ((count?.value ?? 0) > 0) return;
 
