@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { Fragment, useMemo, useState, type FormEvent } from "react";
+import { EquipmentKitsPanel } from "@/components/equipment-kits";
 import { useI18n } from "@/components/i18n";
 import { useWarehouse } from "@/components/warehouse";
 import { Badge, Field, Flash, PageHeader, Panel, buttonClass, controlClass } from "@/components/ui";
@@ -82,12 +83,15 @@ function restoreSummaryFocus(snap: { skuId: string; field: string; scrollTop: nu
 export default function StockPage() {
   const { db, session, users, refresh, revision } = useWarehouse();
   const { t, lang } = useI18n();
-  const allowed = can(session.role, "stock.write");
+  const allowed = can(session.role, "stock.write", db);
   const summary = listSkuSummaries(db);
   const balances = listLocationBalances(db);
   const locations = listLocations(db);
   const movements = listMovements(db);
-  const warehouse = users.find((user) => user.role === "warehouse")?.name ?? "";
+  const warehouse =
+    users.find((user) => can(user.role, "stock.write", db))?.name ??
+    users.find((user) => user.role === "warehouse")?.name ??
+    "";
   const drive = driveManualHint();
   const [flash, setFlash] = useState<{ error?: string; ok?: string }>({});
   const [statusFilter, setStatusFilter] = useState<EquipmentStatus | "all">("all");
@@ -197,7 +201,7 @@ export default function StockPage() {
 
     const focusSnap = captureSummaryFocus();
     try {
-      assertCan(session.role, "stock.write");
+      assertCan(session.role, "stock.write", db);
       setEquipmentSkuBuckets(db, agg.skuId, { onHand, inUse, inRepair }, session.id);
       setBucketDrafts((prev) => {
         const next = { ...prev };
@@ -247,7 +251,7 @@ export default function StockPage() {
       return;
     }
     try {
-      assertCan(session.role, "stock.write");
+      assertCan(session.role, "stock.write", db);
       updateEquipmentItem(
         db,
         row.id,
@@ -273,7 +277,7 @@ export default function StockPage() {
   async function onDelete(row: EquipmentItemRow) {
     if (!window.confirm(t("eq.deleteConfirm"))) return;
     try {
-      assertCan(session.role, "stock.write");
+      assertCan(session.role, "stock.write", db);
       deleteEquipmentItem(db, row.id, session.id);
       if (historyId === row.id) setHistoryId(null);
       setDrafts((prev) => {
@@ -292,7 +296,7 @@ export default function StockPage() {
     event.preventDefault();
     const form = new FormData(event.currentTarget);
     try {
-      assertCan(session.role, "stock.write");
+      assertCan(session.role, "stock.write", db);
       addEquipmentItem(
         db,
         {
@@ -317,7 +321,7 @@ export default function StockPage() {
     const file = new FormData(event.currentTarget).get("file");
     if (!(file instanceof File) || file.size === 0) return;
     try {
-      assertCan(session.role, "stock.write");
+      assertCan(session.role, "stock.write", db);
       const draft = await parseMapperFile(file);
       const result = importEquipmentReserved(db, draft, session.id);
       await refresh();
@@ -338,7 +342,7 @@ export default function StockPage() {
     event.preventDefault();
     const form = new FormData(event.currentTarget);
     try {
-      assertCan(session.role, "stock.write");
+      assertCan(session.role, "stock.write", db);
       const family = createProductFamily(db, String(form.get("name") ?? ""), session.id);
       void refresh().then(() => {
         setVariantFamilyId(family.id);
@@ -354,7 +358,7 @@ export default function StockPage() {
     event.preventDefault();
     const form = new FormData(event.currentTarget);
     try {
-      assertCan(session.role, "stock.write");
+      assertCan(session.role, "stock.write", db);
       const familyId = String(form.get("familyId") ?? "");
       addSkuVariant(
         db,
@@ -382,7 +386,7 @@ export default function StockPage() {
       return;
     }
     try {
-      assertCan(session.role, "stock.write");
+      assertCan(session.role, "stock.write", db);
       setEquipmentStatus(db, itemId, to, session.id);
       setRepairDraft(null);
       void refresh().then(() => setFlash({ ok: t("eq.statusChanged") }));
@@ -399,7 +403,7 @@ export default function StockPage() {
       return;
     }
     try {
-      assertCan(session.role, "stock.write");
+      assertCan(session.role, "stock.write", db);
       const qty = Number(repairDraft.qty);
       const result = transitionEquipmentQty(db, repairDraft.itemId, repairDraft.to, qty, session.id);
       setRepairDraft(null);
@@ -418,7 +422,7 @@ export default function StockPage() {
   function onReorderFamily(familyId: string, direction: "up" | "down") {
     if (familyId === "__uncategorized__") return;
     try {
-      assertCan(session.role, "stock.write");
+      assertCan(session.role, "stock.write", db);
       moveFamily(db, familyId, direction);
       void refresh().then(() => setFlash({ ok: t("eq.orderSaved") }));
     } catch (error) {
@@ -428,7 +432,7 @@ export default function StockPage() {
 
   function onReorderSku(skuId: string, direction: "up" | "down") {
     try {
-      assertCan(session.role, "stock.write");
+      assertCan(session.role, "stock.write", db);
       moveSkuInFamily(db, skuId, direction);
       void refresh().then(() => setFlash({ ok: t("eq.orderSaved") }));
     } catch (error) {
@@ -452,7 +456,7 @@ export default function StockPage() {
       return;
     }
     try {
-      assertCan(session.role, "stock.write");
+      assertCan(session.role, "stock.write", db);
       renameProductFamily(db, familyId, trimmed, session.id);
       setFamilyNameDrafts((prev) => {
         const next = { ...prev };
@@ -479,7 +483,7 @@ export default function StockPage() {
       return;
     }
     try {
-      assertCan(session.role, "stock.write");
+      assertCan(session.role, "stock.write", db);
       renameSku(db, skuId, trimmed, session.id);
       setSkuNameDrafts((prev) => {
         const next = { ...prev };
@@ -496,7 +500,7 @@ export default function StockPage() {
 
   async function onAssignFamily(skuId: string, familyId: string) {
     try {
-      assertCan(session.role, "stock.write");
+      assertCan(session.role, "stock.write", db);
       assignSkuToFamily(db, skuId, familyId || null, session.id);
       setEditingGroupSkuId(null);
       await refresh();
@@ -514,7 +518,7 @@ export default function StockPage() {
       return;
     }
     try {
-      assertCan(session.role, "stock.write");
+      assertCan(session.role, "stock.write", db);
       addSkuVariant(db, { familyId, name }, session.id);
       setAddDrafts((prev) => {
         const next = { ...prev };
@@ -531,7 +535,7 @@ export default function StockPage() {
 
   async function onDeleteSku(skuId: string, skuName: string) {
     try {
-      assertCan(session.role, "stock.write");
+      assertCan(session.role, "stock.write", db);
       const preview = getSkuDeletePreview(db, skuId);
       if (preview.inOrders) {
         window.alert(t("eq.deleteSkuInOrders", { name: skuName, count: preview.orderLineCount }));
@@ -554,7 +558,7 @@ export default function StockPage() {
     if (familyId === "__uncategorized__") return;
     if (!window.confirm(t("eq.deleteFamilyConfirm", { name: familyName }))) return;
     try {
-      assertCan(session.role, "stock.write");
+      assertCan(session.role, "stock.write", db);
       deleteProductFamily(db, familyId, session.id);
       await refresh();
       setFlash({ ok: t("eq.familyDeleted") });
@@ -568,7 +572,7 @@ export default function StockPage() {
     const form = new FormData(event.currentTarget);
     const type = String(form.get("type") ?? "in");
     try {
-      assertCan(session.role, "stock.write");
+      assertCan(session.role, "stock.write", db);
       if (type !== "in" && type !== "out" && type !== "adjust" && type !== "move") {
         throw new Error("type");
       }
@@ -593,7 +597,12 @@ export default function StockPage() {
   return (
     <div>
       <PageHeader eyebrow={t("stock.eyebrow")} title={t("stock.title")} description={t("stock.description")} />
-      {!allowed ? <p className="mb-4 text-sm text-ink/60">{t("stock.switch", { name: warehouse })}</p> : null}
+      {!allowed ? (
+        <div className="mb-4 rounded-md border border-line bg-sand/70 px-3 py-2 text-sm text-ink/70">
+          <p className="font-medium text-ink/80">{t("stock.viewOnly")}</p>
+          <p className="mt-1">{t("stock.viewOnlyHint", { name: warehouse || "—" })}</p>
+        </div>
+      ) : null}
       <Flash error={flash.error} ok={flash.ok} />
 
       <Panel className="mb-4">
@@ -1015,6 +1024,14 @@ export default function StockPage() {
         )}
       </Panel>
 
+      <EquipmentKitsPanel
+        db={db}
+        allowed={allowed}
+        revision={revision}
+        refresh={refresh}
+        onFlash={setFlash}
+      />
+
       <Panel className="mb-4">
         <h2 className="mb-1 font-medium">{t("eq.hierarchyTitle")}</h2>
         <p className="mb-3 text-sm leading-6 text-ink/70">{t("eq.hierarchyHelp")}</p>
@@ -1084,7 +1101,7 @@ export default function StockPage() {
                         className={buttonClass("ghost", "px-2 py-1 text-xs")}
                         onClick={() => {
                           try {
-                            assertCan(session.role, "stock.write");
+                            assertCan(session.role, "stock.write", db);
                             moveFamily(db, family.id, "up");
                             void refresh();
                           } catch (error) {
@@ -1099,7 +1116,7 @@ export default function StockPage() {
                         className={buttonClass("ghost", "px-2 py-1 text-xs")}
                         onClick={() => {
                           try {
-                            assertCan(session.role, "stock.write");
+                            assertCan(session.role, "stock.write", db);
                             moveFamily(db, family.id, "down");
                             void refresh();
                           } catch (error) {
@@ -1129,7 +1146,7 @@ export default function StockPage() {
                               className={buttonClass("ghost", "px-2 py-0.5 text-xs")}
                               onClick={() => {
                                 try {
-                                  assertCan(session.role, "stock.write");
+                                  assertCan(session.role, "stock.write", db);
                                   moveSkuInFamily(db, sku.id, "up");
                                   void refresh();
                                 } catch (error) {
@@ -1144,7 +1161,7 @@ export default function StockPage() {
                               className={buttonClass("ghost", "px-2 py-0.5 text-xs")}
                               onClick={() => {
                                 try {
-                                  assertCan(session.role, "stock.write");
+                                  assertCan(session.role, "stock.write", db);
                                   moveSkuInFamily(db, sku.id, "down");
                                   void refresh();
                                 } catch (error) {

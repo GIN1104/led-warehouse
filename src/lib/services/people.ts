@@ -140,4 +140,59 @@ export function roleDisplayName(db: Sql, role: Role, fallback?: string): string 
   return labels[role] || fallback || DEFAULT_ROLE_LABELS[role];
 }
 
+const ROLE_STOCK_EDIT_PREFIX = "role_stock_edit:";
+
+/** Концептуальный дефолт: только Администратор. Warehouse включается seed'ом для совместимости. */
+export function defaultRoleStockEdit(role: Role): boolean {
+  return role === "admin";
+}
+
+export type RoleStockEdit = Record<Role, boolean>;
+
+export function getRoleStockEdit(db: Sql): RoleStockEdit {
+  const flags = {} as RoleStockEdit;
+  for (const role of PEOPLE_ROLES) {
+    const row = db.get<{ value: string }>(`SELECT value FROM ledger_meta WHERE key = ?`, [
+      `${ROLE_STOCK_EDIT_PREFIX}${role}`,
+    ]);
+    if (row?.value === "1") flags[role] = true;
+    else if (row?.value === "0") flags[role] = false;
+    else flags[role] = defaultRoleStockEdit(role);
+  }
+  return flags;
+}
+
+export function setRoleStockEdit(db: Sql, input: Partial<RoleStockEdit>): RoleStockEdit {
+  for (const role of PEOPLE_ROLES) {
+    const value = input[role];
+    if (value === undefined) continue;
+    assertRole(role);
+    db.run(
+      `INSERT INTO ledger_meta (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value`,
+      [`${ROLE_STOCK_EDIT_PREFIX}${role}`, value ? "1" : "0"],
+    );
+  }
+  return getRoleStockEdit(db);
+}
+
+/**
+ * Первичная инициализация: admin + warehouse могут править склад
+ * (warehouse — чтобы не сломать текущий UX Алексея · Склад).
+ * Повторный вызов не перезаписывает уже сохранённые флаги.
+ */
+export function ensureDefaultRoleStockEdit(db: Sql): RoleStockEdit {
+  const any = db.get<{ key: string }>(
+    `SELECT key FROM ledger_meta WHERE key LIKE 'role_stock_edit:%' LIMIT 1`,
+  );
+  if (!any) {
+    setRoleStockEdit(db, {
+      admin: true,
+      warehouse: true,
+      manager: false,
+      logistics: false,
+    });
+  }
+  return getRoleStockEdit(db);
+}
+
 export { listUsers };

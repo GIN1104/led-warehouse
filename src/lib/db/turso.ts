@@ -19,6 +19,10 @@ const INSERT_ORDER = [
   "work_tasks",
   "ledger_meta",
   "audit_log",
+  "kit_groups",
+  "kit_subtypes",
+  "kit_units",
+  "kit_checklist_items",
 ] as const;
 
 export type SqlStmt = { sql: string; args: unknown[] };
