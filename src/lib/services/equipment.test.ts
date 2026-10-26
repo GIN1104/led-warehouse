@@ -1,14 +1,16 @@
 import { describe, expect, it } from "vitest";
 import { createDb } from "@/lib/db/memory";
-import { applyMovement } from "@/lib/services/ledger";
+import { applyMovement, createOrder } from "@/lib/services/ledger";
 import {
   addEquipmentItem,
   deleteEquipmentItem,
   importEquipmentReserved,
   listEquipmentHistory,
   listEquipmentItems,
+  listEquipmentSkuAggregates,
   setEquipmentStatus,
   sortEquipmentItems,
+  transitionEquipmentQty,
   updateEquipmentItem,
 } from "@/lib/services/equipment";
 import { parseMapperCsv } from "@/lib/services/mapper-sheet";
@@ -160,5 +162,63 @@ describe("оборудование: статусы и импорт", () => {
     expect(again.updated).toBe(1);
     expect(again.items[0]?.qty).toBe(5);
     expect(listEquipmentItems(db).filter((row) => row.externalRef === "eq-crud")).toHaveLength(1);
+  });
+
+  it("частичный ремонт: qty в in_repair, остаток остаётся available", () => {
+    const db = setup();
+    const item = addEquipmentItem(db, { skuId: "CAB-P25", qty: 80, status: "available" }, "wh");
+    const result = transitionEquipmentQty(db, item.id, "in_repair", 2, "wh", "панель треснула");
+    expect(result.split).toBe(true);
+    expect(result.source.qty).toBe(78);
+    expect(result.source.status).toBe("available");
+    expect(result.moved.qty).toBe(2);
+    expect(result.moved.status).toBe("in_repair");
+    expect(result.moved.id).not.toBe(item.id);
+
+    const full = transitionEquipmentQty(db, result.source.id, "needs_repair", 78, "wh");
+    expect(full.split).toBe(false);
+    expect(full.moved.status).toBe("needs_repair");
+    expect(full.moved.qty).toBe(78);
+  });
+
+  it("частичный переход отклоняет qty > строки и 0", () => {
+    const db = setup();
+    const item = addEquipmentItem(db, { skuId: "CAB-P25", qty: 10 }, "wh");
+    expect(() => transitionEquipmentQty(db, item.id, "in_repair", 11, "wh")).toThrow(/больше/);
+    expect(() => transitionEquipmentQty(db, item.id, "in_repair", 0, "wh")).toThrow(/больше нуля/);
+  });
+
+  it("агрегат по SKU: всего / склад / в работе со ссылкой / ремонт", () => {
+    const db = setup();
+    addEquipmentItem(db, { skuId: "CAB-P25", qty: 30, status: "available" }, "wh");
+    const reserved = addEquipmentItem(
+      db,
+      { skuId: "CAB-P25", qty: 48, status: "reserved", customerName: "Сцена Про" },
+      "wh",
+    );
+    const order = createOrder(
+      db,
+      {
+        customerName: "Сцена Про",
+        startDate: "2026-10-20",
+        endDate: "2026-10-22",
+        notes: "",
+        lines: [{ skuId: "CAB-P25", qty: 1 }],
+      },
+      "wh",
+    );
+    db.run(`UPDATE equipment_items SET order_id = ? WHERE id = ?`, [order.orderId, reserved.id]);
+    addEquipmentItem(db, { skuId: "CAB-P25", qty: 2, status: "in_repair" }, "wh");
+
+    const aggs = listEquipmentSkuAggregates(db);
+    const cab = aggs.find((row) => row.skuCode === "CAB-P25");
+    expect(cab).toBeTruthy();
+    expect(cab!.total).toBe(80);
+    expect(cab!.onHand).toBe(30);
+    expect(cab!.inUse).toBe(48);
+    expect(cab!.inRepair).toBe(2);
+    expect(cab!.deployments).toHaveLength(1);
+    expect(cab!.deployments[0]?.orderId).toBe(order.orderId);
+    expect(cab!.deployments[0]?.label).toBe("Сцена Про");
   });
 });

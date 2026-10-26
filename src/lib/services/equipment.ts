@@ -215,7 +215,7 @@ export function importEquipmentReserved(
   };
 }
 
-/** Сменить статус позиции (вручную, без сканера). */
+/** Сменить статус позиции (вручную, без сканера). Весь qty строки. */
 export function setEquipmentStatus(
   db: Sql,
   itemId: string,
@@ -223,23 +223,119 @@ export function setEquipmentStatus(
   actor: string,
   note = "",
 ): EquipmentItemRow {
+  return transitionEquipmentQty(db, itemId, toStatus, undefined, actor, note).moved;
+}
+
+export type TransitionEquipmentResult = {
+  /** Исходная строка после операции (qty уменьшен или статус сменён). */
+  source: EquipmentItemRow;
+  /** Строка в целевом статусе (та же, если qty = весь объём). */
+  moved: EquipmentItemRow;
+  split: boolean;
+};
+
+/**
+ * Перевести часть qty в другой статус.
+ * Если qty не задан или равен всей строке — смена статуса на месте.
+ * Если qty меньше — исходная строка остаётся, создаётся новая с целевым статусом.
+ */
+export function transitionEquipmentQty(
+  db: Sql,
+  itemId: string,
+  toStatus: EquipmentStatus,
+  qty: number | undefined,
+  actor: string,
+  note = "",
+): TransitionEquipmentResult {
   if (!isEquipmentStatus(toStatus)) throw new DomainError("Неизвестный статус оборудования");
-  const current = db.get<{ id: string; status: EquipmentStatus }>(
-    `SELECT id, status FROM equipment_items WHERE id = ?`,
+  const current = db.get<{
+    id: string;
+    skuId: string;
+    qty: number;
+    status: EquipmentStatus;
+    locationId: string | null;
+    note: string;
+    source: string;
+    externalRef: string | null;
+    orderId: string | null;
+    customerName: string;
+  }>(
+    `SELECT id, sku_id AS skuId, qty, status, location_id AS locationId, note, source,
+            external_ref AS externalRef, order_id AS orderId, customer_name AS customerName
+     FROM equipment_items WHERE id = ?`,
     [itemId],
   );
   if (!current) throw new DomainError("Позиция оборудования не найдена");
   if (!canTransitionEquipment(current.status, toStatus)) {
     throw new DomainError(`Нельзя сменить статус с «${current.status}» на «${toStatus}»`);
   }
+
+  const moveQty = qty === undefined ? current.qty : qty;
+  if (!Number.isInteger(moveQty) || moveQty <= 0) {
+    throw new DomainError("Количество должно быть целым и больше нуля");
+  }
+  if (moveQty > current.qty) {
+    throw new DomainError("Количество перехода больше, чем в строке");
+  }
+
   const now = Date.now();
+  const historyNote = note.trim() || `→ ${toStatus}`;
+
+  if (moveQty === current.qty) {
+    db.transaction(() => {
+      db.run(`UPDATE equipment_items SET status = ?, updated_at = ? WHERE id = ?`, [toStatus, now, itemId]);
+      writeHistory(db, itemId, current.status, toStatus, actor, historyNote, now);
+    });
+    const row = getEquipmentItem(db, itemId);
+    if (!row) throw new DomainError("Позиция оборудования не найдена");
+    return { source: row, moved: row, split: false };
+  }
+
+  const remainQty = current.qty - moveQty;
+  const movedId = newId();
   db.transaction(() => {
-    db.run(`UPDATE equipment_items SET status = ?, updated_at = ? WHERE id = ?`, [toStatus, now, itemId]);
-    writeHistory(db, itemId, current.status, toStatus, actor, note.trim() || `→ ${toStatus}`, now);
+    db.run(`UPDATE equipment_items SET qty = ?, updated_at = ?, created_by = ? WHERE id = ?`, [
+      remainQty,
+      now,
+      actor,
+      itemId,
+    ]);
+    writeHistory(
+      db,
+      itemId,
+      current.status,
+      current.status,
+      actor,
+      `qty → ${remainQty} (часть ${moveQty} → ${toStatus})`,
+      now,
+    );
+    db.run(
+      `INSERT INTO equipment_items
+        (id, sku_id, qty, status, location_id, note, source, external_ref, order_id, customer_name, created_at, updated_at, created_by)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [
+        movedId,
+        current.skuId,
+        moveQty,
+        toStatus,
+        current.locationId,
+        current.note,
+        current.source,
+        current.externalRef,
+        current.orderId,
+        current.customerName,
+        now,
+        now,
+        actor,
+      ],
+    );
+    writeHistory(db, movedId, current.status, toStatus, actor, historyNote || `часть ${moveQty} → ${toStatus}`, now);
   });
-  const row = getEquipmentItem(db, itemId);
-  if (!row) throw new DomainError("Позиция оборудования не найдена");
-  return row;
+
+  const source = getEquipmentItem(db, itemId);
+  const moved = getEquipmentItem(db, movedId);
+  if (!source || !moved) throw new DomainError("Позиция оборудования не найдена");
+  return { source, moved, split: true };
 }
 
 export type UpdateEquipmentInput = {
@@ -402,6 +498,92 @@ export function listEquipmentHistory(db: Sql, itemId: string, limit = 20): Equip
      LIMIT ?`,
     [itemId, limit],
   );
+}
+
+/** Ссылка на заказ/событие внутри «в работе». */
+export type EquipmentDeploymentLink = {
+  itemId: string;
+  qty: number;
+  status: EquipmentStatus;
+  orderId: string | null;
+  customerName: string;
+  externalRef: string | null;
+  label: string;
+};
+
+/** Агрегат по SKU: всего / на складе / в работе / в ремонте. */
+export type EquipmentSkuAggregate = {
+  skuId: string;
+  skuCode: string;
+  skuName: string;
+  unit: string;
+  total: number;
+  /** available — доступно для заказа */
+  onHand: number;
+  /** reserved + checked_out */
+  inUse: number;
+  /** needs_repair + in_repair */
+  inRepair: number;
+  byStatus: Record<EquipmentStatus, number>;
+  deployments: EquipmentDeploymentLink[];
+};
+
+function deploymentLabel(row: EquipmentItemRow): string {
+  if (row.customerName.trim()) return row.customerName.trim();
+  if (row.externalRef?.trim()) return row.externalRef.trim();
+  if (row.orderId) return row.orderId;
+  return row.note.trim() || row.status;
+}
+
+/** Сводка по каждой позиции (SKU): qty по статусам + ссылки на заказы «в работе». */
+export function listEquipmentSkuAggregates(db: Sql, filter: { query?: string } = {}): EquipmentSkuAggregate[] {
+  const rows = listEquipmentItems(db, { query: filter.query });
+  const map = new Map<string, EquipmentSkuAggregate>();
+
+  for (const row of rows) {
+    let agg = map.get(row.skuId);
+    if (!agg) {
+      agg = {
+        skuId: row.skuId,
+        skuCode: row.skuCode,
+        skuName: row.skuName,
+        unit: row.unit,
+        total: 0,
+        onHand: 0,
+        inUse: 0,
+        inRepair: 0,
+        byStatus: {
+          available: 0,
+          reserved: 0,
+          checked_out: 0,
+          needs_repair: 0,
+          in_repair: 0,
+        },
+        deployments: [],
+      };
+      map.set(row.skuId, agg);
+    }
+    agg.total += row.qty;
+    agg.byStatus[row.status] += row.qty;
+    if (row.status === "available") agg.onHand += row.qty;
+    if (row.status === "reserved" || row.status === "checked_out") {
+      agg.inUse += row.qty;
+      agg.deployments.push({
+        itemId: row.id,
+        qty: row.qty,
+        status: row.status,
+        orderId: row.orderId,
+        customerName: row.customerName,
+        externalRef: row.externalRef,
+        label: deploymentLabel(row),
+      });
+    }
+    if (row.status === "needs_repair" || row.status === "in_repair") {
+      agg.inRepair += row.qty;
+    }
+  }
+
+  return [...map.values()].sort((a, b) => a.skuCode.localeCompare(b.skuCode, "ru"));
 }
 
 export type EquipmentSortKey = "code" | "name" | "qty" | "status" | "customer" | "updated";
