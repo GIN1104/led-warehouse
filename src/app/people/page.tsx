@@ -10,10 +10,13 @@ import {
   PEOPLE_ROLES,
   createPerson,
   getRoleLabels,
+  getRoleStockEdit,
   removePerson,
   setRoleLabels,
+  setRoleStockEdit,
   updatePerson,
   type RoleLabels,
+  type RoleStockEdit,
 } from "@/lib/services/people";
 import type { Role } from "@/lib/services/queries";
 
@@ -24,6 +27,7 @@ export default function PeoplePage() {
   const editor = users.find((user) => can(user.role, "people.write"))?.name ?? "";
   const [flash, setFlash] = useState<{ error?: string; ok?: string }>({});
   const [labels, setLabels] = useState<RoleLabels>(() => getRoleLabels(db));
+  const [stockEdit, setStockEdit] = useState<RoleStockEdit>(() => getRoleStockEdit(db));
   void revision;
 
   function roleName(role: Role): string {
@@ -94,6 +98,19 @@ export default function PeoplePage() {
       setLabels(next);
       await refresh();
       setFlash({ ok: t("people.labelsSaved") });
+    } catch (error) {
+      setFlash({ error: translateError(lang, error) });
+    }
+  }
+
+  async function onSaveStockEdit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    try {
+      assertCan(session.role, "people.write");
+      const next = setRoleStockEdit(db, stockEdit);
+      setStockEdit(next);
+      await refresh();
+      setFlash({ ok: t("people.stockEditSaved") });
     } catch (error) {
       setFlash({ error: translateError(lang, error) });
     }
@@ -202,29 +219,59 @@ export default function PeoplePage() {
           ) : null}
         </Panel>
 
-        <Panel>
-          <h2 className="mb-1 font-medium">{t("people.labelsTitle")}</h2>
-          <p className="mb-4 text-sm text-ink/65">{t("people.labelsHelp")}</p>
-          <form onSubmit={(event) => void onSaveLabels(event)} className="flex flex-col gap-3">
-            {PEOPLE_ROLES.map((role) => (
-              <Field key={role} label={t(`role.${role}` as MessageKey)}>
-                <input
-                  name={role}
-                  defaultValue={labels[role]}
-                  disabled={!allowed}
-                  className={controlClass}
-                  required
-                  maxLength={40}
-                />
-              </Field>
-            ))}
-            {allowed ? (
-              <button type="submit" className={buttonClass("primary", "self-start")}>
-                {t("people.save")}
-              </button>
-            ) : null}
-          </form>
-        </Panel>
+        <div className="flex flex-col gap-4">
+          <Panel>
+            <h2 className="mb-1 font-medium">{t("people.labelsTitle")}</h2>
+            <p className="mb-4 text-sm text-ink/65">{t("people.labelsHelp")}</p>
+            <form onSubmit={(event) => void onSaveLabels(event)} className="flex flex-col gap-3">
+              {PEOPLE_ROLES.map((role) => (
+                <Field key={role} label={t(`role.${role}` as MessageKey)}>
+                  <input
+                    name={role}
+                    defaultValue={labels[role]}
+                    disabled={!allowed}
+                    className={controlClass}
+                    required
+                    maxLength={40}
+                  />
+                </Field>
+              ))}
+              {allowed ? (
+                <button type="submit" className={buttonClass("primary", "self-start")}>
+                  {t("people.save")}
+                </button>
+              ) : null}
+            </form>
+          </Panel>
+
+          <Panel>
+            <h2 className="mb-1 font-medium">{t("people.stockEditTitle")}</h2>
+            <p className="mb-4 text-sm text-ink/65">{t("people.stockEditHelp")}</p>
+            <form onSubmit={(event) => void onSaveStockEdit(event)} className="flex flex-col gap-3">
+              {PEOPLE_ROLES.map((role) => (
+                <label key={role} className="flex items-center gap-2 text-sm">
+                  <input
+                    type="checkbox"
+                    checked={stockEdit[role]}
+                    disabled={!allowed}
+                    className="size-4 accent-copper"
+                    onChange={(event) =>
+                      setStockEdit((prev) => ({ ...prev, [role]: event.target.checked }))
+                    }
+                  />
+                  <span>
+                    {roleName(role)} — {t("people.stockEdit")}
+                  </span>
+                </label>
+              ))}
+              {allowed ? (
+                <button type="submit" className={buttonClass("primary", "self-start")}>
+                  {t("people.save")}
+                </button>
+              ) : null}
+            </form>
+          </Panel>
+        </div>
       </div>
     </div>
   );

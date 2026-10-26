@@ -1,5 +1,7 @@
 import { normalizeEquipmentName } from "@/lib/domain/sku-code";
 import type { Sql } from "@/lib/db/sql";
+import { seedDefaultKitsIfEmpty } from "@/lib/services/kits";
+import { ensureDefaultRoleStockEdit } from "@/lib/services/people";
 
 export const MIGRATION_SQL = `
 CREATE TABLE IF NOT EXISTS users (
@@ -216,6 +218,42 @@ CREATE TABLE IF NOT EXISTS allowed_emails (
   approved_by TEXT,
   revoked_at INTEGER
 );
+
+CREATE TABLE IF NOT EXISTS kit_groups (
+  id TEXT PRIMARY KEY,
+  name TEXT NOT NULL,
+  sort_order INTEGER NOT NULL DEFAULT 0,
+  created_at INTEGER NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS kit_subtypes (
+  id TEXT PRIMARY KEY,
+  group_id TEXT NOT NULL REFERENCES kit_groups(id),
+  name TEXT NOT NULL,
+  sort_order INTEGER NOT NULL DEFAULT 0,
+  created_at INTEGER NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS kit_units (
+  id TEXT PRIMARY KEY,
+  subtype_id TEXT NOT NULL REFERENCES kit_subtypes(id),
+  label TEXT NOT NULL,
+  sort_order INTEGER NOT NULL DEFAULT 0,
+  created_at INTEGER NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS kit_checklist_items (
+  id TEXT PRIMARY KEY,
+  unit_id TEXT NOT NULL REFERENCES kit_units(id),
+  label TEXT NOT NULL,
+  qty INTEGER NOT NULL DEFAULT 1 CHECK (qty >= 1),
+  sort_order INTEGER NOT NULL DEFAULT 0,
+  created_at INTEGER NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_kit_subtypes_group ON kit_subtypes(group_id);
+CREATE INDEX IF NOT EXISTS idx_kit_units_subtype ON kit_units(subtype_id);
+CREATE INDEX IF NOT EXISTS idx_kit_items_unit ON kit_checklist_items(unit_id);
 `
 
 function columnExists(db: Sql, table: string, column: string): boolean {
@@ -317,7 +355,42 @@ CREATE TABLE IF NOT EXISTS allowed_emails (
   db.exec(
     `CREATE INDEX IF NOT EXISTS idx_allowed_emails_active ON allowed_emails(email) WHERE revoked_at IS NULL`,
   );
+  db.exec(`
+CREATE TABLE IF NOT EXISTS kit_groups (
+  id TEXT PRIMARY KEY,
+  name TEXT NOT NULL,
+  sort_order INTEGER NOT NULL DEFAULT 0,
+  created_at INTEGER NOT NULL
+);
+CREATE TABLE IF NOT EXISTS kit_subtypes (
+  id TEXT PRIMARY KEY,
+  group_id TEXT NOT NULL REFERENCES kit_groups(id),
+  name TEXT NOT NULL,
+  sort_order INTEGER NOT NULL DEFAULT 0,
+  created_at INTEGER NOT NULL
+);
+CREATE TABLE IF NOT EXISTS kit_units (
+  id TEXT PRIMARY KEY,
+  subtype_id TEXT NOT NULL REFERENCES kit_subtypes(id),
+  label TEXT NOT NULL,
+  sort_order INTEGER NOT NULL DEFAULT 0,
+  created_at INTEGER NOT NULL
+);
+CREATE TABLE IF NOT EXISTS kit_checklist_items (
+  id TEXT PRIMARY KEY,
+  unit_id TEXT NOT NULL REFERENCES kit_units(id),
+  label TEXT NOT NULL,
+  qty INTEGER NOT NULL DEFAULT 1 CHECK (qty >= 1),
+  sort_order INTEGER NOT NULL DEFAULT 0,
+  created_at INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_kit_subtypes_group ON kit_subtypes(group_id);
+CREATE INDEX IF NOT EXISTS idx_kit_units_subtype ON kit_units(subtype_id);
+CREATE INDEX IF NOT EXISTS idx_kit_items_unit ON kit_checklist_items(unit_id);
+`);
   backfillSkuHierarchy(db);
+  ensureDefaultRoleStockEdit(db);
+  seedDefaultKitsIfEmpty(db);
   db.run(`INSERT INTO ledger_meta (key, value) VALUES ('revision', '0') ON CONFLICT(key) DO NOTHING`);
   db.run(`UPDATE users SET name = 'Дмитрий' WHERE id = 'user_manager' AND name = 'Мария'`);
   db.run(
