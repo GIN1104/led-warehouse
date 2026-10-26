@@ -81,6 +81,7 @@ export default function StockPage() {
   const [skuNameDrafts, setSkuNameDrafts] = useState<Record<string, string>>({});
   const [addDrafts, setAddDrafts] = useState<Record<string, string>>({});
   const [addingFamilyId, setAddingFamilyId] = useState<string | null>(null);
+  const [editingGroupSkuId, setEditingGroupSkuId] = useState<string | null>(null);
   void revision;
 
   const items = useMemo(() => {
@@ -469,6 +470,7 @@ export default function StockPage() {
     try {
       assertCan(session.role, "stock.write");
       assignSkuToFamily(db, skuId, familyId || null, session.id);
+      setEditingGroupSkuId(null);
       await refresh();
       setFlash({ ok: t("eq.skuMoved") });
     } catch (error) {
@@ -767,19 +769,42 @@ export default function StockPage() {
                                       }
                                     }}
                                   />
-                                  <select
-                                    className={controlClass}
-                                    value={agg.familyId ?? ""}
-                                    aria-label={t("eq.summaryAssignGroup")}
-                                    onChange={(event) => void onAssignFamily(agg.skuId, event.target.value)}
-                                  >
-                                    <option value="">{t("eq.uncategorized")}</option>
-                                    {productFamilies.map((item) => (
-                                      <option key={item.id} value={item.id}>
-                                        {item.name}
-                                      </option>
-                                    ))}
-                                  </select>
+                                  {editingGroupSkuId === agg.skuId ? (
+                                    <div className="flex flex-wrap items-center gap-1">
+                                      <select
+                                        className={`${controlClass} min-w-[8rem]`}
+                                        value={agg.familyId ?? ""}
+                                        aria-label={t("eq.summaryAssignGroup")}
+                                        autoFocus
+                                        onChange={(event) => void onAssignFamily(agg.skuId, event.target.value)}
+                                        onKeyDown={(event) => {
+                                          if (event.key === "Escape") setEditingGroupSkuId(null);
+                                        }}
+                                      >
+                                        <option value="">{t("eq.uncategorized")}</option>
+                                        {productFamilies.map((item) => (
+                                          <option key={item.id} value={item.id}>
+                                            {item.name}
+                                          </option>
+                                        ))}
+                                      </select>
+                                      <button
+                                        type="button"
+                                        className={buttonClass("ghost", "px-2 py-1 text-xs")}
+                                        onClick={() => setEditingGroupSkuId(null)}
+                                      >
+                                        {t("eq.repairCancel")}
+                                      </button>
+                                    </div>
+                                  ) : (
+                                    <button
+                                      type="button"
+                                      className={buttonClass("ghost", "px-2 py-0.5 text-xs self-start text-ink/60")}
+                                      onClick={() => setEditingGroupSkuId(agg.skuId)}
+                                    >
+                                      {t("eq.editGroup")}
+                                    </button>
+                                  )}
                                 </div>
                               ) : (
                                 agg.skuName
