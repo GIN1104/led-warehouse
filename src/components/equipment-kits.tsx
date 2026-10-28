@@ -80,7 +80,7 @@ export function EquipmentKitsPanel({ db, allowed, revision, refresh, onFlash }: 
           </div>
           <div className="flex flex-wrap items-end gap-2">
             {familyMode === "existing" ? (
-              <div className="min-w-[14rem] flex-1">
+              <div className="min-w-0 flex-1 sm:min-w-[14rem]">
                 <Field label={t("kits.pickFamily")}>
                   <select name="familyId" required className={controlClass} defaultValue="">
                     <option value="" disabled>
@@ -95,7 +95,7 @@ export function EquipmentKitsPanel({ db, allowed, revision, refresh, onFlash }: 
                 </Field>
               </div>
             ) : (
-              <div className="min-w-[12rem] flex-1">
+              <div className="min-w-0 flex-1 sm:min-w-[12rem]">
                 <Field label={t("kits.groupName")}>
                   <input
                     name="name"
@@ -181,7 +181,7 @@ export function EquipmentKitsPanel({ db, allowed, revision, refresh, onFlash }: 
                     form.reset();
                   }}
                 >
-                  <div className="min-w-[10rem] flex-1">
+                  <div className="min-w-0 flex-1 sm:min-w-[10rem]">
                     <Field label={t("kits.subtypeName")}>
                       <input
                         name="name"

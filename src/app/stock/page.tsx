@@ -51,8 +51,9 @@ import { listLocationBalances, listLocations, listMovements, listSkuSummaries } 
 const REPAIR_STATUSES: readonly EquipmentStatus[] = ["needs_repair", "in_repair"];
 /** Под sticky-шапкой приложения (h-14) — липнем к viewport, не к карточке. */
 const SUMMARY_STICKY_TOP = "top-14";
-const qtyInputClass = `${controlClass} h-10 w-20 shrink-0 tabular-nums`;
-const summaryCellClass = "px-3 py-2 align-middle";
+const qtyInputClass = `${controlClass} h-9 w-14 shrink-0 tabular-nums md:h-10 md:w-20`;
+const summaryCellClass = "px-1.5 py-2 align-middle md:px-3";
+const mobileQtyLabelClass = "text-[10px] font-medium tracking-wide text-ink/45 uppercase";
 
 function statusTone(status: EquipmentStatus): "neutral" | "ok" | "warn" | "alert" {
   if (status === "available") return "ok";
@@ -606,14 +607,412 @@ export default function StockPage() {
       ) : null}
       <Flash error={flash.error} ok={flash.ok} />
 
-      <Panel className="mb-4">
+      <Panel className="mb-4 max-md:px-3 max-md:py-3">
         <h2 className="mb-1 font-medium">{t("eq.summaryTitle")}</h2>
         <p className="mb-3 text-sm leading-6 text-ink/70">{t("eq.summaryHelp")}</p>
         {familyAggregates.length === 0 ? (
           <p className="text-sm text-ink/60">{t("eq.summaryEmpty")}</p>
         ) : (
-          <div className="rounded-md border border-line bg-paper/60">
-            <table className="w-full min-w-[920px] table-fixed text-start text-sm">
+          <>
+          {/* Mobile: карточки без горизонтального overflow страницы */}
+          <div className="space-y-3 md:hidden">
+            {familyAggregates.map((family) => {
+              const familyIndex = movableFamilies.findIndex((row) => row.familyId === family.familyId);
+              const canMoveFamily = family.familyId !== "__uncategorized__" && allowed;
+              return (
+                <section key={family.familyId} className="overflow-hidden rounded-md border border-line bg-paper/70">
+                  <div className="flex items-start gap-2 border-b border-line bg-sand/80 px-2.5 py-2">
+                    {canMoveFamily ? (
+                      <span className="inline-flex shrink-0 flex-col gap-0.5 pt-0.5">
+                        <button
+                          type="button"
+                          className={buttonClass("ghost", "size-8 px-0 text-xs")}
+                          disabled={familyIndex <= 0}
+                          aria-label={t("eq.moveUp")}
+                          onClick={() => onReorderFamily(family.familyId, "up")}
+                        >
+                          ↑
+                        </button>
+                        <button
+                          type="button"
+                          className={buttonClass("ghost", "size-8 px-0 text-xs")}
+                          disabled={familyIndex < 0 || familyIndex >= movableFamilies.length - 1}
+                          aria-label={t("eq.moveDown")}
+                          onClick={() => onReorderFamily(family.familyId, "down")}
+                        >
+                          ↓
+                        </button>
+                      </span>
+                    ) : null}
+                    <div className="min-w-0 flex-1 space-y-1">
+                      {canMoveFamily ? (
+                        <input
+                          className={`${controlClass} h-9 w-full font-medium`}
+                          value={familyNameDrafts[family.familyId] ?? family.familyName}
+                          aria-label={t("eq.familyName")}
+                          onChange={(event) =>
+                            setFamilyNameDrafts((prev) => ({ ...prev, [family.familyId]: event.target.value }))
+                          }
+                          onBlur={(event) => void saveFamilyName(family.familyId, event.target.value, family.familyName)}
+                          onKeyDown={(event) => {
+                            if (event.key === "Enter") {
+                              event.preventDefault();
+                              (event.target as HTMLInputElement).blur();
+                            }
+                          }}
+                        />
+                      ) : (
+                        <p className="truncate font-medium">{family.familyName}</p>
+                      )}
+                      <p className="text-xs text-ink/50">
+                        {t("eq.summaryGroupTotal")}: {family.total}
+                        {" · "}
+                        {t("eq.summaryOnHand")} {family.onHand}
+                        {" · "}
+                        {t("eq.summaryInUse")} {family.inUse}
+                        {" · "}
+                        {t("eq.summaryInRepair")} {family.inRepair}
+                      </p>
+                    </div>
+                  </div>
+
+                  {canMoveFamily ? (
+                    <div className="flex flex-wrap items-center gap-1 border-b border-line px-2.5 py-2">
+                      {addingFamilyId === family.familyId ? (
+                        <>
+                          <input
+                            className={`${controlClass} h-9 min-w-0 flex-1`}
+                            value={addDrafts[family.familyId] ?? ""}
+                            placeholder={t("eq.variantPlaceholder")}
+                            aria-label={t("eq.variantName")}
+                            autoFocus
+                            onChange={(event) =>
+                              setAddDrafts((prev) => ({ ...prev, [family.familyId]: event.target.value }))
+                            }
+                            onKeyDown={(event) => {
+                              if (event.key === "Enter") {
+                                event.preventDefault();
+                                void onAddInFamily(family.familyId);
+                              }
+                              if (event.key === "Escape") setAddingFamilyId(null);
+                            }}
+                          />
+                          <button
+                            type="button"
+                            className={buttonClass("primary", "h-9 px-2 text-xs")}
+                            onClick={() => void onAddInFamily(family.familyId)}
+                          >
+                            {t("eq.addInGroup")}
+                          </button>
+                          <button
+                            type="button"
+                            className={buttonClass("ghost", "h-9 px-2 text-xs")}
+                            onClick={() => setAddingFamilyId(null)}
+                          >
+                            {t("eq.repairCancel")}
+                          </button>
+                        </>
+                      ) : (
+                        <button
+                          type="button"
+                          className={buttonClass("ghost", "h-9 px-2 text-xs")}
+                          onClick={() => setAddingFamilyId(family.familyId)}
+                        >
+                          {t("eq.addInGroup")}
+                        </button>
+                      )}
+                      {family.skus.length === 0 ? (
+                        <button
+                          type="button"
+                          className={buttonClass("danger", "h-9 px-2 text-xs")}
+                          onClick={() => void onDeleteEmptyFamily(family.familyId, family.familyName)}
+                        >
+                          {t("eq.deleteFamily")}
+                        </button>
+                      ) : null}
+                    </div>
+                  ) : null}
+
+                  {family.skus.length === 0 ? (
+                    <p className="px-2.5 py-3 text-xs text-ink/50">{t("eq.summaryNoVariants")}</p>
+                  ) : (
+                    <ul className="divide-y divide-line">
+                      {family.skus.map((agg, skuIndex) => {
+                        const draft = bucketDraftFor(agg);
+                        const kitNest = kitBySku.get(agg.skuId);
+                        return (
+                          <li key={agg.skuId} className="px-2.5 py-3">
+                            <div className="flex items-start gap-2">
+                              {allowed ? (
+                                <span className="inline-flex shrink-0 flex-col gap-0.5">
+                                  <button
+                                    type="button"
+                                    className={buttonClass("ghost", "size-8 px-0 text-xs")}
+                                    disabled={skuIndex <= 0}
+                                    aria-label={t("eq.moveUp")}
+                                    onClick={() => onReorderSku(agg.skuId, "up")}
+                                  >
+                                    ↑
+                                  </button>
+                                  <button
+                                    type="button"
+                                    className={buttonClass("ghost", "size-8 px-0 text-xs")}
+                                    disabled={skuIndex >= family.skus.length - 1}
+                                    aria-label={t("eq.moveDown")}
+                                    onClick={() => onReorderSku(agg.skuId, "down")}
+                                  >
+                                    ↓
+                                  </button>
+                                </span>
+                              ) : null}
+                              <div className="min-w-0 flex-1 space-y-2">
+                                <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                                  <span className="font-mono text-[11px] text-ink/45">{agg.skuCode}</span>
+                                  {allowed ? (
+                                    <button
+                                      type="button"
+                                      className={buttonClass("danger", "ms-auto h-8 px-2 text-xs")}
+                                      onClick={() => void onDeleteSku(agg.skuId, agg.skuName)}
+                                    >
+                                      {t("eq.delete")}
+                                    </button>
+                                  ) : null}
+                                </div>
+                                {allowed ? (
+                                  <div className="flex min-w-0 flex-col gap-1.5">
+                                    <input
+                                      className={`${controlClass} h-9 w-full`}
+                                      value={skuNameDrafts[agg.skuId] ?? agg.skuName}
+                                      aria-label={t("stock.name")}
+                                      onChange={(event) =>
+                                        setSkuNameDrafts((prev) => ({ ...prev, [agg.skuId]: event.target.value }))
+                                      }
+                                      onBlur={(event) => void saveSkuName(agg.skuId, event.target.value, agg.skuName)}
+                                      onKeyDown={(event) => {
+                                        if (event.key === "Enter") {
+                                          event.preventDefault();
+                                          (event.target as HTMLInputElement).blur();
+                                        }
+                                      }}
+                                    />
+                                    {editingGroupSkuId === agg.skuId ? (
+                                      <div className="flex flex-wrap gap-1">
+                                        <select
+                                          className={`${controlClass} h-9 min-w-0 flex-1 py-0 text-xs`}
+                                          value={agg.familyId ?? ""}
+                                          aria-label={t("eq.summaryAssignGroup")}
+                                          autoFocus
+                                          onChange={(event) => void onAssignFamily(agg.skuId, event.target.value)}
+                                          onKeyDown={(event) => {
+                                            if (event.key === "Escape") setEditingGroupSkuId(null);
+                                          }}
+                                        >
+                                          <option value="">{t("eq.uncategorized")}</option>
+                                          {productFamilies.map((item) => (
+                                            <option key={item.id} value={item.id}>
+                                              {item.name}
+                                            </option>
+                                          ))}
+                                        </select>
+                                        <button
+                                          type="button"
+                                          className={buttonClass("ghost", "h-9 px-2 text-xs")}
+                                          onClick={() => setEditingGroupSkuId(null)}
+                                        >
+                                          {t("eq.repairCancel")}
+                                        </button>
+                                      </div>
+                                    ) : (
+                                      <button
+                                        type="button"
+                                        className={buttonClass("ghost", "h-8 w-fit px-2 text-xs text-ink/60")}
+                                        onClick={() => setEditingGroupSkuId(agg.skuId)}
+                                      >
+                                        {t("eq.editGroup")}
+                                      </button>
+                                    )}
+                                  </div>
+                                ) : (
+                                  <p className="font-medium">{agg.skuName}</p>
+                                )}
+
+                                <div className="grid grid-cols-2 gap-2">
+                                  <label className="flex flex-col gap-1">
+                                    <span className={mobileQtyLabelClass}>{t("eq.summaryTotal")}</span>
+                                    {allowed ? (
+                                      <input
+                                        type="number"
+                                        min={0}
+                                        step={1}
+                                        className={`${qtyInputClass} w-full max-w-none`}
+                                        data-sku-id={agg.skuId}
+                                        data-field="total"
+                                        value={draft.total}
+                                        aria-label={t("eq.summaryTotal")}
+                                        onChange={(event) => setBucketDraft(agg, { total: event.target.value })}
+                                        onBlur={(event) => void saveBuckets(agg, { total: event.target.value })}
+                                        onKeyDown={(event) => {
+                                          if (event.key === "Enter") {
+                                            event.preventDefault();
+                                            (event.target as HTMLInputElement).blur();
+                                          }
+                                        }}
+                                      />
+                                    ) : (
+                                      <span className="text-sm tabular-nums">{agg.total}</span>
+                                    )}
+                                  </label>
+                                  <label className="flex flex-col gap-1">
+                                    <span className={mobileQtyLabelClass}>{t("eq.summaryOnHand")}</span>
+                                    {allowed ? (
+                                      <input
+                                        type="number"
+                                        min={0}
+                                        step={1}
+                                        className={`${qtyInputClass} w-full max-w-none`}
+                                        data-sku-id={agg.skuId}
+                                        data-field="onHand"
+                                        value={draft.onHand}
+                                        aria-label={t("eq.summaryOnHand")}
+                                        onChange={(event) => {
+                                          const onHand = event.target.value;
+                                          const inUse = Number(draft.inUse) || 0;
+                                          const inRepair = Number(draft.inRepair) || 0;
+                                          setBucketDraft(agg, {
+                                            onHand,
+                                            total: String((Number(onHand) || 0) + inUse + inRepair),
+                                          });
+                                        }}
+                                        onBlur={(event) => void saveBuckets(agg, { onHand: event.target.value })}
+                                        onKeyDown={(event) => {
+                                          if (event.key === "Enter") {
+                                            event.preventDefault();
+                                            (event.target as HTMLInputElement).blur();
+                                          }
+                                        }}
+                                      />
+                                    ) : (
+                                      <Badge tone="ok">{agg.onHand}</Badge>
+                                    )}
+                                  </label>
+                                  <label className="flex flex-col gap-1">
+                                    <span className={mobileQtyLabelClass}>{t("eq.summaryInUse")}</span>
+                                    {allowed ? (
+                                      <input
+                                        type="number"
+                                        min={0}
+                                        step={1}
+                                        className={`${qtyInputClass} w-full max-w-none`}
+                                        data-sku-id={agg.skuId}
+                                        data-field="inUse"
+                                        value={draft.inUse}
+                                        aria-label={t("eq.summaryInUse")}
+                                        onChange={(event) => {
+                                          const inUse = event.target.value;
+                                          const onHand = Number(draft.onHand) || 0;
+                                          const inRepair = Number(draft.inRepair) || 0;
+                                          setBucketDraft(agg, {
+                                            inUse,
+                                            total: String(onHand + (Number(inUse) || 0) + inRepair),
+                                          });
+                                        }}
+                                        onBlur={(event) => void saveBuckets(agg, { inUse: event.target.value })}
+                                        onKeyDown={(event) => {
+                                          if (event.key === "Enter") {
+                                            event.preventDefault();
+                                            (event.target as HTMLInputElement).blur();
+                                          }
+                                        }}
+                                      />
+                                    ) : (
+                                      <Badge tone={agg.inUse > 0 ? "warn" : "neutral"}>{agg.inUse}</Badge>
+                                    )}
+                                  </label>
+                                  <label className="flex flex-col gap-1">
+                                    <span className={mobileQtyLabelClass}>{t("eq.summaryInRepair")}</span>
+                                    {allowed ? (
+                                      <input
+                                        type="number"
+                                        min={0}
+                                        step={1}
+                                        className={`${qtyInputClass} w-full max-w-none`}
+                                        data-sku-id={agg.skuId}
+                                        data-field="inRepair"
+                                        value={draft.inRepair}
+                                        aria-label={t("eq.summaryInRepair")}
+                                        onChange={(event) => {
+                                          const inRepair = event.target.value;
+                                          const onHand = Number(draft.onHand) || 0;
+                                          const inUse = Number(draft.inUse) || 0;
+                                          setBucketDraft(agg, {
+                                            inRepair,
+                                            total: String(onHand + inUse + (Number(inRepair) || 0)),
+                                          });
+                                        }}
+                                        onBlur={(event) => void saveBuckets(agg, { inRepair: event.target.value })}
+                                        onKeyDown={(event) => {
+                                          if (event.key === "Enter") {
+                                            event.preventDefault();
+                                            (event.target as HTMLInputElement).blur();
+                                          }
+                                        }}
+                                      />
+                                    ) : (
+                                      <Badge tone={agg.inRepair > 0 ? "alert" : "neutral"}>{agg.inRepair}</Badge>
+                                    )}
+                                  </label>
+                                </div>
+
+                                {agg.deployments.length > 0 ? (
+                                  <ul className="space-y-1 text-xs leading-5 text-ink/70">
+                                    {agg.deployments.map((dep) => (
+                                      <li key={dep.itemId} className="break-words">
+                                        {dep.qty} {agg.unit}
+                                        {" · "}
+                                        {t(`eq.status.${dep.status}` as MessageKey)}
+                                        {" · "}
+                                        {dep.orderId ? (
+                                          <Link href={orderHref(dep.orderId)} className="text-copper hover:underline">
+                                            {dep.label || t("eq.openOrder")}
+                                          </Link>
+                                        ) : (
+                                          <span>{dep.label}</span>
+                                        )}
+                                      </li>
+                                    ))}
+                                  </ul>
+                                ) : null}
+
+                                {kitNest ? (
+                                  <div className="-mx-1 overflow-x-auto">
+                                    <table className="w-full min-w-0 text-start text-sm">
+                                      <tbody>
+                                        <KitSummaryNest
+                                          db={db}
+                                          subtype={kitNest}
+                                          allowed={allowed}
+                                          refresh={refresh}
+                                          onFlash={setFlash}
+                                        />
+                                      </tbody>
+                                    </table>
+                                  </div>
+                                ) : null}
+                              </div>
+                            </div>
+                          </li>
+                        );
+                      })}
+                    </ul>
+                  )}
+                </section>
+              );
+            })}
+          </div>
+
+          {/* Desktop: прежняя sticky-таблица */}
+          <div className="hidden rounded-md border border-line bg-paper/60 md:block">
+            <table className="w-full table-fixed text-start text-sm">
               <colgroup>
                 <col className="w-[5.5rem]" />
                 <col className="w-[7rem]" />
@@ -1034,6 +1433,7 @@ export default function StockPage() {
               </tbody>
             </table>
           </div>
+          </>
         )}
       </Panel>
 
