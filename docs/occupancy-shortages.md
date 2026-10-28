@@ -27,3 +27,12 @@
 - Soft allocation: `src/lib/domain/allocation.ts`  
 - Shared DB для команды: [`production-shared-db.md`](./production-shared-db.md)  
 - Оборудование / kits: [`equipment-inventory-workflow.md`](./equipment-inventory-workflow.md)  
+- Check-in + kit в заказе + кейсы: [`checkin-kits-cabinets.md`](./checkin-kits-cabinets.md)  
+
+### Статус M2 / M3 (окт 2026)
+
+| # | Статус |
+|---|--------|
+| **M2** kit auto-add + чеклист/снятие в заказе | ✅ (`order_accessories`) |
+| **M3** явный check-in + повреждение → repair | ✅ на `/stock` |
+| **PDF packing** | ❌ не делаем (список меняется до выезда) |
