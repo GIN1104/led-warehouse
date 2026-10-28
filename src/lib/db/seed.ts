@@ -31,6 +31,7 @@ export function seedIfEmpty(db: Sql): void {
   const catalog: [string, string, string, string][] = [
     ["CAB-P25", "Кабинет LED P2.5 500×500", "Кабинеты", "Арендуемый кабинет, учёт по количеству"],
     ["CAB-P39", "Кабинет LED P3.9 500×500", "Кабинеты", ""],
+    ["CAB-P28-10", "Кабинет LED P2.8 1000×500", "Кабинеты", "Большой кубик: 6 шт в кейсе"],
     ["CTL-NOVA", "Контроллер NovaStar", "Контроллеры", ""],
     ["CBL-PWR", "Кабель питания powerCON", "Кабели", ""],
     ["CBL-SIG", "Кабель сигнальный EtherCON", "Кабели", ""],
@@ -50,6 +51,7 @@ export function seedIfEmpty(db: Sql): void {
   const opening: { skuId: string; locationId: string; qty: number }[] = [
     { skuId: "CAB-P25", locationId: LOC_A, qty: 40 },
     { skuId: "CAB-P39", locationId: LOC_A, qty: 24 },
+    { skuId: "CAB-P28-10", locationId: LOC_A, qty: 18 },
     { skuId: "CTL-NOVA", locationId: LOC_A, qty: 6 },
     { skuId: "CBL-PWR", locationId: LOC_B, qty: 80 },
     { skuId: "CBL-SIG", locationId: LOC_B, qty: 50 },

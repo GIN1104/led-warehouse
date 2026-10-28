@@ -13,6 +13,7 @@ const INSERT_ORDER = [
   "stock_movements",
   "scan_events",
   "rental_lines",
+  "order_accessories",
   "shortage_signals",
   "external_hires",
   "alerts",
