@@ -15,10 +15,10 @@ export default function HomePage() {
   void revision;
 
   const cards = [
-    { label: t("home.sku"), value: data.skuCount, hint: t("home.skuHint") },
-    { label: t("home.orders"), value: data.openOrders, hint: t("home.ordersHint") },
-    { label: t("home.shortage"), value: data.shortageUnits, hint: t("home.shortageHint") },
-    { label: t("home.hires"), value: data.hiresNeeded, hint: t("home.hiresHint") },
+    { label: t("home.sku"), value: data.skuCount, hint: t("home.skuHint"), href: "/stock/" },
+    { label: t("home.orders"), value: data.openOrders, hint: t("home.ordersHint"), href: "/orders/" },
+    { label: t("home.shortage"), value: data.shortageUnits, hint: t("home.shortageHint"), href: "/shortages/" },
+    { label: t("home.hires"), value: data.hiresNeeded, hint: t("home.hiresHint"), href: "/external-hires/" },
   ];
 
   return (
@@ -27,9 +27,11 @@ export default function HomePage() {
       <div className="mb-6 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
         {cards.map((card) => (
           <Panel key={card.label}>
-            <p className="text-xs tracking-wide text-ink/50 uppercase">{card.label}</p>
-            <p className="mt-2 font-mono text-3xl font-medium">{card.value}</p>
-            <p className="mt-1 text-xs text-ink/50">{card.hint}</p>
+            <Link href={card.href} className="block hover:opacity-90">
+              <p className="text-xs tracking-wide text-ink/50 uppercase">{card.label}</p>
+              <p className="mt-2 font-mono text-3xl font-medium">{card.value}</p>
+              <p className="mt-1 text-xs text-ink/50">{card.hint}</p>
+            </Link>
           </Panel>
         ))}
       </div>

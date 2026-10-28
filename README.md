@@ -12,7 +12,7 @@
 
 Интерфейс на русском, английском и иврите (иврит справа налево). **Вход по email** (`/login`): заявка → одобрение на `/access-requests` → постоянный allowlist. Всегда: `starchenkogin@gmail.com` (нельзя отозвать); по умолчанию: `ledvision2026.il@gmail.com` (можно отозвать). Управляют доступом только эти два адреса. После входа — Excel-импорт и Google Calendar как раньше. Подробнее: [`docs/email-auth.md`](docs/email-auth.md).
 
-**Общий учёт** — один файл SQLite на сервере. Его видят все браузеры, которые открыли этот сервер. На GitHub Pages сервера нет, поэтому там у каждого браузера своя копия в IndexedDB. Общий файл живёт в Docker: каталог `data` монтируется в контейнер, и его можно скопировать на другой компьютер вместе с проектом.
+**Общий учёт (production default)** — один файл SQLite на сервере (`docker compose` + каталог `data/`) или Turso. Его видят все браузеры, которые открыли этот сервер. **GitHub Pages = демо**: у каждого браузера своя IndexedDB. Подробный runbook: [`docs/production-shared-db.md`](docs/production-shared-db.md).
 
 Документы:
 
@@ -45,11 +45,13 @@
 
 ## Где общий учёт
 
-В `npm run dev` и в Docker база одна: `data/warehouse.sqlite` (в контейнере путь `/data/warehouse.sqlite`). Браузер держит копию и записывает её обратно; mapper и рамка пишут в тот же файл. Если файл изменился с другого места, экран подхватывает свежую копию.
+**Production:** Docker/`data/warehouse.sqlite` или Turso — см. [`docs/production-shared-db.md`](docs/production-shared-db.md).
 
-GitHub Pages эту базу не хостит. Там остаётся демо «только этот браузер».
+В `npm run dev` и в Docker база одна: `data/warehouse.sqlite` (в контейнере `/data/warehouse.sqlite`). Браузер держит копию и записывает её обратно; mapper и рамка пишут в тот же файл.
 
-Общая база в облаке — [Turso](https://turso.tech/pricing): тот же SQLite. Бесплатно 5 ГБ, 500 млн чтений строк и 10 млн записей в месяц, без карты. Дальше план Developer ($4.99 в месяц при оплате за год, 9 ГБ и доплата $0.75 за лишний ГБ). Токен живёт только на сервере склада (`npm run dev` или Docker), не в сайте Pages.
+GitHub Pages эту базу не хостит — демо «только этот браузер».
+
+Облако: [Turso](https://turso.tech/pricing) (тот же SQLite). Токен только на сервере склада, не в Pages.
 
 ```bash
 # https://docs.turso.tech/quickstart — войти и создать базу

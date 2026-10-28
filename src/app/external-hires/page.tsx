@@ -47,7 +47,16 @@ export default function ExternalHiresPage() {
 
   return (
     <div>
-      <PageHeader eyebrow={t("hires.eyebrow")} title={t("hires.title")} description={t("hires.description")} />
+      <PageHeader
+        eyebrow={t("hires.eyebrow")}
+        title={t("hires.title")}
+        description={t("hires.description")}
+        action={
+          <Link href="/shortages/" className="text-sm text-copper hover:underline">
+            {t("nav.shortages")}
+          </Link>
+        }
+      />
       <Flash error={flash.error} ok={flash.ok} />
       {!allowed ? <p className="mb-4 text-sm text-ink/60">{t("hires.switch", { name: manager })}</p> : null}
       <div className="flex flex-col gap-3">
