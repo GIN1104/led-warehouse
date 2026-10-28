@@ -13,7 +13,7 @@ import {
   type KitSubtype,
 } from "@/lib/services/kits";
 
-const cell = "px-3 py-1.5 align-middle";
+const cell = "px-1.5 py-1.5 align-middle md:px-3";
 
 type Props = {
   db: Sql;
@@ -172,7 +172,7 @@ export function KitSummaryNest({ db, subtype, allowed, refresh, onFlash }: Props
                             <input
                               name="label"
                               required
-                              className={`${controlClass} h-8 min-w-[8rem] flex-1 py-0 text-xs`}
+                              className={`${controlClass} h-8 min-w-0 flex-1 py-0 text-xs sm:min-w-[8rem]`}
                               placeholder={t("kits.itemPlaceholder")}
                               maxLength={80}
                               aria-label={t("kits.itemLabel")}
@@ -183,7 +183,7 @@ export function KitSummaryNest({ db, subtype, allowed, refresh, onFlash }: Props
                               min={1}
                               step={1}
                               defaultValue={1}
-                              className={`${controlClass} h-8 w-16 py-0 text-xs`}
+                              className={`${controlClass} h-8 w-14 py-0 text-xs sm:w-16`}
                               aria-label={t("kits.itemQty")}
                             />
                             <button type="submit" className={buttonClass("ghost", "h-8 px-2 text-xs")}>
@@ -220,7 +220,7 @@ export function KitSummaryNest({ db, subtype, allowed, refresh, onFlash }: Props
               <input
                 name="label"
                 required
-                className={`${controlClass} h-8 min-w-[7rem] py-0 text-xs`}
+                className={`${controlClass} h-8 min-w-0 flex-1 py-0 text-xs sm:min-w-[7rem] sm:flex-none`}
                 placeholder={t("kits.unitPlaceholder")}
                 maxLength={80}
                 aria-label={t("kits.unitLabel")}

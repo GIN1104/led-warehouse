@@ -9,9 +9,11 @@ import { useWarehouse } from "@/components/warehouse";
 import type { Lang, MessageKey } from "@/lib/i18n/messages";
 import { getRoleLabels } from "@/lib/services/people";
 import type { Role } from "@/lib/services/queries";
+import { cn } from "@/lib/utils";
 
 const languages: Lang[] = ["ru", "en", "he"];
 const SIDEBAR_KEY = "led-warehouse:sidebar";
+const DESKTOP_MQ = "(min-width: 768px)";
 
 function LanguageSwitch({ onDark = true }: { onDark?: boolean }) {
   const { lang, setLang, t } = useI18n();
@@ -73,18 +75,22 @@ function RoleSwitch() {
 
 function rememberSidebar(open: boolean) {
   try {
-    if (open) window.localStorage.removeItem(SIDEBAR_KEY);
-    else window.localStorage.setItem(SIDEBAR_KEY, "hidden");
+    window.localStorage.setItem(SIDEBAR_KEY, open ? "open" : "hidden");
   } catch {
     // Приватный режим: выбор живёт только до перезагрузки.
   }
+}
+
+function isDesktop(): boolean {
+  return typeof window !== "undefined" && window.matchMedia(DESKTOP_MQ).matches;
 }
 
 export function Shell({ children }: { children: ReactNode }) {
   const { db, session, shared, notice, revision } = useWarehouse();
   const { session: auth, logout } = useEmailAuth();
   const { t } = useI18n();
-  const [open, setOpen] = useState(true);
+  // На телефоне по умолчанию закрыта — иначе сайдбар съедает ~72vw.
+  const [open, setOpen] = useState(false);
   const labels = getRoleLabels(db);
   void revision;
 
@@ -94,9 +100,12 @@ export function Shell({ children }: { children: ReactNode }) {
       await Promise.resolve();
       if (cancel) return;
       try {
-        if (window.localStorage.getItem(SIDEBAR_KEY) === "hidden") setOpen(false);
+        const stored = window.localStorage.getItem(SIDEBAR_KEY);
+        if (stored === "hidden") setOpen(false);
+        else if (stored === "open") setOpen(true);
+        else setOpen(isDesktop());
       } catch {
-        // Нет доступа к localStorage — панель остаётся открытой.
+        setOpen(isDesktop());
       }
     })();
     return () => {
@@ -112,24 +121,42 @@ export function Shell({ children }: { children: ReactNode }) {
     });
   }
 
+  function closeMobileNav() {
+    if (isDesktop()) return;
+    setOpen(false);
+    rememberSidebar(false);
+  }
+
   return (
     <div className="flex min-h-dvh">
+      {open ? (
+        <button
+          type="button"
+          className="fixed inset-0 z-30 bg-ink/45 md:hidden"
+          aria-label={t("shell.hide")}
+          onClick={closeMobileNav}
+        />
+      ) : null}
       <aside
         id="app-sidebar"
         inert={open ? undefined : true}
         aria-hidden={!open}
-        className={
-          open
-            ? "sticky top-0 flex h-dvh w-[min(16rem,72vw)] shrink-0 flex-col bg-ink text-paper"
-            : "sticky top-0 h-dvh w-0 shrink-0 overflow-hidden"
-        }
+        className={cn(
+          "flex h-dvh flex-col bg-ink text-paper",
+          // Mobile: overlay drawer — не сжимает main.
+          "fixed inset-y-0 start-0 z-40 w-[min(16rem,85vw)] transition-transform duration-200 ease-out",
+          open ? "translate-x-0" : "-translate-x-full rtl:translate-x-full",
+          // Desktop: in-flow sticky column.
+          "md:sticky md:top-0 md:z-auto md:translate-x-0 md:rtl:translate-x-0 md:transition-none",
+          open ? "md:w-64 md:shrink-0" : "md:w-0 md:overflow-hidden",
+        )}
       >
         <div className="shrink-0 px-4 pt-4 pb-2">
           <p className="text-lg font-semibold tracking-tight">LED Warehouse</p>
           <p className="text-xs text-white/55">{t("brand.tagline")}</p>
         </div>
         <div className="min-h-0 flex-1 overflow-y-auto overscroll-y-contain px-3">
-          <Nav />
+          <Nav onNavigate={closeMobileNav} />
         </div>
         <div className="shrink-0 border-t border-white/10 px-4 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
           <LanguageSwitch />
@@ -160,17 +187,23 @@ export function Shell({ children }: { children: ReactNode }) {
             onClick={toggle}
             className="inline-flex size-10 shrink-0 items-center justify-center rounded-md border border-line bg-white text-ink"
           >
-            {open ? <PanelLeftClose size={18} aria-hidden className="rtl:-scale-x-100" /> : <PanelLeft size={18} aria-hidden className="rtl:-scale-x-100" />}
+            {open ? (
+              <PanelLeftClose size={18} aria-hidden className="rtl:-scale-x-100" />
+            ) : (
+              <PanelLeft size={18} aria-hidden className="rtl:-scale-x-100" />
+            )}
             <span className="sr-only">{open ? t("shell.hide") : t("shell.show")}</span>
           </button>
           <p className="truncate font-semibold">LED Warehouse</p>
-          <p className="ms-auto truncate text-xs text-ink/60">
+          <p className="ms-auto max-w-[45%] truncate text-xs text-ink/60 sm:max-w-none">
             {session.name} · {roleCaption(session.role, labels, t)}
             {auth ? ` · ${auth.email}` : ""}
           </p>
         </header>
-        <main className="min-w-0 flex-1 px-4 py-6 md:px-8 md:py-8">
-          {notice === "conflict" ? <p className="mb-4 rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-sm">{t("shell.conflict")}</p> : null}
+        <main className="min-w-0 flex-1 overflow-x-clip px-3 py-5 sm:px-4 md:px-8 md:py-8">
+          {notice === "conflict" ? (
+            <p className="mb-4 rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-sm">{t("shell.conflict")}</p>
+          ) : null}
           {children}
         </main>
       </div>
