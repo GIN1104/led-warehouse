@@ -9,6 +9,7 @@ import { useWarehouse } from "@/components/warehouse";
 import { Badge, Field, Flash, PageHeader, Panel, buttonClass, controlClass } from "@/components/ui";
 import { assertCan, can } from "@/lib/auth";
 import { formatDateTime } from "@/lib/dates";
+import { cabinetPackFromText } from "@/lib/domain/cabinet-pack";
 import { EQUIPMENT_STATUSES, EQUIPMENT_TRANSITIONS, type EquipmentStatus } from "@/lib/domain/equipment-status";
 import { driveManualHint } from "@/lib/google/drive-sync";
 import { translateError, type MessageKey } from "@/lib/i18n/messages";
@@ -104,6 +105,7 @@ export default function StockPage() {
   const [variantFamilyId, setVariantFamilyId] = useState("");
   const [drafts, setDrafts] = useState<Record<string, { qty: string; name: string }>>({});
   const [repairDraft, setRepairDraft] = useState<{ itemId: string; to: EquipmentStatus; qty: string } | null>(null);
+  const [checkInDraft, setCheckInDraft] = useState<{ itemId: string; qty: string; damaged: boolean } | null>(null);
   const [bucketDrafts, setBucketDrafts] = useState<
     Record<string, { total: string; onHand: string; inUse: string; inRepair: string }>
   >({});
@@ -383,15 +385,49 @@ export default function StockPage() {
 
   function onStatus(itemId: string, to: EquipmentStatus) {
     const row = items.find((item) => item.id === itemId);
+    if (row?.status === "checked_out" && (to === "available" || to === "needs_repair")) {
+      setCheckInDraft({ itemId, qty: String(Math.min(row.qty, row.qty)), damaged: to === "needs_repair" });
+      setRepairDraft(null);
+      return;
+    }
     if (REPAIR_STATUSES.includes(to) && row && row.qty > 1) {
       setRepairDraft({ itemId, to, qty: "1" });
+      setCheckInDraft(null);
       return;
     }
     try {
       assertCan(session.role, "stock.write", db);
       setEquipmentStatus(db, itemId, to, session.id);
       setRepairDraft(null);
+      setCheckInDraft(null);
       void refresh().then(() => setFlash({ ok: t("eq.statusChanged") }));
+    } catch (error) {
+      setFlash({ error: translateError(lang, error) });
+    }
+  }
+
+  function onCheckInApply() {
+    if (!checkInDraft) return;
+    const row = items.find((item) => item.id === checkInDraft.itemId);
+    if (!row) {
+      setCheckInDraft(null);
+      return;
+    }
+    try {
+      assertCan(session.role, "stock.write", db);
+      const qty = Number(checkInDraft.qty);
+      const to: EquipmentStatus = checkInDraft.damaged ? "needs_repair" : "available";
+      const result = transitionEquipmentQty(db, checkInDraft.itemId, to, qty, session.id, checkInDraft.damaged ? "check-in damaged" : "check-in");
+      setCheckInDraft(null);
+      void refresh().then(() => {
+        setFlash({
+          ok: checkInDraft.damaged
+            ? t("eq.checkInDamagedOk")
+            : result.split
+              ? t("eq.partialOk", { moved: result.moved.qty, remain: result.source.qty })
+              : t("eq.checkInOk"),
+        });
+      });
     } catch (error) {
       setFlash({ error: translateError(lang, error) });
     }
@@ -835,6 +871,19 @@ export default function StockPage() {
                                 ) : (
                                   <p className="font-medium">{agg.skuName}</p>
                                 )}
+                                {(() => {
+                                  const pack = cabinetPackFromText(agg.total, `${agg.skuCode} ${agg.skuName}`);
+                                  if (!pack) return null;
+                                  return (
+                                    <p className="text-[11px] tabular-nums text-ink/50" title={t("eq.cabinetPackHint")}>
+                                      {t("eq.cabinetPack", {
+                                        m2: pack.squareMeters,
+                                        cubes: pack.cubes,
+                                        cases: pack.cases,
+                                      })}
+                                    </p>
+                                  );
+                                })()}
 
                                 <div className="grid grid-cols-2 gap-2">
                                   <label className="flex flex-col gap-1">
@@ -1257,6 +1306,19 @@ export default function StockPage() {
                               ) : (
                                 <span className="line-clamp-1">{agg.skuName}</span>
                               )}
+                              {(() => {
+                                const pack = cabinetPackFromText(agg.total, `${agg.skuCode} ${agg.skuName}`);
+                                if (!pack) return null;
+                                return (
+                                  <p className="mt-1 text-[11px] tabular-nums text-ink/50" title={t("eq.cabinetPackHint")}>
+                                    {t("eq.cabinetPack", {
+                                      m2: pack.squareMeters,
+                                      cubes: pack.cubes,
+                                      cases: pack.cases,
+                                    })}
+                                  </p>
+                                );
+                              })()}
                             </td>
                             <td className={summaryCellClass}>
                               {allowed ? (
@@ -1807,7 +1869,21 @@ export default function StockPage() {
                                 {t("eq.save")}
                               </button>
                             ) : null}
-                            {next.map((status) => (
+                            {row.status === "checked_out" ? (
+                              <button
+                                type="button"
+                                className={buttonClass("primary", "px-2 py-1 text-xs")}
+                                onClick={() => {
+                                  setRepairDraft(null);
+                                  setCheckInDraft({ itemId: row.id, qty: String(row.qty), damaged: false });
+                                }}
+                              >
+                                {t("eq.checkIn")}
+                              </button>
+                            ) : null}
+                            {next
+                              .filter((status) => !(row.status === "checked_out" && (status === "available" || status === "needs_repair")))
+                              .map((status) => (
                               <button
                                 key={status}
                                 type="button"
@@ -1832,6 +1908,46 @@ export default function StockPage() {
                               {t("eq.delete")}
                             </button>
                           </div>
+                          {checkInDraft?.itemId === row.id ? (
+                            <div className="rounded-md border border-copper/30 bg-paper/80 p-2">
+                              <p className="mb-2 text-xs text-ink/60">{t("eq.checkInHelp")}</p>
+                              <div className="flex flex-wrap items-end gap-2">
+                                <Field label={t("eq.checkInQty")}>
+                                  <input
+                                    type="number"
+                                    min={1}
+                                    max={row.qty}
+                                    step={1}
+                                    className={`${controlClass} w-24`}
+                                    value={checkInDraft.qty}
+                                    onChange={(event) =>
+                                      setCheckInDraft({ ...checkInDraft, qty: event.target.value })
+                                    }
+                                  />
+                                </Field>
+                                <label className="inline-flex items-center gap-2 pb-2 text-xs text-ink/70">
+                                  <input
+                                    type="checkbox"
+                                    checked={checkInDraft.damaged}
+                                    onChange={(event) =>
+                                      setCheckInDraft({ ...checkInDraft, damaged: event.target.checked })
+                                    }
+                                  />
+                                  {t("eq.checkInDamaged")}
+                                </label>
+                                <button type="button" className={buttonClass("primary", "px-2 py-1 text-xs")} onClick={onCheckInApply}>
+                                  {t("eq.checkInApply")}
+                                </button>
+                                <button
+                                  type="button"
+                                  className={buttonClass("ghost", "px-2 py-1 text-xs")}
+                                  onClick={() => setCheckInDraft(null)}
+                                >
+                                  {t("eq.repairCancel")}
+                                </button>
+                              </div>
+                            </div>
+                          ) : null}
                           {repairDraft?.itemId === row.id ? (
                             <div className="rounded-md border border-line bg-paper/80 p-2">
                               <p className="mb-2 text-xs text-ink/60">{t("eq.repairQtyHelp")}</p>

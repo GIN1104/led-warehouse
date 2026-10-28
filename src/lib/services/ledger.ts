@@ -4,6 +4,7 @@ import { DomainError } from "@/lib/domain/errors";
 import { normalizeEquipmentName } from "@/lib/domain/sku-code";
 import { newId, type Sql } from "@/lib/db/sql";
 import { findOrCreateFamily } from "@/lib/services/catalog-hierarchy";
+import { attachKitAccessoriesForOrder } from "@/lib/services/order-accessories";
 
 type SkuRecord = {
   id: string;
@@ -522,6 +523,11 @@ export function createOrder(
     }
     for (const skuId of merged.keys()) recalcSku(tx, skuId);
     const lines = tx.all<LineRecord>(`${LINE_SQL} WHERE order_id = ?`, [orderId]);
+    attachKitAccessoriesForOrder(
+      tx,
+      orderId,
+      lines.map((line) => ({ skuId: line.skuId, qty: line.qtyRequested })),
+    );
     audit(tx, actor, "order.create", "rental_order", orderId, { customerName });
     return {
       orderId,

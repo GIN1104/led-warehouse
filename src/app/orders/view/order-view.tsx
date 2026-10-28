@@ -10,7 +10,13 @@ import { assertCan, can } from "@/lib/auth";
 import { formatDate } from "@/lib/dates";
 import { translateError, type MessageKey } from "@/lib/i18n/messages";
 import { setOrderStatus } from "@/lib/services/ledger";
+import {
+  cancelOrderAccessory,
+  restoreOrderAccessory,
+  setOrderAccessoryAssembled,
+} from "@/lib/services/order-accessories";
 import { getOrderDetail } from "@/lib/services/queries";
+import { cn } from "@/lib/utils";
 
 export function OrderFallback() {
   const { t } = useI18n();
@@ -30,8 +36,10 @@ export function OrderView() {
   if (!detail) {
     return <p className="text-sm">{t("order.missing")}</p>;
   }
-  const { order, lines, hires } = detail;
+  const { order, lines, hires, accessories } = detail;
   const shortage = lines.reduce((sumQty, line) => sumQty + line.qtyShortage, 0);
+  const activeAccessories = accessories.filter((row) => !row.cancelled);
+  const cancelledAccessories = accessories.filter((row) => row.cancelled);
 
   function changeStatus(status: "cancelled" | "closed") {
     try {
@@ -39,6 +47,36 @@ export function OrderView() {
       setOrderStatus(db, order.id, status, session.id);
       refresh();
       setFlash({ ok: t("order.updated") });
+    } catch (error) {
+      setFlash({ error: translateError(lang, error) });
+    }
+  }
+
+  function onToggleAssembled(accessoryId: string, assembled: boolean) {
+    try {
+      assertCan(session.role, "order.write");
+      setOrderAccessoryAssembled(db, accessoryId, assembled);
+      refresh();
+    } catch (error) {
+      setFlash({ error: translateError(lang, error) });
+    }
+  }
+
+  function onCancelAccessory(accessoryId: string) {
+    try {
+      assertCan(session.role, "order.write");
+      cancelOrderAccessory(db, accessoryId);
+      refresh();
+    } catch (error) {
+      setFlash({ error: translateError(lang, error) });
+    }
+  }
+
+  function onRestoreAccessory(accessoryId: string) {
+    try {
+      assertCan(session.role, "order.write");
+      restoreOrderAccessory(db, accessoryId);
+      refresh();
     } catch (error) {
       setFlash({ error: translateError(lang, error) });
     }
@@ -101,6 +139,61 @@ export function OrderView() {
           </tbody>
         </table>
       </Panel>
+
+      <Panel className="mb-4">
+        <h2 className="mb-1 font-medium">{t("order.accessories")}</h2>
+        <p className="mb-3 text-sm text-ink/60">{t("order.accessoriesHelp")}</p>
+        {accessories.length === 0 ? (
+          <p className="text-sm text-ink/50">{t("order.accessoriesEmpty")}</p>
+        ) : (
+          <ul className="flex flex-col gap-2">
+            {activeAccessories.map((row) => (
+              <li
+                key={row.id}
+                className={cn(
+                  "flex flex-wrap items-center gap-2 rounded-md border border-line bg-paper/60 px-3 py-2 text-sm",
+                  row.assembled ? "border-moss/40 bg-lime-50/50" : "",
+                )}
+              >
+                <label className="inline-flex min-w-0 flex-1 items-center gap-2">
+                  <input
+                    type="checkbox"
+                    checked={row.assembled}
+                    disabled={!allowed || order.status !== "confirmed"}
+                    onChange={(event) => onToggleAssembled(row.id, event.target.checked)}
+                    aria-label={t("order.accessoryHave")}
+                  />
+                  <span className={cn(row.assembled ? "text-ink/50 line-through" : "")}>
+                    {row.skuCode ? <span className="font-mono text-xs text-ink/45">{row.skuCode} · </span> : null}
+                    {row.label}
+                    {row.qty > 1 ? ` ×${row.qty}` : ""}
+                  </span>
+                </label>
+                {allowed && order.status === "confirmed" ? (
+                  <button type="button" className={buttonClass("ghost", "h-8 px-2 text-xs")} onClick={() => onCancelAccessory(row.id)}>
+                    {t("order.accessoryCancel")}
+                  </button>
+                ) : null}
+              </li>
+            ))}
+            {cancelledAccessories.map((row) => (
+              <li key={row.id} className="flex flex-wrap items-center gap-2 px-3 py-1 text-sm text-ink/45">
+                <span className="line-through">
+                  {row.label}
+                  {row.qty > 1 ? ` ×${row.qty}` : ""}
+                </span>
+                <Badge tone="neutral">{t("order.accessoryCancelled")}</Badge>
+                {allowed && order.status === "confirmed" ? (
+                  <button type="button" className={buttonClass("ghost", "h-8 px-2 text-xs")} onClick={() => onRestoreAccessory(row.id)}>
+                    {t("order.accessoryRestore")}
+                  </button>
+                ) : null}
+              </li>
+            ))}
+          </ul>
+        )}
+      </Panel>
+
       {hires.length > 0 ? (
         <Panel className="mb-4">
           <h2 className="mb-2 font-medium">{t("order.hireTitle")}</h2>

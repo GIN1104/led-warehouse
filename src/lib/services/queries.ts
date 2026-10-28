@@ -1,5 +1,6 @@
 import { todayIso } from "@/lib/dates";
 import type { Sql } from "@/lib/db/sql";
+import { listOrderAccessories } from "@/lib/services/order-accessories";
 
 export type Role = "warehouse" | "logistics" | "manager" | "admin";
 
@@ -192,7 +193,8 @@ export function getOrderDetail(db: Sql, orderId: string) {
      FROM external_hires h INNER JOIN skus s ON s.id = h.sku_id WHERE h.order_id = ?`,
     [orderId],
   );
-  return { order, lines, hires };
+  const accessories = listOrderAccessories(db, orderId);
+  return { order, lines, hires, accessories };
 }
 
 export function listAlerts(db: Sql, status?: "open" | "ack" | "closed") {

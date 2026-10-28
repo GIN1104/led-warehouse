@@ -259,6 +259,19 @@ CREATE TABLE IF NOT EXISTS kit_checklist_items (
 CREATE INDEX IF NOT EXISTS idx_kit_subtypes_group ON kit_subtypes(group_id);
 CREATE INDEX IF NOT EXISTS idx_kit_units_subtype ON kit_units(subtype_id);
 CREATE INDEX IF NOT EXISTS idx_kit_items_unit ON kit_checklist_items(unit_id);
+
+CREATE TABLE IF NOT EXISTS order_accessories (
+  id TEXT PRIMARY KEY,
+  order_id TEXT NOT NULL REFERENCES rental_orders(id),
+  sku_id TEXT REFERENCES skus(id),
+  label TEXT NOT NULL,
+  qty INTEGER NOT NULL DEFAULT 1 CHECK (qty >= 1),
+  assembled INTEGER NOT NULL DEFAULT 0 CHECK (assembled IN (0, 1)),
+  cancelled INTEGER NOT NULL DEFAULT 0 CHECK (cancelled IN (0, 1)),
+  sort_order INTEGER NOT NULL DEFAULT 0,
+  created_at INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_order_accessories_order ON order_accessories(order_id);
 `
 
 function columnExists(db: Sql, table: string, column: string): boolean {
@@ -401,6 +414,20 @@ CREATE INDEX IF NOT EXISTS idx_kit_items_unit ON kit_checklist_items(unit_id);
   }
   db.exec(`CREATE INDEX IF NOT EXISTS idx_kit_groups_family ON kit_groups(family_id)`);
   db.exec(`CREATE INDEX IF NOT EXISTS idx_kit_subtypes_sku ON kit_subtypes(sku_id)`);
+  db.exec(`
+CREATE TABLE IF NOT EXISTS order_accessories (
+  id TEXT PRIMARY KEY,
+  order_id TEXT NOT NULL REFERENCES rental_orders(id),
+  sku_id TEXT REFERENCES skus(id),
+  label TEXT NOT NULL,
+  qty INTEGER NOT NULL DEFAULT 1 CHECK (qty >= 1),
+  assembled INTEGER NOT NULL DEFAULT 0 CHECK (assembled IN (0, 1)),
+  cancelled INTEGER NOT NULL DEFAULT 0 CHECK (cancelled IN (0, 1)),
+  sort_order INTEGER NOT NULL DEFAULT 0,
+  created_at INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_order_accessories_order ON order_accessories(order_id);
+`);
   backfillSkuHierarchy(db);
   ensureDefaultRoleStockEdit(db);
   fixKitLeptopTypo(db);
