@@ -2,7 +2,22 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Bell, Boxes, CalendarDays, ClipboardList, KeyRound, LayoutDashboard, ListTodo, MapPin, ScanLine, Truck, Users, Warehouse } from "lucide-react";
+import {
+  Bell,
+  Boxes,
+  CalendarDays,
+  ClipboardList,
+  GanttChart,
+  KeyRound,
+  LayoutDashboard,
+  ListTodo,
+  MapPin,
+  ScanLine,
+  TriangleAlert,
+  Truck,
+  Users,
+  Warehouse,
+} from "lucide-react";
 import { useI18n } from "@/components/i18n";
 import type { MessageKey } from "@/lib/i18n/messages";
 import { cn } from "@/lib/utils";
@@ -14,6 +29,8 @@ const links: { href: string; label: MessageKey; icon: typeof LayoutDashboard }[]
   { href: "/stock", label: "nav.stock", icon: Warehouse },
   { href: "/scan", label: "nav.scan", icon: ScanLine },
   { href: "/orders", label: "nav.orders", icon: ClipboardList },
+  { href: "/occupancy", label: "nav.occupancy", icon: GanttChart },
+  { href: "/shortages", label: "nav.shortages", icon: TriangleAlert },
   { href: "/tasks", label: "nav.tasks", icon: ListTodo },
   { href: "/people", label: "nav.people", icon: Users },
   { href: "/access-requests", label: "nav.access", icon: KeyRound },
