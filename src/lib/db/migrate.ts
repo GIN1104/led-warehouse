@@ -8,7 +8,10 @@ CREATE TABLE IF NOT EXISTS users (
   id TEXT PRIMARY KEY,
   name TEXT NOT NULL,
   role TEXT NOT NULL CHECK (role IN ('warehouse', 'logistics', 'manager', 'admin')),
-  email TEXT
+  email TEXT,
+  phone TEXT,
+  telegram_username TEXT,
+  telegram_chat_id TEXT
 );
 
 CREATE TABLE IF NOT EXISTS skus (
@@ -273,6 +276,18 @@ CREATE TABLE IF NOT EXISTS order_accessories (
   created_at INTEGER NOT NULL
 );
 CREATE INDEX IF NOT EXISTS idx_order_accessories_order ON order_accessories(order_id);
+
+CREATE TABLE IF NOT EXISTS telegram_outbox (
+  id TEXT PRIMARY KEY,
+  kind TEXT NOT NULL CHECK (kind IN ('access_request', 'shortage', 'check_in')),
+  chat_id TEXT,
+  username TEXT,
+  payload TEXT NOT NULL,
+  mode TEXT NOT NULL CHECK (mode IN ('sent', 'mock', 'skipped')),
+  created_at INTEGER NOT NULL,
+  error TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_telegram_outbox_created ON telegram_outbox(created_at);
 `
 
 function columnExists(db: Sql, table: string, column: string): boolean {
@@ -347,9 +362,31 @@ export function migrate(db: Sql): void {
   if (!columnExists(db, "users", "email")) {
     db.exec(`ALTER TABLE users ADD COLUMN email TEXT`);
   }
+  if (!columnExists(db, "users", "phone")) {
+    db.exec(`ALTER TABLE users ADD COLUMN phone TEXT`);
+  }
+  if (!columnExists(db, "users", "telegram_username")) {
+    db.exec(`ALTER TABLE users ADD COLUMN telegram_username TEXT`);
+  }
+  if (!columnExists(db, "users", "telegram_chat_id")) {
+    db.exec(`ALTER TABLE users ADD COLUMN telegram_chat_id TEXT`);
+  }
   db.exec(
     `CREATE UNIQUE INDEX IF NOT EXISTS uq_users_email ON users(email) WHERE email IS NOT NULL AND email != ''`,
   );
+  db.exec(`
+CREATE TABLE IF NOT EXISTS telegram_outbox (
+  id TEXT PRIMARY KEY,
+  kind TEXT NOT NULL CHECK (kind IN ('access_request', 'shortage', 'check_in')),
+  chat_id TEXT,
+  username TEXT,
+  payload TEXT NOT NULL,
+  mode TEXT NOT NULL CHECK (mode IN ('sent', 'mock', 'skipped')),
+  created_at INTEGER NOT NULL,
+  error TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_telegram_outbox_created ON telegram_outbox(created_at);
+`);
   db.exec(`
 CREATE TABLE IF NOT EXISTS access_requests (
   id TEXT PRIMARY KEY,

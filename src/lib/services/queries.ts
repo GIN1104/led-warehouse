@@ -4,13 +4,53 @@ import { listOrderAccessories } from "@/lib/services/order-accessories";
 
 export type Role = "warehouse" | "logistics" | "manager" | "admin";
 
-export type UserRow = { id: string; name: string; role: Role; email: string | null };
+export type UserRow = {
+  id: string;
+  name: string;
+  role: Role;
+  email: string | null;
+  phone: string | null;
+  telegramUsername: string | null;
+  telegramChatId: string | null;
+};
+
+function mapUserRow(row: {
+  id: string;
+  name: string;
+  role: Role;
+  email: string | null;
+  phone: string | null;
+  telegramUsername: string | null;
+  telegramChatId: string | null;
+}): UserRow {
+  return {
+    id: row.id,
+    name: row.name,
+    role: row.role,
+    email: row.email?.trim() ? row.email.trim().toLowerCase() : null,
+    phone: row.phone?.trim() ? row.phone.trim() : null,
+    telegramUsername: row.telegramUsername?.trim() ? row.telegramUsername.trim().replace(/^@/, "") : null,
+    telegramChatId: row.telegramChatId?.trim() ? row.telegramChatId.trim() : null,
+  };
+}
 
 export function listUsers(db: Sql): UserRow[] {
-  return db.all<UserRow>(`SELECT id, name, role, email FROM users ORDER BY name`).map((row) => ({
-    ...row,
-    email: row.email?.trim() ? row.email.trim().toLowerCase() : null,
-  }));
+  return db
+    .all<{
+      id: string;
+      name: string;
+      role: Role;
+      email: string | null;
+      phone: string | null;
+      telegramUsername: string | null;
+      telegramChatId: string | null;
+    }>(
+      `SELECT id, name, role, email, phone,
+              telegram_username AS telegramUsername,
+              telegram_chat_id AS telegramChatId
+       FROM users ORDER BY name`,
+    )
+    .map(mapUserRow);
 }
 
 export function findUserByEmail(db: Sql, email: string): UserRow | undefined {

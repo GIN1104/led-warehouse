@@ -8,6 +8,7 @@ import {
   setPersonRole,
   setRoleLabel,
   setRoleLabels,
+  updateOwnCabinet,
   updatePerson,
 } from "@/lib/services/people";
 import { listUsers } from "@/lib/services/queries";
@@ -17,7 +18,15 @@ describe("справочник людей и ярлыки ролей", () => {
     const db = createDb();
     const person = createPerson(db, { name: "Ирина", role: "manager", email: "irina@led.local" });
     expect(listUsers(db)).toEqual([
-      { id: person.id, name: "Ирина", role: "manager", email: "irina@led.local" },
+      {
+        id: person.id,
+        name: "Ирина",
+        role: "manager",
+        email: "irina@led.local",
+        phone: null,
+        telegramUsername: null,
+        telegramChatId: null,
+      },
     ]);
 
     renamePerson(db, person.id, "Ирина К.");
@@ -47,6 +56,25 @@ describe("справочник людей и ярлыки ролей", () => {
     expect(() => removePerson(db, second.id, { currentUserId: second.id })).toThrow(/текущего/);
     removePerson(db, second.id, { currentUserId: alone.id });
     expect(listUsers(db)).toHaveLength(1);
+  });
+
+  it("личный кабинет: телефон и Telegram без смены роли", () => {
+    const db = createDb();
+    const person = createPerson(db, { name: "Ирина", role: "manager", email: "irina@led.local" });
+    const next = updateOwnCabinet(db, person.id, {
+      phone: "+972500000000",
+      telegramUsername: "@LedNika",
+      telegramChatId: "123456789",
+    });
+    expect(next).toMatchObject({
+      phone: "+972500000000",
+      telegramUsername: "LedNika",
+      telegramChatId: "123456789",
+      role: "manager",
+      email: "irina@led.local",
+    });
+    expect(() => updateOwnCabinet(db, person.id, { telegramUsername: "ab" })).toThrow(/Telegram username/);
+    expect(() => updateOwnCabinet(db, person.id, { telegramChatId: "abc" })).toThrow(/chatId/);
   });
 
   it("сохраняет кастомные названия ролей в ledger_meta", () => {

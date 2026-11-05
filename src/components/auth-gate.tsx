@@ -26,6 +26,7 @@ import {
   type AccessLoginOutcome,
 } from "@/lib/services/access-requests";
 import { findUserByEmail } from "@/lib/services/queries";
+import { flushTelegramOutbox } from "@/lib/telegram/notify";
 
 function isLoginPath(pathname: string): boolean {
   const path = pathname.length > 1 && pathname.endsWith("/") ? pathname.slice(0, -1) : pathname;
@@ -105,6 +106,7 @@ export function AuthGate({ children }: { children: ReactNode }) {
         finishLogin(db, switchUser, outcome.email, outcome.userId, setSession);
         await refresh();
       } else if (outcome.kind === "pending") {
+        await flushTelegramOutbox(db);
         await refresh();
       }
       return outcome;
