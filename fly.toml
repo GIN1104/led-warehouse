@@ -1,0 +1,39 @@
+# LED Warehouse API host (shared ledger + Turso). Secrets via `fly secrets set`.
+# App name may get a suffix if taken; check `fly status` after launch.
+
+app = "led-warehouse-api"
+primary_region = "lhr"
+
+[build]
+  dockerfile = "Dockerfile"
+
+[env]
+  NEXT_PUBLIC_SHARED = "1"
+  LEDGER_PATH = "/data/warehouse.sqlite"
+  PORT = "8080"
+  HOSTNAME = "0.0.0.0"
+
+[http_service]
+  internal_port = 8080
+  force_https = true
+  auto_stop_machines = "stop"
+  auto_start_machines = true
+  min_machines_running = 0
+  processes = ["app"]
+
+  [[http_service.checks]]
+    interval = "15s"
+    timeout = "5s"
+    grace_period = "45s"
+    method = "GET"
+    path = "/api/v1/health/"
+
+[[vm]]
+  memory = "512mb"
+  cpu_kind = "shared"
+  cpus = 1
+
+[mounts]
+  source = "led_ledger_data"
+  destination = "/data"
+  initial_size = "1gb"

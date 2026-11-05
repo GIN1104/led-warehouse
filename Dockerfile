@@ -8,11 +8,14 @@ WORKDIR /app
 COPY package.json package-lock.json ./
 RUN npm ci
 COPY . .
+# Bake shared client for Fly API host (Pages stays static with SHARED="").
 ENV NEXT_PUBLIC_SHARED=1
 RUN npm run build
 
 ENV NODE_ENV=production
 ENV LEDGER_PATH=/data/warehouse.sqlite
+ENV PORT=8080
+ENV HOSTNAME=0.0.0.0
 VOLUME /data
-EXPOSE 3000
+EXPOSE 8080
 CMD ["npm", "start"]

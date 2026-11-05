@@ -18,7 +18,14 @@ let status = 1;
 try {
   const result = spawnSync("npx", ["next", "build"], {
     stdio: "inherit",
-    env: { ...process.env, STATIC_EXPORT: "1", NEXT_PUBLIC_SHARED: "" },
+    env: {
+      ...process.env,
+      STATIC_EXPORT: "1",
+      NEXT_PUBLIC_SHARED: "",
+      // Default Fly shared API; override via env/Variable when pages.yml wires it.
+      NEXT_PUBLIC_ACCESS_API_BASE:
+        process.env.NEXT_PUBLIC_ACCESS_API_BASE || "https://led-warehouse-api.fly.dev",
+    },
   });
   status = result.status ?? 1;
 } finally {

@@ -39,27 +39,43 @@ TURSO_AUTH_TOKEN=eyJ…
 Mock: `TURSO_DATABASE_URL=file:./data/turso-mock.db`.  
 Проверка: `curl -s http://localhost:3000/api/v1/health/` → `tursoConfigured: true`.
 
-## 3. Docker API host
+## 3. API host: Fly.io (выбрано командой)
+
+App: `led-warehouse-api`, region `lhr` (рядом с Turso `aws-eu-west-1`). Config: `fly.toml` + `Dockerfile` (`NEXT_PUBLIC_SHARED=1`, port 8080).
+
+```bash
+# secrets — только на Fly, не в git
+fly secrets set \
+  TURSO_DATABASE_URL='libsql://…' \
+  TURSO_AUTH_TOKEN='…'
+
+fly deploy
+# HTTPS: https://led-warehouse-api.fly.dev
+curl -sS https://led-warehouse-api.fly.dev/api/v1/health/
+# → {"ok":true,"shared":true,"tursoConfigured":true,…}
+```
+
+Локальный volume `/data` на Fly = cache; source of truth = Turso `ledvision`.  
+CORS: `https://gin1104.github.io` + localhost; доп. — `ACCESS_CORS_ORIGINS`.
+
+Локальный Docker (dev):
 
 ```bash
 mkdir -p data
-export TURSO_DATABASE_URL='libsql://…'
-export TURSO_AUTH_TOKEN='…'
+export TURSO_DATABASE_URL='…' TURSO_AUTH_TOKEN='…'   # из .env.local
 docker compose up --build -d
 ```
 
-`./data/warehouse.sqlite` = локальный cache; при Turso source of truth = облако.  
-CORS: `https://gin1104.github.io` + localhost; доп. — `ACCESS_CORS_ORIGINS`.
+## 4. Pages → заявки (`NEXT_PUBLIC_ACCESS_API_BASE`)
 
-## 4. Pages → заявки
+1. Fly host жив (шаг 3).  
+2. Repo Variable уже: `NEXT_PUBLIC_ACCESS_API_BASE=https://led-warehouse-api.fly.dev`.  
+3. `scripts/export-build.mjs` по умолчанию печёт этот URL в Pages (если Variable/env не задан).  
+   Опционально позже в `pages.yml`: `NEXT_PUBLIC_ACCESS_API_BASE: ${{ vars.NEXT_PUBLIC_ACCESS_API_BASE }}` (нужен GitHub `workflow` scope).  
+4. Пересобрать Pages (merge в `main` или workflow_dispatch).  
+   Заявки → `{ACCESS_API_BASE}/api/v1/access-requests/`.
 
-1. Задеплоить API host с Turso.  
-2. В `.github/workflows/pages.yml` (build env) добавить:  
-   `NEXT_PUBLIC_ACCESS_API_BASE: ${{ vars.NEXT_PUBLIC_ACCESS_API_BASE }}`  
-3. Repo **Variable** `NEXT_PUBLIC_ACCESS_API_BASE=https://api.example.com`  
-4. Пересобрать Pages. Заявки → `{ACCESS_API_BASE}/api/v1/access-requests/`.
-
-Или вся команда ходит только на API host — тогда `ACCESS_API_BASE` не нужен.
+Или вся команда ходит только на Fly URL — тогда Variable не нужна.
 
 ## Сценарии
 
