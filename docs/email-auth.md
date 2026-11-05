@@ -65,6 +65,21 @@ Seed `alexey@led.local` / `dmitry@led.local` остаются в People для �
 
 ---
 
+## Pages vs shared
+
+| Среда | Заявки |
+|-------|--------|
+| **GitHub Pages** | IndexedDB **этого** браузера — заявка не видна админу на другом устройстве |
+| **`NEXT_PUBLIC_SHARED=1` (Docker/Turso)** | Общий ledger — заявки шарятся |
+| **`NEXT_PUBLIC_ACCESS_API_BASE`** | Клиент (в т.ч. Pages) шлёт заявки на ваш shared host (`/api/v1/access-requests`) |
+
+На `/access-requests` — баннер, если shared/API выключены.  
+Сервер: `TELEGRAM_BOT_TOKEN` + `TELEGRAM_ADMIN_CHAT_IDS` → notify админам при новой заявке.  
+**Ручной add email** закрывает pending того же адреса (`approved`).
+
+API: `GET/POST /api/v1/access-requests`, `POST /api/v1/access-requests/decide` `{ action: approve\|reject\|add }`.
+
 ## Безопасность MVP
 
-На Pages данные в локальной БД браузера — gate для команды. Permanent owner гарантирует вход владельца с любого устройства при свежей БД.
+На Pages данные в локальной БД браузера — gate для демо. Permanent owner гарантирует вход владельца с любого устройства при свежей БД. Для команды нужен shared backend.
+

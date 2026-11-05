@@ -21,6 +21,7 @@ import {
   writeEmailAuthSession,
 } from "@/lib/email-auth/session";
 import type { EmailAuthSession } from "@/lib/email-auth/types";
+import { postSharedAccessRequest } from "@/lib/email-auth/access-api";
 import {
   requestAccessOrLogin,
   type AccessLoginOutcome,
@@ -106,6 +107,8 @@ export function AuthGate({ children }: { children: ReactNode }) {
         finishLogin(db, switchUser, outcome.email, outcome.userId, setSession);
         await refresh();
       } else if (outcome.kind === "pending") {
+        // Shared/Docker/Turso или NEXT_PUBLIC_ACCESS_API_BASE: дублируем заявку на сервер + Telegram админам.
+        await postSharedAccessRequest(outcome.email);
         await flushTelegramOutbox(db);
         await refresh();
       }

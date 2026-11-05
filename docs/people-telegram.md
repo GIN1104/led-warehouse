@@ -28,5 +28,6 @@ NEXT_PUBLIC_SHARED=1
 
 - С токеном: `POST /api/v1/telegram/notify` → Bot API `sendMessage`, outbox mode `sent`.
 - Без токена / на Pages: UI + outbox mode `mock` (демо не ломается).
+- Access request multi-device: `NEXT_PUBLIC_SHARED=1` или `NEXT_PUBLIC_ACCESS_API_BASE` + `TELEGRAM_ADMIN_CHAT_IDS` (см. [email-auth.md](./email-auth.md)).
 
-Токен — от [@BotFather](https://t.me/BotFather). Chat id — после `/start` боту (`getUpdates` или @userinfobot), сохранить на `/me`.
+Токен — от [@BotFather](https://t.me/BotFather). Chat id — после `/start` боту (`getUpdates` или @userinfobot), сохранить на `/me` или в `TELEGRAM_ADMIN_CHAT_IDS`.

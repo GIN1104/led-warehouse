@@ -79,7 +79,6 @@ describe("access requests и allowlist policy", () => {
     const db = createDb();
     expect(requestAccessOrLogin(db, "not-an-email")).toEqual({ kind: "invalid_email" });
   });
-});
 
   it("временный доступ с expires_at: вход до срока, отказ после", () => {
     const db = createDb();
@@ -107,3 +106,17 @@ describe("access requests и allowlist policy", () => {
     expect(row?.expiresAt).toBeTruthy();
     expect(row!.expiresAt! - row!.approvedAt).toBe(30 * 86_400_000);
   });
+
+  it("ручной addAllowedEmail закрывает pending того же email", () => {
+    const db = createDb();
+    seedIfEmpty(db);
+    const pending = requestAccessOrLogin(db, "ghost@company.com");
+    expect(pending.kind).toBe("pending");
+    expect(listAccessRequests(db, { status: "pending" }).some((row) => row.email === "ghost@company.com")).toBe(true);
+
+    addAllowedEmailManual(db, "ghost@company.com", PERMANENT_OWNER_EMAIL, { expiresInDays: 30 });
+    expect(listAccessRequests(db, { status: "pending" }).some((row) => row.email === "ghost@company.com")).toBe(false);
+    expect(listAccessRequests(db, { status: "approved" }).some((row) => row.email === "ghost@company.com")).toBe(true);
+    expect(isEmailActivelyAllowed(db, "ghost@company.com")).toBe(true);
+  });
+});
