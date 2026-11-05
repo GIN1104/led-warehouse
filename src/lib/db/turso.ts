@@ -148,12 +148,82 @@ async function ensureRemoteAlters(target: Client): Promise<void> {
   }
 }
 
+async function rebuildUsersForDriverRole(target: Client): Promise<void> {
+  const flag = await target.execute(`SELECT value FROM ledger_meta WHERE key = 'schema:users_role_driver'`);
+  if (flag.rows[0]?.value) return;
+  try {
+    await target.execute({
+      sql: `INSERT INTO users (id, name, role) VALUES (?, ?, ?)`,
+      args: ["__probe_driver__", "probe", "driver"],
+    });
+    await target.execute({ sql: `DELETE FROM users WHERE id = ?`, args: ["__probe_driver__"] });
+    await target.execute(
+      `INSERT INTO ledger_meta (key, value) VALUES ('schema:users_role_driver', '1') ON CONFLICT(key) DO UPDATE SET value = '1'`,
+    );
+    return;
+  } catch {
+    /* old CHECK without driver */
+  }
+  await target.executeMultiple(`
+CREATE TABLE IF NOT EXISTS users__role_v2 (
+  id TEXT PRIMARY KEY,
+  name TEXT NOT NULL,
+  role TEXT NOT NULL CHECK (role IN ('warehouse', 'logistics', 'manager', 'admin', 'driver')),
+  email TEXT,
+  phone TEXT,
+  telegram_username TEXT,
+  telegram_chat_id TEXT
+);
+DELETE FROM users__role_v2;
+INSERT INTO users__role_v2 (id, name, role, email, phone, telegram_username, telegram_chat_id)
+  SELECT id, name, role, email, phone, telegram_username, telegram_chat_id FROM users;
+DROP TABLE users;
+ALTER TABLE users__role_v2 RENAME TO users;
+CREATE UNIQUE INDEX IF NOT EXISTS uq_users_email ON users(email) WHERE email IS NOT NULL AND email != '';
+INSERT INTO ledger_meta (key, value) VALUES ('schema:users_role_driver', '1') ON CONFLICT(key) DO UPDATE SET value = '1';
+`);
+}
+
+async function rebuildLocationsForSiteKind(target: Client): Promise<void> {
+  const flag = await target.execute(`SELECT value FROM ledger_meta WHERE key = 'schema:locations_kind_site'`);
+  if (flag.rows[0]?.value) return;
+  try {
+    await target.execute({
+      sql: `INSERT INTO locations (id, name, kind, parent_id) VALUES (?, ?, ?, NULL)`,
+      args: ["__probe_site__", "probe", "site"],
+    });
+    await target.execute({ sql: `DELETE FROM locations WHERE id = ?`, args: ["__probe_site__"] });
+    await target.execute(
+      `INSERT INTO ledger_meta (key, value) VALUES ('schema:locations_kind_site', '1') ON CONFLICT(key) DO UPDATE SET value = '1'`,
+    );
+    return;
+  } catch {
+    /* old CHECK */
+  }
+  await target.executeMultiple(`
+CREATE TABLE IF NOT EXISTS locations__kind_v2 (
+  id TEXT PRIMARY KEY,
+  name TEXT NOT NULL,
+  kind TEXT NOT NULL CHECK (kind IN ('warehouse', 'zone', 'bin', 'site')),
+  parent_id TEXT
+);
+DELETE FROM locations__kind_v2;
+INSERT INTO locations__kind_v2 (id, name, kind, parent_id)
+  SELECT id, name, kind, parent_id FROM locations;
+DROP TABLE locations;
+ALTER TABLE locations__kind_v2 RENAME TO locations;
+INSERT INTO ledger_meta (key, value) VALUES ('schema:locations_kind_site', '1') ON CONFLICT(key) DO UPDATE SET value = '1';
+`);
+}
+
 export async function migrateRemote(target: Client = remote()): Promise<void> {
   await target.executeMultiple(MIGRATION_SQL);
   await ensureRemoteAlters(target);
   await target.execute(
     `INSERT INTO ledger_meta (key, value) VALUES ('revision', '0') ON CONFLICT(key) DO NOTHING`,
   );
+  await rebuildUsersForDriverRole(target);
+  await rebuildLocationsForSiteKind(target);
 }
 
 export async function remoteRevision(target: Client = remote()): Promise<number> {
@@ -221,12 +291,20 @@ export async function alignWithRemote(db: Sql, localUsers: number, localRevision
   const users = await remoteUserCount(target);
   const revision = await remoteRevision(target);
   if (users > 0 && (localUsers === 0 || revision > localRevision)) {
-    await pullSnapshot(db, target);
-    return "pull";
+    try {
+      await pullSnapshot(db, target);
+      return "pull";
+    } catch {
+      return "same";
+    }
   }
   if (localUsers > 0 && (users === 0 || localRevision > revision)) {
-    await pushSnapshot(db, target);
-    return "push";
+    try {
+      await pushSnapshot(db, target);
+      return "push";
+    } catch {
+      return "same";
+    }
   }
   return "same";
 }
