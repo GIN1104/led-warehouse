@@ -53,9 +53,10 @@ CORS: `https://gin1104.github.io` + localhost; доп. — `ACCESS_CORS_ORIGINS`
 ## 4. Pages → заявки
 
 1. Задеплоить API host с Turso.  
-2. GitHub Actions variable `NEXT_PUBLIC_ACCESS_API_BASE=https://api.example.com` (подхватывает `pages.yml`).  
-3. Пересобрать Pages.  
-4. Заявки идут на `{ACCESS_API_BASE}/api/v1/access-requests/`.
+2. В `.github/workflows/pages.yml` (build env) добавить:  
+   `NEXT_PUBLIC_ACCESS_API_BASE: ${{ vars.NEXT_PUBLIC_ACCESS_API_BASE }}`  
+3. Repo **Variable** `NEXT_PUBLIC_ACCESS_API_BASE=https://api.example.com`  
+4. Пересобрать Pages. Заявки → `{ACCESS_API_BASE}/api/v1/access-requests/`.
 
 Или вся команда ходит только на API host — тогда `ACCESS_API_BASE` не нужен.
 
