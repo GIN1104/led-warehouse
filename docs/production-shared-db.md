@@ -16,22 +16,23 @@
 | Health | `GET /api/v1/health` → `{ shared, tursoConfigured }` |
 | Pages → API | `NEXT_PUBLIC_ACCESS_API_BASE=https://<api-host>` |
 
-## 1. Создать Turso DB
+## 1. Turso DB `ledvision`
+
+Имя базы у команды: **`ledvision`** (создана Evgeny). URL и token — только в `.env.local` / secrets хоста, **не в git**.
 
 ```bash
 turso auth login
-turso db create led-warehouse
-turso db show led-warehouse --url
-turso db tokens create led-warehouse
+# уже есть: turso db show ledvision --url
+turso db tokens create ledvision
 ```
 
-Нужны два secret (не в git): `TURSO_DATABASE_URL`, `TURSO_AUTH_TOKEN`.
+Secrets (не коммитить): `TURSO_DATABASE_URL`, `TURSO_AUTH_TOKEN`.
 
 ## 2. `.env.local` на API host
 
 ```
 NEXT_PUBLIC_SHARED=1
-TURSO_DATABASE_URL=libsql://led-warehouse-….turso.io
+TURSO_DATABASE_URL=libsql://ledvision-….turso.io
 TURSO_AUTH_TOKEN=eyJ…
 ```
 

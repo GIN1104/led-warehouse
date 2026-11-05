@@ -52,9 +52,9 @@
 В `.env.local` на сервере: `NEXT_PUBLIC_SHARED=1`, `TURSO_DATABASE_URL`, `TURSO_AUTH_TOKEN`. Локальный `data/warehouse.sqlite` — cache; sync с Turso при старте и на каждой записи. Токен **не** класть в Pages.
 
 ```bash
-turso db create led-warehouse
-turso db show led-warehouse --url
-turso db tokens create led-warehouse
+# DB name: ledvision (URL + token только в .env.local / host secrets, не в git)
+turso db show ledvision --url
+turso db tokens create ledvision
 docker compose up --build   # прокидывает TURSO_* из env
 ```
 
