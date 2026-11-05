@@ -5,7 +5,12 @@ services:
       - "3000:3000"
     environment:
       LEDGER_PATH: /data/warehouse.sqlite
+      # Shared SQLite in Turso (set both). file:./data/turso-mock.db = local mock без token.
       TURSO_DATABASE_URL: ${TURSO_DATABASE_URL:-}
       TURSO_AUTH_TOKEN: ${TURSO_AUTH_TOKEN:-}
+      ACCESS_CORS_ORIGINS: ${ACCESS_CORS_ORIGINS:-}
+      TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN:-}
+      TELEGRAM_ADMIN_CHAT_IDS: ${TELEGRAM_ADMIN_CHAT_IDS:-}
     volumes:
       - ./data:/data
+

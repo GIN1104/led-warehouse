@@ -70,14 +70,14 @@ Seed `alexey@led.local` / `dmitry@led.local` остаются в People для �
 | Среда | Заявки |
 |-------|--------|
 | **GitHub Pages** | IndexedDB **этого** браузера — заявка не видна админу на другом устройстве |
-| **`NEXT_PUBLIC_SHARED=1` (Docker/Turso)** | Общий ledger — заявки шарятся |
-| **`NEXT_PUBLIC_ACCESS_API_BASE`** | Клиент (в т.ч. Pages) шлёт заявки на ваш shared host (`/api/v1/access-requests`) |
+| **`NEXT_PUBLIC_SHARED=1` (Docker + Turso)** | Общий ledger — заявки шарятся |
+| **`NEXT_PUBLIC_ACCESS_API_BASE`** | Pages шлёт заявки на API host (`/api/v1/access-requests`); CORS для `gin1104.github.io` |
 
 На `/access-requests` — баннер, если shared/API выключены.  
-Сервер: `TELEGRAM_BOT_TOKEN` + `TELEGRAM_ADMIN_CHAT_IDS` → notify админам при новой заявке.  
+Сервер: `TELEGRAM_BOT_TOKEN` + `TELEGRAM_ADMIN_CHAT_IDS` → notify (опционально).  
 **Ручной add email** закрывает pending того же адреса (`approved`).
 
-API: `GET/POST /api/v1/access-requests`, `POST /api/v1/access-requests/decide` `{ action: approve\|reject\|add }`.
+API: `GET/POST /api/v1/access-requests`, `…/decide`, probe `GET /api/v1/health`. Runbook: [`production-shared-db.md`](./production-shared-db.md).
 
 ## Безопасность MVP
 

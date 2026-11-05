@@ -1,3 +1,4 @@
+import { corsPreflight, withCors } from "@/lib/api/cors";
 import { DomainError } from "@/lib/domain/errors";
 import { enqueueLedger } from "@/lib/db/file-store";
 import { isValidEmailShape, normalizeEmail } from "@/lib/email-auth/normalize";
@@ -13,6 +14,10 @@ import { listTelegramNotifyRecipients, sendTelegramMessage } from "@/lib/telegra
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
+
+export async function OPTIONS(request: Request) {
+  return corsPreflight(request);
+}
 
 async function deliverAccessTelegram(email: string) {
   const { chatIds, text } = await enqueueLedger((db) => {
@@ -46,13 +51,16 @@ export async function GET(request: Request) {
       status === "pending" || status === "approved" || status === "rejected" ? { status } : undefined,
     ),
   );
-  return Response.json({
-    ok: true,
-    shared: true,
-    requests,
-    telegramConfigured: hasTelegramBotToken(),
-    adminChatIds: getTelegramAdminChatIds().length,
-  });
+  return withCors(
+    request,
+    Response.json({
+      ok: true,
+      shared: true,
+      requests,
+      telegramConfigured: hasTelegramBotToken(),
+      adminChatIds: getTelegramAdminChatIds().length,
+    }),
+  );
 }
 
 /** POST { email } — создать pending в shared ledger + Telegram админам. */
@@ -61,11 +69,14 @@ export async function POST(request: Request) {
   try {
     body = (await request.json()) as { email?: string };
   } catch {
-    return Response.json({ error: "Нужен JSON { email }" }, { status: 400 });
+    return withCors(request, Response.json({ error: "Нужен JSON { email }" }, { status: 400 }));
   }
   const email = normalizeEmail(body.email ?? "");
   if (!isValidEmailShape(email)) {
-    return Response.json({ error: "Некорректный email", reason: "invalid_email" }, { status: 400 });
+    return withCors(
+      request,
+      Response.json({ error: "Некорректный email", reason: "invalid_email" }, { status: 400 }),
+    );
   }
 
   try {
@@ -84,9 +95,12 @@ export async function POST(request: Request) {
         ? await deliverAccessTelegram(email)
         : { attempted: 0, sent: 0, mode: "mock" as const };
 
-    return Response.json({ ok: true, mode: result.mode, request: result.request, telegram });
+    return withCors(
+      request,
+      Response.json({ ok: true, mode: result.mode, request: result.request, telegram }),
+    );
   } catch (error) {
     const message = error instanceof DomainError ? error.message : error instanceof Error ? error.message : "error";
-    return Response.json({ ok: false, error: message }, { status: 500 });
+    return withCors(request, Response.json({ ok: false, error: message }, { status: 500 }));
   }
 }

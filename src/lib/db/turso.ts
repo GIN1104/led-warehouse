@@ -8,6 +8,8 @@ const INSERT_ORDER = [
   "locations",
   "product_families",
   "skus",
+  "equipment_items",
+  "equipment_status_history",
   "rental_orders",
   "stock_balances",
   "stock_movements",
@@ -35,10 +37,16 @@ export type SqlStmt = { sql: string; args: unknown[] };
 
 let client: Client | null = null;
 
-export function tursoConfig(): { url: string; authToken: string } | null {
+/**
+ * Turso/libSQL remote. Real cloud needs URL + token.
+ * Local mock without secrets: `TURSO_DATABASE_URL=file:…/mock.db` (token optional).
+ */
+export function tursoConfig(): { url: string; authToken?: string } | null {
   const url = process.env.TURSO_DATABASE_URL?.trim() ?? "";
   const authToken = process.env.TURSO_AUTH_TOKEN?.trim() ?? "";
-  if (!url || !authToken) return null;
+  if (!url) return null;
+  if (url.startsWith("file:")) return authToken ? { url, authToken } : { url };
+  if (!authToken) return null;
   return { url, authToken };
 }
 
