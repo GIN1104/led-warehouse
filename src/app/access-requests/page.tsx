@@ -1,10 +1,15 @@
 "use client";
 
-import { useState, type FormEvent } from "react";
+import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
 import { useEmailAuth } from "@/components/auth-gate";
 import { useI18n } from "@/components/i18n";
 import { useWarehouse } from "@/components/warehouse";
 import { Empty, Field, Flash, PageHeader, Panel, buttonClass, controlClass } from "@/components/ui";
+import {
+  accessApiEnabled,
+  fetchSharedPendingRequests,
+  postSharedAccessDecision,
+} from "@/lib/email-auth/access-api";
 import { DEFAULT_TEMP_ACCESS_DAYS, TEMP_ACCESS_DAY_OPTIONS } from "@/lib/email-auth/temp-access";
 import { translateError } from "@/lib/i18n/messages";
 import {
@@ -15,6 +20,7 @@ import {
   listAllowedEmails,
   rejectAccessRequest,
   revokeAllowedEmail,
+  type AccessRequestRow,
 } from "@/lib/services/access-requests";
 
 function formatWhen(ts: number, lang: string): string {
@@ -33,25 +39,66 @@ function daysFromChoice(choice: DurationChoice): number | null {
   return Number(choice);
 }
 
+function mergePending(local: AccessRequestRow[], remote: AccessRequestRow[] | null): AccessRequestRow[] {
+  const byEmail = new Map<string, AccessRequestRow>();
+  for (const row of [...(remote ?? []), ...local]) {
+    const prev = byEmail.get(row.email);
+    if (!prev || row.createdAt >= prev.createdAt) byEmail.set(row.email, row);
+  }
+  return [...byEmail.values()].sort((a, b) => b.createdAt - a.createdAt);
+}
+
 export default function AccessRequestsPage() {
   const { db, shared, refresh, revision } = useWarehouse();
   const { session: auth } = useEmailAuth();
   const { t, lang } = useI18n();
   const manager = canManageAccess(auth?.email);
+  const apiOn = accessApiEnabled();
   const [flash, setFlash] = useState<{ error?: string; ok?: string }>({});
   const [manualEmail, setManualEmail] = useState("");
   const [manualDuration, setManualDuration] = useState<DurationChoice>(String(DEFAULT_TEMP_ACCESS_DAYS) as DurationChoice);
   const [approveDuration, setApproveDuration] = useState<DurationChoice>(String(DEFAULT_TEMP_ACCESS_DAYS) as DurationChoice);
+  const [remotePending, setRemotePending] = useState<AccessRequestRow[] | null>(null);
   void revision;
 
-  const pending = listAccessRequests(db, { status: "pending" });
+  const localPending = listAccessRequests(db, { status: "pending" });
+  const pending = useMemo(() => mergePending(localPending, remotePending), [localPending, remotePending]);
   const decided = listAccessRequests(db).filter((row) => row.status !== "pending").slice(0, 20);
   const allowlist = listAllowedEmails(db, { includeExpired: true });
 
+  const pullRemote = useCallback(async () => {
+    if (!apiOn) {
+      setRemotePending(null);
+      return;
+    }
+    const rows = await fetchSharedPendingRequests();
+    setRemotePending(rows);
+  }, [apiOn]);
+
+  useEffect(() => {
+    void pullRemote();
+    if (!apiOn) return;
+    const timer = setInterval(() => void pullRemote(), 8000);
+    return () => clearInterval(timer);
+  }, [apiOn, pullRemote, revision]);
+
   async function onApprove(id: string) {
     try {
-      approveAccessRequest(db, id, auth!.email, { expiresInDays: daysFromChoice(approveDuration) });
+      if (apiOn) {
+        await postSharedAccessDecision({
+          requestId: id,
+          action: "approve",
+          actorEmail: auth!.email,
+          expiresInDays: daysFromChoice(approveDuration),
+        });
+      }
+      try {
+        approveAccessRequest(db, id, auth!.email, { expiresInDays: daysFromChoice(approveDuration) });
+      } catch {
+        /* заявка могла быть только на сервере */
+      }
       await refresh();
+      await pullRemote();
       setFlash({ ok: t("access.approved") });
     } catch (error) {
       setFlash({ error: translateError(lang, error) });
@@ -60,8 +107,20 @@ export default function AccessRequestsPage() {
 
   async function onReject(id: string) {
     try {
-      rejectAccessRequest(db, id, auth!.email);
+      if (apiOn) {
+        await postSharedAccessDecision({
+          requestId: id,
+          action: "reject",
+          actorEmail: auth!.email,
+        });
+      }
+      try {
+        rejectAccessRequest(db, id, auth!.email);
+      } catch {
+        /* only on server */
+      }
       await refresh();
+      await pullRemote();
       setFlash({ ok: t("access.rejected") });
     } catch (error) {
       setFlash({ error: translateError(lang, error) });
@@ -81,11 +140,20 @@ export default function AccessRequestsPage() {
   async function onManualAdd(event: FormEvent) {
     event.preventDefault();
     try {
+      if (apiOn) {
+        await postSharedAccessDecision({
+          action: "add",
+          actorEmail: auth!.email,
+          email: manualEmail,
+          expiresInDays: daysFromChoice(manualDuration),
+        });
+      }
       addAllowedEmailManual(db, manualEmail, auth!.email, {
         expiresInDays: daysFromChoice(manualDuration),
       });
       setManualEmail("");
       await refresh();
+      await pullRemote();
       setFlash({ ok: t("access.added") });
     } catch (error) {
       setFlash({ error: translateError(lang, error) });
@@ -99,6 +167,15 @@ export default function AccessRequestsPage() {
         title={t("access.title")}
         description={t("access.description")}
       />
+
+      {!shared && !apiOn ? (
+        <p className="rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-950">
+          {t("access.pagesLocalBanner")}
+        </p>
+      ) : null}
+      {shared || apiOn ? (
+        <p className="rounded-md border border-line bg-white px-3 py-2 text-sm text-ink/70">{t("access.sharedBanner")}</p>
+      ) : null}
       {!shared ? <p className="text-sm text-ink/55">{t("access.browser")}</p> : null}
       <p className="text-sm text-ink/60">{t("access.tempHelp")}</p>
       <Flash error={flash.error} ok={flash.ok} />
@@ -175,21 +252,15 @@ export default function AccessRequestsPage() {
                   </p>
                   <p className="text-xs text-ink/50">
                     {t("access.approvedAt")}: {formatWhen(row.approvedAt, lang)}
-                    {row.expiresAt ? (
-                      <>
-                        {" · "}
-                        {t("access.expiresAt")}: {formatWhen(row.expiresAt, lang)}
-                      </>
-                    ) : null}
+                    {row.expiresAt && !row.expired ? ` · ${t("access.expiresAt")}: ${formatWhen(row.expiresAt, lang)}` : ""}
                   </p>
                 </div>
                 {manager && !row.permanent ? (
-                  <button type="button" className={buttonClass("ghost")} onClick={() => void onRevoke(row.email)}>
+                  <button type="button" className={buttonClass("danger")} onClick={() => void onRevoke(row.email)}>
                     {t("access.revoke")}
                   </button>
-                ) : null}
-                {row.permanent ? (
-                  <p className="text-xs text-ink/45">{t("access.cannotRevoke")}</p>
+                ) : row.permanent ? (
+                  <span className="text-xs text-ink/45">{t("access.cannotRevoke")}</span>
                 ) : null}
               </li>
             ))}
@@ -197,15 +268,14 @@ export default function AccessRequestsPage() {
         )}
 
         {manager ? (
-          <form onSubmit={(event) => void onManualAdd(event)} className="mt-4 flex flex-col gap-2 border-t border-line pt-4 sm:flex-row sm:items-end">
+          <form onSubmit={(event) => void onManualAdd(event)} className="mt-4 grid gap-2 border-t border-line pt-4 sm:grid-cols-[1fr_8rem_auto] sm:items-end">
             <Field label={t("access.addEmail")}>
               <input
                 type="email"
+                required
+                className={controlClass}
                 value={manualEmail}
                 onChange={(event) => setManualEmail(event.target.value)}
-                className={controlClass}
-                required
-                maxLength={120}
                 placeholder="name@company.com"
               />
             </Field>
@@ -233,16 +303,14 @@ export default function AccessRequestsPage() {
       {decided.length > 0 ? (
         <Panel>
           <h2 className="mb-3 text-sm font-semibold tracking-wide text-ink/70 uppercase">{t("access.historyTitle")}</h2>
-          <ul className="divide-y divide-line">
+          <ul className="divide-y divide-line text-sm">
             {decided.map((row) => (
-              <li key={row.id} className="flex flex-col gap-1 py-2 sm:flex-row sm:items-center sm:justify-between">
-                <p className="text-sm text-ink">
-                  {row.email}{" "}
-                  <span className="text-ink/50">
-                    · {row.status === "approved" ? t("access.statusApproved") : t("access.statusRejected")}
-                  </span>
-                </p>
-                <p className="text-xs text-ink/45">{row.decidedAt ? formatWhen(row.decidedAt, lang) : ""}</p>
+              <li key={row.id} className="flex justify-between gap-3 py-2">
+                <span>{row.email}</span>
+                <span className="text-ink/55">
+                  {row.status === "approved" ? t("access.statusApproved") : t("access.statusRejected")} ·{" "}
+                  {formatWhen(row.decidedAt ?? 0, lang)}
+                </span>
               </li>
             ))}
           </ul>

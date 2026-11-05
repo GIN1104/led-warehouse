@@ -273,6 +273,31 @@ export function revokeAllowedEmail(db: Sql, email: string, actorEmail: string, n
   db.run(`UPDATE allowed_emails SET revoked_at = ? WHERE email = ?`, [now, normalized]);
 }
 
+/**
+ * Закрывает pending-заявку того же email как approved (после ручного add / sync).
+ * Не создаёт allowlist — только статус заявки. Permanent owner не трогаем.
+ */
+export function closePendingAccessRequestAsApproved(
+  db: Sql,
+  email: string,
+  actorEmail: string,
+  now = Date.now(),
+): AccessRequestRow | null {
+  const normalized = assertEmail(email);
+  const pending = findPendingRequest(db, normalized);
+  if (!pending) return null;
+  db.run(
+    `UPDATE access_requests SET status = 'approved', decided_by = ?, decided_at = ? WHERE id = ? AND status = 'pending'`,
+    [normalizeEmail(actorEmail), now, pending.id],
+  );
+  return {
+    ...pending,
+    status: "approved",
+    decidedBy: normalizeEmail(actorEmail),
+    decidedAt: now,
+  };
+}
+
 export function addAllowedEmailManual(
   db: Sql,
   email: string,
@@ -290,6 +315,8 @@ export function addAllowedEmailManual(
   if (!isPermanentOwnerEmail(normalized)) {
     ensurePersonForEmail(db, normalized, opts?.role ?? "warehouse");
   }
+  // Ручной add без approve оставлял «невидимую» pending в другом браузере/экране — закрываем.
+  closePendingAccessRequestAsApproved(db, normalized, actorEmail, now);
   return row;
 }
 
