@@ -9,7 +9,7 @@ import { Badge, Field, Flash, PageHeader, Panel, buttonClass, controlClass } fro
 import { assertCan, can } from "@/lib/auth";
 import { formatDate } from "@/lib/dates";
 import { translateError, type MessageKey } from "@/lib/i18n/messages";
-import { setOrderStatus } from "@/lib/services/ledger";
+import { renameOrder, setOrderStatus } from "@/lib/services/ledger";
 import {
   cancelOrderAccessory,
   restoreOrderAccessory,
@@ -102,6 +102,19 @@ export function OrderView() {
     }
   }
 
+  function onRename(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const data = new FormData(event.currentTarget);
+    try {
+      assertCan(session.role, "order.write");
+      renameOrder(db, order.id, String(data.get("customerName") ?? ""), session.id);
+      refresh();
+      setFlash({ ok: t("order.renamed") });
+    } catch (error) {
+      setFlash({ error: translateError(lang, error) });
+    }
+  }
+
   const note = [order.notes || t("order.noNote"), order.source === "mapper" ? t("order.fromMapper") : ""].filter(Boolean).join(" ");
 
   return (
@@ -120,6 +133,27 @@ export function OrderView() {
         action={<Badge tone={order.status === "confirmed" ? "ok" : "neutral"}>{t(`orderStatus.${order.status}` as MessageKey)}</Badge>}
       />
       <Flash error={flash.error} ok={flash.ok} />
+      {allowed ? (
+        <Panel className="mb-4">
+          <form onSubmit={onRename} className="flex flex-col gap-3 sm:flex-row sm:items-end">
+            <div className="min-w-0 flex-1">
+              <Field label={t("order.rename")}>
+                <input
+                  key={order.customerName}
+                  name="customerName"
+                  required
+                  minLength={2}
+                  defaultValue={order.customerName}
+                  className={controlClass}
+                />
+              </Field>
+            </div>
+            <button type="submit" className={buttonClass("primary")}>
+              {t("order.renameSave")}
+            </button>
+          </form>
+        </Panel>
+      ) : null}
       {shortage > 0 ? (
         <p className="mb-4 rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-950">
           {t("order.savedShortage", { qty: shortage })}{" "}

@@ -26,21 +26,21 @@ import { cn } from "@/lib/utils";
 
 const links: { href: string; label: MessageKey; icon: typeof LayoutDashboard }[] = [
   { href: "/", label: "nav.overview", icon: LayoutDashboard },
-  { href: "/catalog", label: "nav.catalog", icon: Boxes },
-  { href: "/locations", label: "nav.locations", icon: MapPin },
+  { href: "/calendar", label: "nav.calendar", icon: CalendarDays },
+  { href: "/orders", label: "nav.orders", icon: ClipboardList },
   { href: "/stock", label: "nav.stock", icon: Warehouse },
   { href: "/transfers", label: "nav.transfers", icon: ArrowLeftRight },
-  { href: "/scan", label: "nav.scan", icon: ScanLine },
-  { href: "/orders", label: "nav.orders", icon: ClipboardList },
   { href: "/occupancy", label: "nav.occupancy", icon: GanttChart },
   { href: "/shortages", label: "nav.shortages", icon: TriangleAlert },
+  { href: "/catalog", label: "nav.catalog", icon: Boxes },
+  { href: "/locations", label: "nav.locations", icon: MapPin },
+  { href: "/scan", label: "nav.scan", icon: ScanLine },
   { href: "/tasks", label: "nav.tasks", icon: ListTodo },
+  { href: "/external-hires", label: "nav.hires", icon: Truck },
+  { href: "/alerts", label: "nav.alerts", icon: Bell },
   { href: "/me", label: "nav.me", icon: UserRound },
   { href: "/people", label: "nav.people", icon: Users },
   { href: "/access-requests", label: "nav.access", icon: KeyRound },
-  { href: "/calendar", label: "nav.calendar", icon: CalendarDays },
-  { href: "/alerts", label: "nav.alerts", icon: Bell },
-  { href: "/external-hires", label: "nav.hires", icon: Truck },
 ];
 
 export function Nav({ compact = false, onNavigate }: { compact?: boolean; onNavigate?: () => void }) {

@@ -2,7 +2,7 @@ import { mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { createClient } from "@libsql/client";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { openBetterSqlite } from "@/lib/db/better";
 import { migrate } from "@/lib/db/migrate";
 import {
@@ -15,9 +15,19 @@ import {
 } from "@/lib/db/turso";
 
 describe("tursoConfig", () => {
-  afterEach(() => {
+  const prevUrl = process.env.TURSO_DATABASE_URL;
+  const prevToken = process.env.TURSO_AUTH_TOKEN;
+
+  beforeEach(() => {
     delete process.env.TURSO_DATABASE_URL;
     delete process.env.TURSO_AUTH_TOKEN;
+  });
+
+  afterEach(() => {
+    if (prevUrl === undefined) delete process.env.TURSO_DATABASE_URL;
+    else process.env.TURSO_DATABASE_URL = prevUrl;
+    if (prevToken === undefined) delete process.env.TURSO_AUTH_TOKEN;
+    else process.env.TURSO_AUTH_TOKEN = prevToken;
   });
 
   it("выключен без URL", () => {

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { createDb } from "@/lib/db/memory";
-import { applyMovement, createOrder, ingestScan, setOrderStatus } from "@/lib/services/ledger";
+import { applyMovement, createOrder, ingestScan, renameOrder, setOrderStatus } from "@/lib/services/ledger";
 import { getOrderDetail, listAlerts, listExternalHires } from "@/lib/services/queries";
 
 function setup() {
@@ -126,6 +126,32 @@ describe("склад и заказы", () => {
     expect(detail?.lines[0]?.qtyShortage).toBe(0);
     expect(detail?.lines[0]?.qtySoftReserved).toBe(6);
     expect(listExternalHires(db).every((hire) => hire.status === "closed" || hire.orderId !== second.orderId)).toBe(true);
+  });
+
+  it("переименовывает заказ и пишет audit", () => {
+    const db = setup();
+    applyMovement(db, { skuId: "CAB-P25", locationId: "loc", type: "in", qty: 2, reason: "тест" }, "manager");
+    const created = createOrder(
+      db,
+      {
+        customerName: "Старое имя",
+        startDate: "2026-11-01",
+        endDate: "2026-11-02",
+        lines: [{ skuId: "CAB-P25", qty: 1 }],
+        createdAt: 1,
+      },
+      "manager",
+    );
+    renameOrder(db, created.orderId, "  Новое имя  ", "manager");
+    const detail = getOrderDetail(db, created.orderId);
+    expect(detail?.order.customerName).toBe("Новое имя");
+    const audit = db.get<{ action: string; payload: string }>(
+      `SELECT action, payload FROM audit_log WHERE entity_id = ? AND action = 'order.rename'`,
+      [created.orderId],
+    );
+    expect(audit?.action).toBe("order.rename");
+    expect(JSON.parse(audit?.payload ?? "{}")).toMatchObject({ from: "Старое имя", to: "Новое имя" });
+    expect(() => renameOrder(db, created.orderId, "x", "manager")).toThrow(/Укажите заказчика/);
   });
 
   it("повтор скана с тем же event_id не двигает остаток", () => {

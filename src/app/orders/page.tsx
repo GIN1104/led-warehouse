@@ -5,11 +5,12 @@ import { useState, type FormEvent } from "react";
 import { useI18n } from "@/components/i18n";
 import { useWarehouse } from "@/components/warehouse";
 import { Badge, Field, Flash, PageHeader, Panel, buttonClass, controlClass } from "@/components/ui";
-import { can } from "@/lib/auth";
+import { assertCan, can } from "@/lib/auth";
 import { sharedLedger, apiUrl } from "@/lib/api";
 import { formatDate } from "@/lib/dates";
 import { translateError } from "@/lib/i18n/messages";
 import { orderHref } from "@/lib/paths";
+import { renameOrder } from "@/lib/services/ledger";
 import { importMapperOrder } from "@/lib/services/mapper";
 import { parseMapperCsv } from "@/lib/services/mapper-sheet";
 import { listOrders } from "@/lib/services/queries";
@@ -21,7 +22,22 @@ export default function OrdersPage() {
   const orders = listOrders(db);
   const manager = users.find((user) => user.role === "manager")?.name ?? "";
   const [flash, setFlash] = useState<{ error?: string; ok?: string }>({});
+  const [renamingId, setRenamingId] = useState<string | null>(null);
   void revision;
+
+  function onRename(event: FormEvent<HTMLFormElement>, orderId: string) {
+    event.preventDefault();
+    const data = new FormData(event.currentTarget);
+    try {
+      assertCan(session.role, "order.write");
+      renameOrder(db, orderId, String(data.get("customerName") ?? ""), session.id);
+      setRenamingId(null);
+      refresh();
+      setFlash({ ok: t("order.renamed") });
+    } catch (error) {
+      setFlash({ error: translateError(lang, error) });
+    }
+  }
 
   async function onMapper(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -75,21 +91,46 @@ export default function OrdersPage() {
               <th className="px-3 py-2 font-medium">{t("orders.status")}</th>
               <th className="px-3 py-2 font-medium">{t("orders.shortage")}</th>
               <th className="px-3 py-2 font-medium">{t("orders.issued")}</th>
+              {allowed ? <th className="px-3 py-2 font-medium">{t("orders.rename")}</th> : null}
             </tr>
           </thead>
           <tbody>
             {orders.map((order) => (
               <tr key={order.id} className="border-t border-line">
                 <td className="px-3 py-2">
-                  <Link href={orderHref(order.id)} className="font-medium hover:text-copper">
-                    {order.customerName}
-                  </Link>
-                  {order.source === "mapper" ? (
-                    <span className="ms-2">
-                      <Badge tone="neutral">{t("orders.mapperBadge")}</Badge>
-                    </span>
-                  ) : null}
-                  {order.notes ? <p className="text-ink/50">{order.notes}</p> : null}
+                  {renamingId === order.id ? (
+                    <form
+                      onSubmit={(event) => onRename(event, order.id)}
+                      className="flex flex-col gap-2 sm:flex-row sm:items-center"
+                    >
+                      <input
+                        name="customerName"
+                        required
+                        minLength={2}
+                        defaultValue={order.customerName}
+                        aria-label={t("orders.renameHint")}
+                        className={controlClass}
+                      />
+                      <button type="submit" className={buttonClass("primary")}>
+                        {t("order.renameSave")}
+                      </button>
+                      <button type="button" className={buttonClass("ghost")} onClick={() => setRenamingId(null)}>
+                        {t("common.cancel")}
+                      </button>
+                    </form>
+                  ) : (
+                    <>
+                      <Link href={orderHref(order.id)} className="font-medium hover:text-copper">
+                        {order.customerName}
+                      </Link>
+                      {order.source === "mapper" ? (
+                        <span className="ms-2">
+                          <Badge tone="neutral">{t("orders.mapperBadge")}</Badge>
+                        </span>
+                      ) : null}
+                      {order.notes ? <p className="text-ink/50">{order.notes}</p> : null}
+                    </>
+                  )}
                 </td>
                 <td className="px-3 py-2" dir="ltr">
                   {formatDate(order.startDate)} — {formatDate(order.endDate)}
@@ -99,6 +140,15 @@ export default function OrdersPage() {
                   {order.shortage > 0 ? <Badge tone="warn">{order.shortage}</Badge> : <Badge tone="ok">{t("common.no")}</Badge>}
                 </td>
                 <td className="px-3 py-2">{order.issued > 0 ? <Badge tone="neutral">{order.issued}</Badge> : "0"}</td>
+                {allowed ? (
+                  <td className="px-3 py-2">
+                    {renamingId === order.id ? null : (
+                      <button type="button" className={buttonClass("ghost")} onClick={() => setRenamingId(order.id)}>
+                        {t("orders.rename")}
+                      </button>
+                    )}
+                  </td>
+                ) : null}
               </tr>
             ))}
           </tbody>
