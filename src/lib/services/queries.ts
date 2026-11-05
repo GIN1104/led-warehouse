@@ -2,7 +2,7 @@ import { todayIso } from "@/lib/dates";
 import type { Sql } from "@/lib/db/sql";
 import { listOrderAccessories } from "@/lib/services/order-accessories";
 
-export type Role = "warehouse" | "logistics" | "manager" | "admin";
+export type Role = "warehouse" | "logistics" | "manager" | "admin" | "driver";
 
 export type UserRow = {
   id: string;
@@ -66,9 +66,12 @@ export function listDirectoryEmails(db: Sql): string[] {
 }
 
 export function listLocations(db: Sql) {
-  const rows = db.all<{ id: string; name: string; kind: "warehouse" | "zone" | "bin"; parentId: string | null }>(
-    `SELECT id, name, kind, parent_id AS parentId FROM locations`,
-  );
+  const rows = db.all<{
+    id: string;
+    name: string;
+    kind: "warehouse" | "zone" | "bin" | "site";
+    parentId: string | null;
+  }>(`SELECT id, name, kind, parent_id AS parentId FROM locations`);
   const byId = new Map(rows.map((row) => [row.id, row]));
   return rows
     .map((row) => ({
@@ -168,8 +171,15 @@ export function listOrders(db: Sql) {
     createdAt: number;
     createdBy: string;
     source: string;
+    phase: string;
+    mountDate: string | null;
+    showStart: string | null;
+    showEnd: string | null;
+    demountDate: string | null;
   }>(
-    `SELECT id, customer_name AS customerName, start_date AS startDate, end_date AS endDate, status, notes, created_at AS createdAt, created_by AS createdBy, source
+    `SELECT id, customer_name AS customerName, start_date AS startDate, end_date AS endDate, status, notes,
+            created_at AS createdAt, created_by AS createdBy, source, phase,
+            mount_date AS mountDate, show_start AS showStart, show_end AS showEnd, demount_date AS demountDate
      FROM rental_orders ORDER BY created_at DESC`,
   );
   const lines = db.all<{ orderId: string; qtyShortage: number; qtyIssued: number }>(
@@ -198,8 +208,15 @@ export function getOrderDetail(db: Sql, orderId: string) {
     createdBy: string;
     source: string;
     externalId: string | null;
+    phase: string;
+    mountDate: string | null;
+    showStart: string | null;
+    showEnd: string | null;
+    demountDate: string | null;
   }>(
-    `SELECT id, customer_name AS customerName, start_date AS startDate, end_date AS endDate, status, notes, created_at AS createdAt, created_by AS createdBy, source, external_id AS externalId
+    `SELECT id, customer_name AS customerName, start_date AS startDate, end_date AS endDate, status, notes,
+            created_at AS createdAt, created_by AS createdBy, source, external_id AS externalId, phase,
+            mount_date AS mountDate, show_start AS showStart, show_end AS showEnd, demount_date AS demountDate
      FROM rental_orders WHERE id = ?`,
     [orderId],
   );

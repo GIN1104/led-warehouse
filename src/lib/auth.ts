@@ -4,9 +4,18 @@ import { getRoleStockEdit } from "@/lib/services/people";
 import type { Role } from "@/lib/services/queries";
 
 const grants: Record<Role, readonly string[]> = {
-  warehouse: ["catalog.write", "location.write", "scan.write", "task.write", "people.write"],
-  manager: ["catalog.write", "order.write", "hire.write", "alert.write", "task.write", "people.write"],
-  logistics: [],
+  warehouse: ["catalog.write", "location.write", "scan.write", "task.write", "people.write", "transfer.write"],
+  manager: [
+    "catalog.write",
+    "order.write",
+    "hire.write",
+    "alert.write",
+    "task.write",
+    "people.write",
+    "transfer.write",
+  ],
+  logistics: ["transfer.write"],
+  driver: ["transfer.write", "task.write"],
   admin: ["*"],
 };
 

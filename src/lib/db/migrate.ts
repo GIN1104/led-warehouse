@@ -7,7 +7,7 @@ export const MIGRATION_SQL = `
 CREATE TABLE IF NOT EXISTS users (
   id TEXT PRIMARY KEY,
   name TEXT NOT NULL,
-  role TEXT NOT NULL CHECK (role IN ('warehouse', 'logistics', 'manager', 'admin')),
+  role TEXT NOT NULL CHECK (role IN ('warehouse', 'logistics', 'manager', 'admin', 'driver')),
   email TEXT,
   phone TEXT,
   telegram_username TEXT,
@@ -30,7 +30,7 @@ CREATE TABLE IF NOT EXISTS skus (
 CREATE TABLE IF NOT EXISTS locations (
   id TEXT PRIMARY KEY,
   name TEXT NOT NULL,
-  kind TEXT NOT NULL CHECK (kind IN ('warehouse', 'zone', 'bin')),
+  kind TEXT NOT NULL CHECK (kind IN ('warehouse', 'zone', 'bin', 'site')),
   parent_id TEXT REFERENCES locations(id)
 );
 
@@ -66,7 +66,12 @@ CREATE TABLE IF NOT EXISTS rental_orders (
   created_at INTEGER NOT NULL,
   created_by TEXT NOT NULL,
   source TEXT NOT NULL DEFAULT 'ui',
-  external_id TEXT
+  external_id TEXT,
+  mount_date TEXT,
+  show_start TEXT,
+  show_end TEXT,
+  demount_date TEXT,
+  phase TEXT NOT NULL DEFAULT 'planning'
 );
 
 CREATE TABLE IF NOT EXISTS rental_lines (
@@ -288,11 +293,96 @@ CREATE TABLE IF NOT EXISTS telegram_outbox (
   error TEXT
 );
 CREATE INDEX IF NOT EXISTS idx_telegram_outbox_created ON telegram_outbox(created_at);
+
+CREATE TABLE IF NOT EXISTS stock_transfers (
+  id TEXT PRIMARY KEY,
+  sku_id TEXT NOT NULL REFERENCES skus(id),
+  qty INTEGER NOT NULL CHECK (qty >= 1),
+  from_location_id TEXT NOT NULL REFERENCES locations(id),
+  to_location_id TEXT NOT NULL REFERENCES locations(id),
+  status TEXT NOT NULL CHECK (status IN ('planned', 'in_transit', 'received', 'cancelled')),
+  order_id TEXT REFERENCES rental_orders(id),
+  driver_user_id TEXT REFERENCES users(id),
+  note TEXT NOT NULL DEFAULT '',
+  created_at INTEGER NOT NULL,
+  created_by TEXT NOT NULL,
+  shipped_at INTEGER,
+  received_at INTEGER
+);
+CREATE INDEX IF NOT EXISTS idx_stock_transfers_status ON stock_transfers(status);
 `
 
 function columnExists(db: Sql, table: string, column: string): boolean {
   const rows = db.all<{ name: string }>(`PRAGMA table_info(${table})`);
   return rows.some((row) => row.name === column);
+}
+
+function metaFlag(db: Sql, key: string): boolean {
+  return Boolean(db.get<{ value: string }>(`SELECT value FROM ledger_meta WHERE key = ?`, [key]));
+}
+
+function setMetaFlag(db: Sql, key: string): void {
+  db.run(`INSERT INTO ledger_meta (key, value) VALUES (?, '1') ON CONFLICT(key) DO UPDATE SET value = '1'`, [key]);
+}
+
+/** Расширяет CHECK ролей (driver) без потери строк. */
+function ensureUsersRoleDriver(db: Sql): void {
+  if (metaFlag(db, "schema:users_role_driver")) return;
+  try {
+    db.run(`INSERT INTO users (id, name, role) VALUES ('__probe_driver__', 'probe', 'driver')`);
+    db.run(`DELETE FROM users WHERE id = '__probe_driver__'`);
+    setMetaFlag(db, "schema:users_role_driver");
+    return;
+  } catch {
+    /* старый CHECK — пересоздаём таблицу */
+  }
+  db.exec(`PRAGMA foreign_keys=OFF`);
+  db.exec(`
+CREATE TABLE users__role_v2 (
+  id TEXT PRIMARY KEY,
+  name TEXT NOT NULL,
+  role TEXT NOT NULL CHECK (role IN ('warehouse', 'logistics', 'manager', 'admin', 'driver')),
+  email TEXT,
+  phone TEXT,
+  telegram_username TEXT,
+  telegram_chat_id TEXT
+);
+INSERT INTO users__role_v2 (id, name, role, email, phone, telegram_username, telegram_chat_id)
+  SELECT id, name, role, email, phone, telegram_username, telegram_chat_id FROM users;
+DROP TABLE users;
+ALTER TABLE users__role_v2 RENAME TO users;
+CREATE UNIQUE INDEX IF NOT EXISTS uq_users_email ON users(email) WHERE email IS NOT NULL AND email != '';
+`);
+  db.exec(`PRAGMA foreign_keys=ON`);
+  setMetaFlag(db, "schema:users_role_driver");
+}
+
+/** Расширяет CHECK локаций (site = объект/площадка). */
+function ensureLocationsSiteKind(db: Sql): void {
+  if (metaFlag(db, "schema:locations_kind_site")) return;
+  try {
+    db.run(`INSERT INTO locations (id, name, kind, parent_id) VALUES ('__probe_site__', 'probe', 'site', NULL)`);
+    db.run(`DELETE FROM locations WHERE id = '__probe_site__'`);
+    setMetaFlag(db, "schema:locations_kind_site");
+    return;
+  } catch {
+    /* старый CHECK */
+  }
+  db.exec(`PRAGMA foreign_keys=OFF`);
+  db.exec(`
+CREATE TABLE locations__kind_v2 (
+  id TEXT PRIMARY KEY,
+  name TEXT NOT NULL,
+  kind TEXT NOT NULL CHECK (kind IN ('warehouse', 'zone', 'bin', 'site')),
+  parent_id TEXT
+);
+INSERT INTO locations__kind_v2 (id, name, kind, parent_id)
+  SELECT id, name, kind, parent_id FROM locations;
+DROP TABLE locations;
+ALTER TABLE locations__kind_v2 RENAME TO locations;
+`);
+  db.exec(`PRAGMA foreign_keys=ON`);
+  setMetaFlag(db, "schema:locations_kind_site");
 }
 
 function backfillSkuHierarchy(db: Sql): void {
@@ -374,6 +464,43 @@ export function migrate(db: Sql): void {
   db.exec(
     `CREATE UNIQUE INDEX IF NOT EXISTS uq_users_email ON users(email) WHERE email IS NOT NULL AND email != ''`,
   );
+  // ledger_meta нужен для флагов схемы
+  db.run(`INSERT INTO ledger_meta (key, value) VALUES ('revision', '0') ON CONFLICT(key) DO NOTHING`);
+  ensureUsersRoleDriver(db);
+  ensureLocationsSiteKind(db);
+  if (!columnExists(db, "rental_orders", "mount_date")) {
+    db.exec(`ALTER TABLE rental_orders ADD COLUMN mount_date TEXT`);
+  }
+  if (!columnExists(db, "rental_orders", "show_start")) {
+    db.exec(`ALTER TABLE rental_orders ADD COLUMN show_start TEXT`);
+  }
+  if (!columnExists(db, "rental_orders", "show_end")) {
+    db.exec(`ALTER TABLE rental_orders ADD COLUMN show_end TEXT`);
+  }
+  if (!columnExists(db, "rental_orders", "demount_date")) {
+    db.exec(`ALTER TABLE rental_orders ADD COLUMN demount_date TEXT`);
+  }
+  if (!columnExists(db, "rental_orders", "phase")) {
+    db.exec(`ALTER TABLE rental_orders ADD COLUMN phase TEXT NOT NULL DEFAULT 'planning'`);
+  }
+  db.exec(`
+CREATE TABLE IF NOT EXISTS stock_transfers (
+  id TEXT PRIMARY KEY,
+  sku_id TEXT NOT NULL REFERENCES skus(id),
+  qty INTEGER NOT NULL CHECK (qty >= 1),
+  from_location_id TEXT NOT NULL REFERENCES locations(id),
+  to_location_id TEXT NOT NULL REFERENCES locations(id),
+  status TEXT NOT NULL CHECK (status IN ('planned', 'in_transit', 'received', 'cancelled')),
+  order_id TEXT REFERENCES rental_orders(id),
+  driver_user_id TEXT REFERENCES users(id),
+  note TEXT NOT NULL DEFAULT '',
+  created_at INTEGER NOT NULL,
+  created_by TEXT NOT NULL,
+  shipped_at INTEGER,
+  received_at INTEGER
+);
+CREATE INDEX IF NOT EXISTS idx_stock_transfers_status ON stock_transfers(status);
+`);
   db.exec(`
 CREATE TABLE IF NOT EXISTS telegram_outbox (
   id TEXT PRIMARY KEY,
@@ -508,5 +635,23 @@ CREATE INDEX IF NOT EXISTS idx_order_accessories_order ON order_accessories(orde
        VALUES (?, ?, 'seed:temp-30d', NULL, ?)`,
       [tempEmail, now, now + 30 * dayMs],
     );
+  }
+  // Peer slice: водитель + площадки на уже существующих демо-БД (когда seed уже был).
+  // Не вставлять до seedIfEmpty — иначе COUNT(users)>0 и каталог не засеется.
+  const hasDemoSeed = db.get<{ id: string }>(`SELECT id FROM users WHERE id = 'user_warehouse'`);
+  if (hasDemoSeed) {
+    if (!db.get<{ id: string }>(`SELECT id FROM users WHERE id = 'user_driver'`)) {
+      db.run(`INSERT INTO users (id, name, role, email) VALUES ('user_driver', 'Игорь', 'driver', 'igor@led.local')`);
+    }
+    if (!db.get<{ id: string }>(`SELECT id FROM locations WHERE id = 'loc_site_embankment'`)) {
+      db.run(
+        `INSERT INTO locations (id, name, kind, parent_id) VALUES ('loc_site_embankment', 'Площадка «Набережная»', 'site', NULL)`,
+      );
+    }
+    if (!db.get<{ id: string }>(`SELECT id FROM locations WHERE id = 'loc_site_field'`)) {
+      db.run(
+        `INSERT INTO locations (id, name, kind, parent_id) VALUES ('loc_site_field', 'Площадка «Поле»', 'site', NULL)`,
+      );
+    }
   }
 }
