@@ -10,6 +10,7 @@ import { expiresAtFromDays, isAccessExpired } from "@/lib/email-auth/temp-access
 import { newId, type Sql } from "@/lib/db/sql";
 import { createPerson } from "@/lib/services/people";
 import { findUserByEmail, type Role, type UserRow } from "@/lib/services/queries";
+import { notifyAccessRequestTelegram } from "@/lib/telegram/notify";
 
 export type AccessRequestStatus = "pending" | "approved" | "rejected";
 
@@ -310,6 +311,8 @@ export function createAccessRequest(db: Sql, email: string, now = Date.now()): A
      VALUES (?, ?, 'pending', ?, NULL, NULL)`,
     [id, normalized, now],
   );
+  // Telegram: mock/outbox без токена; flush через BFF при Docker + TELEGRAM_BOT_TOKEN.
+  notifyAccessRequestTelegram(db, normalized, now);
   return {
     id,
     email: normalized,

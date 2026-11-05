@@ -5,6 +5,7 @@ import { normalizeEquipmentName } from "@/lib/domain/sku-code";
 import { newId, type Sql } from "@/lib/db/sql";
 import { findOrCreateFamily } from "@/lib/services/catalog-hierarchy";
 import { attachKitAccessoriesForOrder } from "@/lib/services/order-accessories";
+import { notifyShortageTelegram } from "@/lib/telegram/notify";
 
 type SkuRecord = {
   id: string;
@@ -352,6 +353,7 @@ function syncShortage(tx: Sql, sku: SkuRecord, order: OrderRecord, qtyShortage: 
         [alertId, sku.id, order.id, hireId, message, now],
       );
       if (hireId) tx.run(`UPDATE external_hires SET alert_id = ? WHERE id = ?`, [alertId, hireId]);
+      notifyShortageTelegram(tx, message, now);
     } else {
       const [first, ...rest] = existingAlerts;
       if (!first) return;

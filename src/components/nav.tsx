@@ -15,6 +15,7 @@ import {
   ScanLine,
   TriangleAlert,
   Truck,
+  UserRound,
   Users,
   Warehouse,
 } from "lucide-react";
@@ -32,6 +33,7 @@ const links: { href: string; label: MessageKey; icon: typeof LayoutDashboard }[]
   { href: "/occupancy", label: "nav.occupancy", icon: GanttChart },
   { href: "/shortages", label: "nav.shortages", icon: TriangleAlert },
   { href: "/tasks", label: "nav.tasks", icon: ListTodo },
+  { href: "/me", label: "nav.me", icon: UserRound },
   { href: "/people", label: "nav.people", icon: Users },
   { href: "/access-requests", label: "nav.access", icon: KeyRound },
   { href: "/calendar", label: "nav.calendar", icon: CalendarDays },

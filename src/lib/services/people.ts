@@ -49,20 +49,63 @@ function assertEmailAvailable(db: Sql, email: string | null, exceptId?: string):
   if (row && row.id !== exceptId) throw new DomainError("Этот email уже привязан к другому человеку");
 }
 
-function readPerson(db: Sql, id: string): UserRow {
-  const row = db.get<UserRow>(`SELECT id, name, role, email FROM users WHERE id = ?`, [id]);
-  if (!row) throw new DomainError("Человек не найден");
-  return { ...row, email: row.email?.trim() ? row.email.trim().toLowerCase() : null };
+function assertPhone(raw: string | null | undefined): string | null {
+  if (raw == null) return null;
+  const next = raw.trim();
+  if (!next) return null;
+  if (next.length > 40) throw new DomainError("Телефон слишком длинный");
+  return next;
 }
 
-export function createPerson(db: Sql, input: { name: string; role: Role; email?: string | null }): UserRow {
+function assertTelegramUsername(raw: string | null | undefined): string | null {
+  if (raw == null) return null;
+  const next = raw.trim().replace(/^@/, "");
+  if (!next) return null;
+  if (!/^[A-Za-z0-9_]{5,32}$/.test(next)) {
+    throw new DomainError("Укажите корректный Telegram username");
+  }
+  return next;
+}
+
+function assertTelegramChatId(raw: string | null | undefined): string | null {
+  if (raw == null) return null;
+  const next = raw.trim();
+  if (!next) return null;
+  if (!/^-?\d{5,20}$/.test(next)) throw new DomainError("Укажите корректный Telegram chatId");
+  return next;
+}
+
+function readPerson(db: Sql, id: string): UserRow {
+  const row = listUsers(db).find((user) => user.id === id);
+  if (!row) throw new DomainError("Человек не найден");
+  return row;
+}
+
+export function createPerson(
+  db: Sql,
+  input: {
+    name: string;
+    role: Role;
+    email?: string | null;
+    phone?: string | null;
+    telegramUsername?: string | null;
+    telegramChatId?: string | null;
+  },
+): UserRow {
   const name = assertName(input.name);
   const role = assertRole(input.role);
   const email = assertPersonEmail(input.email);
+  const phone = assertPhone(input.phone);
+  const telegramUsername = assertTelegramUsername(input.telegramUsername);
+  const telegramChatId = assertTelegramChatId(input.telegramChatId);
   assertEmailAvailable(db, email);
   const id = `user_${newId().replace(/-/g, "").slice(0, 12)}`;
-  db.run(`INSERT INTO users (id, name, role, email) VALUES (?, ?, ?, ?)`, [id, name, role, email]);
-  return { id, name, role, email };
+  db.run(
+    `INSERT INTO users (id, name, role, email, phone, telegram_username, telegram_chat_id)
+     VALUES (?, ?, ?, ?, ?, ?, ?)`,
+    [id, name, role, email, phone, telegramUsername, telegramChatId],
+  );
+  return { id, name, role, email, phone, telegramUsername, telegramChatId };
 }
 
 export function renamePerson(db: Sql, id: string, name: string): UserRow {
@@ -82,15 +125,52 @@ export function setPersonRole(db: Sql, id: string, role: Role): UserRow {
 export function updatePerson(
   db: Sql,
   id: string,
-  input: { name: string; role: Role; email?: string | null },
+  input: {
+    name: string;
+    role: Role;
+    email?: string | null;
+    phone?: string | null;
+    telegramUsername?: string | null;
+    telegramChatId?: string | null;
+  },
 ): UserRow {
+  const current = readPerson(db, id);
   const name = assertName(input.name);
   const role = assertRole(input.role);
-  const email = input.email === undefined ? readPerson(db, id).email : assertPersonEmail(input.email);
+  const email = input.email === undefined ? current.email : assertPersonEmail(input.email);
+  const phone = input.phone === undefined ? current.phone : assertPhone(input.phone);
+  const telegramUsername =
+    input.telegramUsername === undefined ? current.telegramUsername : assertTelegramUsername(input.telegramUsername);
+  const telegramChatId =
+    input.telegramChatId === undefined ? current.telegramChatId : assertTelegramChatId(input.telegramChatId);
   assertEmailAvailable(db, email, id);
-  readPerson(db, id);
-  db.run(`UPDATE users SET name = ?, role = ?, email = ? WHERE id = ?`, [name, role, email, id]);
-  return { id, name, role, email };
+  db.run(
+    `UPDATE users SET name = ?, role = ?, email = ?, phone = ?, telegram_username = ?, telegram_chat_id = ?
+     WHERE id = ?`,
+    [name, role, email, phone, telegramUsername, telegramChatId, id],
+  );
+  return { id, name, role, email, phone, telegramUsername, telegramChatId };
+}
+
+/** Свой кабинет: контакты и Telegram без права people.write. Имя/роль/email не меняет. */
+export function updateOwnCabinet(
+  db: Sql,
+  id: string,
+  input: { phone?: string | null; telegramUsername?: string | null; telegramChatId?: string | null },
+): UserRow {
+  const current = readPerson(db, id);
+  const phone = input.phone === undefined ? current.phone : assertPhone(input.phone);
+  const telegramUsername =
+    input.telegramUsername === undefined ? current.telegramUsername : assertTelegramUsername(input.telegramUsername);
+  const telegramChatId =
+    input.telegramChatId === undefined ? current.telegramChatId : assertTelegramChatId(input.telegramChatId);
+  db.run(`UPDATE users SET phone = ?, telegram_username = ?, telegram_chat_id = ? WHERE id = ?`, [
+    phone,
+    telegramUsername,
+    telegramChatId,
+    id,
+  ]);
+  return { ...current, phone, telegramUsername, telegramChatId };
 }
 
 /** Нельзя удалить последнего человека в базе и нельзя удалить себя из UI (проверка снаружи). */

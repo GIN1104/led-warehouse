@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useState, type FormEvent } from "react";
 import { useI18n } from "@/components/i18n";
 import { useWarehouse } from "@/components/warehouse";
@@ -61,6 +62,9 @@ export default function PeoplePage() {
         name: String(data.get("name") ?? ""),
         role: String(data.get("role") ?? "warehouse") as Role,
         email: String(data.get("email") ?? ""),
+        phone: String(data.get("phone") ?? ""),
+        telegramUsername: String(data.get("telegramUsername") ?? ""),
+        telegramChatId: String(data.get("telegramChatId") ?? ""),
       });
       await refresh();
       setFlash({ ok: t("people.updated") });
@@ -122,6 +126,11 @@ export default function PeoplePage() {
         eyebrow={t("people.eyebrow")}
         title={t("people.title")}
         description={shared ? t("people.description") : t("people.browser")}
+        action={
+          <Link href="/me/" className={buttonClass("ghost")}>
+            {t("people.myCabinet")}
+          </Link>
+        }
       />
       <Flash error={flash.error} ok={flash.ok} />
       {!allowed ? <p className="mb-4 text-sm text-ink/70">{t("people.switch", { name: editor || "—" })}</p> : null}
@@ -134,7 +143,7 @@ export default function PeoplePage() {
             {users.map((user) => (
               <li key={user.id} className="rounded-md border border-line bg-white p-3">
                 <form
-                  className="grid gap-2 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_10rem_auto_auto] sm:items-end"
+                  className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3 sm:items-end"
                   onSubmit={(event) => {
                     event.preventDefault();
                     void onSavePerson(user.id, event.currentTarget);
@@ -170,17 +179,56 @@ export default function PeoplePage() {
                       ))}
                     </select>
                   </Field>
-                  <button type="submit" disabled={!allowed} className={buttonClass("primary")}>
-                    {t("people.save")}
-                  </button>
-                  <button
-                    type="button"
-                    disabled={!allowed || user.id === session.id || users.length <= 1}
-                    className={buttonClass("danger")}
-                    onClick={() => void onRemove(user.id)}
-                  >
-                    {t("people.remove")}
-                  </button>
+                  <Field label={t("me.phone")}>
+                    <input
+                      name="phone"
+                      defaultValue={user.phone ?? ""}
+                      disabled={!allowed}
+                      className={controlClass}
+                      maxLength={40}
+                      placeholder={t("me.phonePlaceholder")}
+                    />
+                  </Field>
+                  <Field label={t("me.telegramUsername")}>
+                    <input
+                      name="telegramUsername"
+                      defaultValue={user.telegramUsername ?? ""}
+                      disabled={!allowed}
+                      className={controlClass}
+                      maxLength={32}
+                      placeholder={t("me.telegramUsernamePlaceholder")}
+                    />
+                  </Field>
+                  <Field label={t("me.telegramChatId")}>
+                    <input
+                      name="telegramChatId"
+                      defaultValue={user.telegramChatId ?? ""}
+                      disabled={!allowed}
+                      className={controlClass}
+                      maxLength={20}
+                      placeholder={t("me.telegramChatIdPlaceholder")}
+                    />
+                  </Field>
+                  <div className="flex flex-wrap gap-2 sm:col-span-full">
+                    <button type="submit" disabled={!allowed} className={buttonClass("primary")}>
+                      {t("people.save")}
+                    </button>
+                    <button
+                      type="button"
+                      disabled={!allowed || user.id === session.id || users.length <= 1}
+                      className={buttonClass("danger")}
+                      onClick={() => void onRemove(user.id)}
+                    >
+                      {t("people.remove")}
+                    </button>
+                    {user.telegramChatId ? (
+                      <span className="self-center text-xs text-ink/55">
+                        TG @{user.telegramUsername || "—"} · {user.telegramChatId}
+                      </span>
+                    ) : (
+                      <span className="self-center text-xs text-ink/45">{t("people.telegramNone")}</span>
+                    )}
+                  </div>
                 </form>
               </li>
             ))}
