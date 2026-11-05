@@ -1,22 +1,14 @@
-import { apiUrl, sharedLedger } from "@/lib/api";
+import { accessApiBase, apiUrl, sharedLedger } from "@/lib/api";
 import type { AccessRequestRow } from "@/lib/services/access-requests";
 
-/** Внешний shared API (Docker/Turso host), чтобы Pages мог слать заявки в общий ledger. */
-export function accessApiBase(): string {
-  return (process.env.NEXT_PUBLIC_ACCESS_API_BASE ?? "").trim().replace(/\/$/, "");
-}
+export { accessApiBase };
 
-/** Shared ledger на этом origin ИЛИ явный NEXT_PUBLIC_ACCESS_API_BASE. */
+/** Shared ledger на этом origin ИЛИ Pages → NEXT_PUBLIC_ACCESS_API_BASE. */
 export function accessApiEnabled(): boolean {
-  return sharedLedger || Boolean(accessApiBase());
+  return sharedLedger;
 }
 
 function accessEndpoint(path: string): string {
-  const base = accessApiBase();
-  if (base) {
-    const normalized = path.endsWith("/") ? path : `${path}/`;
-    return `${base}${normalized.startsWith("/") ? normalized : `/${normalized}`}`;
-  }
   return apiUrl(path);
 }
 

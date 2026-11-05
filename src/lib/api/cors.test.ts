@@ -6,7 +6,7 @@ describe("CORS для Pages → ACCESS_API_BASE", () => {
     delete process.env.ACCESS_CORS_ORIGINS;
   });
 
-  it("разрешает github pages origin по умолчанию", () => {
+  it("разрешает github pages origin по умолчанию и expose X-Revision", () => {
     expect(accessCorsOrigins()).toContain("https://gin1104.github.io");
     const headers = corsHeaders(
       new Request("http://api.example/health", {
@@ -14,6 +14,7 @@ describe("CORS для Pages → ACCESS_API_BASE", () => {
       }),
     ) as Record<string, string>;
     expect(headers["Access-Control-Allow-Origin"]).toBe("https://gin1104.github.io");
+    expect(headers["Access-Control-Expose-Headers"]).toBe("X-Revision");
   });
 
   it("не отражает чужой Origin", () => {

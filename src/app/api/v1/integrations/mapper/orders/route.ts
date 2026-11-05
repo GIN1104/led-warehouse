@@ -1,4 +1,5 @@
 import ExcelJS from "exceljs";
+import { corsPreflight, withCors } from "@/lib/api/cors";
 import { bumpRevision, enqueueLedger } from "@/lib/db/file-store";
 import { DomainError } from "@/lib/domain/errors";
 import { isScanAuthorized } from "@/lib/hmac";
@@ -7,6 +8,10 @@ import { parseMapperCsv, parseMapperTable, type MapperOrderDraft } from "@/lib/s
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
+
+export async function OPTIONS(request: Request) {
+  return corsPreflight(request);
+}
 
 function cellText(value: unknown): string {
   if (value instanceof Date) return value.toISOString().slice(0, 10);
@@ -62,19 +67,22 @@ export async function POST(request: Request) {
   try {
     const { draft, raw, multipart } = await readDraft(request);
     if (!allowed(request, raw, multipart)) {
-      return Response.json({ error: "unauthorized" }, { status: 401 });
+      return withCors(request, Response.json({ error: "unauthorized" }, { status: 401 }));
     }
     const result = await enqueueLedger((db) => {
       const imported = importMapperOrder(db, draft, "mapper");
       const revision = imported.idempotent ? undefined : bumpRevision(db);
       return { imported, revision };
     });
-    return Response.json(result.imported, {
-      status: result.imported.idempotent ? 200 : 201,
-      headers: result.revision === undefined ? undefined : { "X-Revision": String(result.revision) },
-    });
+    return withCors(
+      request,
+      Response.json(result.imported, {
+        status: result.imported.idempotent ? 200 : 201,
+        headers: result.revision === undefined ? undefined : { "X-Revision": String(result.revision) },
+      }),
+    );
   } catch (error) {
     const message = error instanceof DomainError ? error.message : error instanceof Error ? error.message : "Не удалось принять заказ";
-    return Response.json({ error: message }, { status: 400 });
+    return withCors(request, Response.json({ error: message }, { status: 400 }));
   }
 }

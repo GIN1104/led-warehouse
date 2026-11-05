@@ -1,91 +1,50 @@
-# Production: shared DB = **Turso** (+ API host)
+# Production: shared DB = **Turso** + **Fly.io**
 
-**Pages** ([https://GIN1104.github.io/led-warehouse/](https://GIN1104.github.io/led-warehouse/)) — static demo: IndexedDB per browser. Заявки на доступ **не** шарятся между устройствами, пока Pages не бьёт в живой API host.
+**Команда открывает Pages или Fly — данные одни и те же** (весь ledger: заказы, оборудование, заявки). Source of truth = Turso `ledvision` на API host; клиент синхронизирует через `/api/v1/ledger`.
 
-Команда выбрала **Turso** как общую БД. Код уже умеет sync (`src/lib/db/turso.ts` + `file-store.ts`). Credentials только на **Node-сервере** (Docker / `npm start`), не в статике Pages.
+| Клиент | Как видит данные |
+|--------|------------------|
+| **Fly UI** https://led-warehouse-api.fly.dev | same-origin API, `NEXT_PUBLIC_SHARED=1` |
+| **Pages** https://gin1104.github.io/led-warehouse/ | `NEXT_PUBLIC_ACCESS_API_BASE` → Fly ledger API (не IndexedDB) |
+| Телефон / ПК | любой из двух URL — один Turso ledger |
 
-## Что уже в коде
+## Credentials (не в git)
 
-| Часть | Статус |
-|-------|--------|
-| `TURSO_DATABASE_URL` + `TURSO_AUTH_TOKEN` | `tursoConfig()`; без них Turso выкл. |
-| Sync | `alignWithRemote` / push / replay на каждой записи ledger |
-| Mock без секретов | `TURSO_DATABASE_URL=file:./data/turso-mock.db` (token не нужен) |
-| Docker | `docker-compose.yml` прокидывает `TURSO_*`; image с `NEXT_PUBLIC_SHARED=1` |
-| Access API | `/api/v1/access-requests` (+ decide), CORS для Pages origin |
-| Health | `GET /api/v1/health` → `{ shared, tursoConfigured }` |
-| Pages → API | `NEXT_PUBLIC_ACCESS_API_BASE=https://<api-host>` |
+| Secret | Где |
+|--------|-----|
+| `TURSO_DATABASE_URL` / `TURSO_AUTH_TOKEN` | Fly secrets + локальный `.env.local` |
+| DB name | `ledvision` |
 
-## 1. Turso DB `ledvision`
+## Fly.io API host
 
-Имя базы у команды: **`ledvision`** (создана Evgeny). URL и token — только в `.env.local` / secrets хоста, **не в git**.
-
-```bash
-turso auth login
-# уже есть: turso db show ledvision --url
-turso db tokens create ledvision
-```
-
-Secrets (не коммитить): `TURSO_DATABASE_URL`, `TURSO_AUTH_TOKEN`.
-
-## 2. `.env.local` на API host
-
-```
-NEXT_PUBLIC_SHARED=1
-TURSO_DATABASE_URL=libsql://ledvision-….turso.io
-TURSO_AUTH_TOKEN=eyJ…
-```
-
-Mock: `TURSO_DATABASE_URL=file:./data/turso-mock.db`.  
-Проверка: `curl -s http://localhost:3000/api/v1/health/` → `tursoConfigured: true`.
-
-## 3. API host: Fly.io (выбрано командой)
-
-App: `led-warehouse-api`, region `lhr` (рядом с Turso `aws-eu-west-1`). Config: `fly.toml` + `Dockerfile` (`NEXT_PUBLIC_SHARED=1`, port 8080).
+App `led-warehouse-api`, region `lhr`. Config: `fly.toml`, `Dockerfile`.
 
 ```bash
-# secrets — только на Fly, не в git
-fly secrets set \
-  TURSO_DATABASE_URL='libsql://…' \
-  TURSO_AUTH_TOKEN='…'
-
+fly secrets set TURSO_DATABASE_URL='…' TURSO_AUTH_TOKEN='…'
 fly deploy
-# HTTPS: https://led-warehouse-api.fly.dev
 curl -sS https://led-warehouse-api.fly.dev/api/v1/health/
-# → {"ok":true,"shared":true,"tursoConfigured":true,…}
+# → shared + tursoConfigured
 ```
 
-Локальный volume `/data` на Fly = cache; source of truth = Turso `ledvision`.  
-CORS: `https://gin1104.github.io` + localhost; доп. — `ACCESS_CORS_ORIGINS`.
+CORS: `https://gin1104.github.io` (+ localhost). Ledger GET/PUT и revision отдают `Access-Control-Expose-Headers: X-Revision`.
 
-Локальный Docker (dev):
+## Pages → весь ledger
+
+1. Repo Variable: `NEXT_PUBLIC_ACCESS_API_BASE=https://led-warehouse-api.fly.dev`
+2. `scripts/export-build.mjs` печёт этот URL в static bundle (и включает shared client).
+3. После merge в `main` → GitHub Pages rebuild.
+4. Клиент: `openSharedDb` / `pushSharedDb` → `{ACCESS_API_BASE}/api/v1/ledger/`.
+
+Без Variable/ACCESS_API_BASE Pages снова был бы IndexedDB per-browser — так больше не для команды.
+
+## Локальный Docker
 
 ```bash
-mkdir -p data
-export TURSO_DATABASE_URL='…' TURSO_AUTH_TOKEN='…'   # из .env.local
-docker compose up --build -d
+NEXT_PUBLIC_SHARED=1
+TURSO_DATABASE_URL=…  TURSO_AUTH_TOKEN=…   # из .env.local
+docker compose up --build
 ```
 
-## 4. Pages → заявки (`NEXT_PUBLIC_ACCESS_API_BASE`)
-
-1. Fly host жив (шаг 3).  
-2. Repo Variable уже: `NEXT_PUBLIC_ACCESS_API_BASE=https://led-warehouse-api.fly.dev`.  
-3. `scripts/export-build.mjs` по умолчанию печёт этот URL в Pages (если Variable/env не задан).  
-   Опционально позже в `pages.yml`: `NEXT_PUBLIC_ACCESS_API_BASE: ${{ vars.NEXT_PUBLIC_ACCESS_API_BASE }}` (нужен GitHub `workflow` scope).  
-4. Пересобрать Pages (merge в `main` или workflow_dispatch).  
-   Заявки → `{ACCESS_API_BASE}/api/v1/access-requests/`.
-
-Или вся команда ходит только на Fly URL — тогда Variable не нужна.
-
-## Сценарии
-
-| Сценарий | Путь |
-|----------|------|
-| Демо Pages alone | IndexedDB |
-| **Команда** | **Turso + Docker/API host** |
-| Pages + общие заявки | host + `NEXT_PUBLIC_ACCESS_API_BASE` |
-| Dev без секретов | `file:` mock |
-
-Optional: `TELEGRAM_BOT_TOKEN` / `TELEGRAM_ADMIN_CHAT_IDS` для notify. Sheets mirror — не БД (см. peer-transfers docs).
+Mock без облака: `TURSO_DATABASE_URL=file:./data/turso-mock.db`.
 
 См. [`email-auth.md`](./email-auth.md), README § «Где общий учёт».
