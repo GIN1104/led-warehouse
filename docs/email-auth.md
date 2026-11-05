@@ -6,11 +6,11 @@
 
 ## Вердикт UX
 
-**Заявка → одобрение → постоянный allowlist.**
+**Заявка → одобрение → allowlist (бессрочно или временно).**
 
-1. `/login`: email → если уже допущен → сразу сессия; иначе `access_request` pending.
-2. Админы allowlist на `/access-requests`: Одобрить / Отклонить / Отозвать / ручное добавление.
-3. После approve повторно не спрашиваем, пока не revoke.
+1. `/login`: email → если уже допущен и срок не истёк → сразу сессия; иначе `access_request` pending.
+2. Админы allowlist на `/access-requests`: Одобрить / Отклонить / Отозвать / ручное добавление; при approve/add — срок (**бессрочно** / **7** / **30** дней, дефолт UI **30**).
+3. После approve повторно не спрашиваем, пока не revoke и пока не истёк `expires_at`.
 
 OTP mock (BFF `/api/v1/auth/otp` + Resend) — запасной путь в Docker; основной UX — заявка/allowlist.
 
@@ -21,12 +21,15 @@ OTP mock (BFF `/api/v1/auth/otp` + Resend) — запасной путь в Dock
 | Email | Правило |
 |-------|---------|
 | `starchenkogin@gmail.com` | **Permanent**: всегда разрешён, с любого устройства, **revoke запрещён** (hardcoded) |
-| `ledvision2026.il@gmail.com` | В allowlist **по умолчанию** (seed migrate), **можно отозвать** |
-| Все остальные | Заявка pending → approve/reject; после approve — постоянный допуск до revoke |
+| `ledvision2026.il@gmail.com` | В allowlist **по умолчанию** (seed migrate), **можно отозвать**, без expiry |
+| `nika123.z@mail.ru` | **Временный** seed: **30 дней** с первого migrate на устройстве; **не админ** (только вход); revoke разрешён |
+| Все остальные | Заявка pending → approve/reject; срок 7/30 дней или бессрочно до revoke |
 
 **Кто управляет** (approve / reject / revoke / ручное добавление): только  
 `starchenkogin@gmail.com` и `ledvision2026.il@gmail.com`.  
-Остальные approved-пользователи входят в приложение, но не меняют доступ.
+Остальные approved-пользователи (в т.ч. временные) входят в приложение, но не меняют доступ.
+
+**Срок:** колонка `allowed_emails.expires_at` (NULL = бессрочно). Дефолт временного доступа — **30 дней** (`DEFAULT_TEMP_ACCESS_DAYS`). Истёкший email не входит, пока админ не перевыпустит доступ.
 
 Seed `alexey@led.local` / `dmitry@led.local` остаются в People для демо «кто работает», но **не** дают вход без approve.
 
@@ -45,8 +48,9 @@ Seed `alexey@led.local` / `dmitry@led.local` остаются в People для �
 ## Модель
 
 - `access_requests`: email, status (`pending`|`approved`|`rejected`), created_at, decided_by?, decided_at?
-- `allowed_emails`: email PK, approved_at, approved_by, revoked_at (NULL = активен)
+- `allowed_emails`: email PK, approved_at, approved_by, revoked_at (NULL = не отозван), **expires_at** (NULL = бессрочно)
 - Permanent owner **не обязан** быть строкой в таблице — проверка hardcoded
+- Активен: `revoked_at IS NULL` и (`expires_at IS NULL` или `expires_at > now`)
 
 ---
 

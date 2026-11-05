@@ -6,6 +6,7 @@ import {
   PERMANENT_OWNER_EMAIL,
 } from "@/lib/email-auth/allowlist-policy";
 import {
+  addAllowedEmailManual,
   approveAccessRequest,
   canManageAccess,
   isEmailActivelyAllowed,
@@ -79,3 +80,30 @@ describe("access requests и allowlist policy", () => {
     expect(requestAccessOrLogin(db, "not-an-email")).toEqual({ kind: "invalid_email" });
   });
 });
+
+  it("временный доступ с expires_at: вход до срока, отказ после", () => {
+    const db = createDb();
+    seedIfEmpty(db);
+    const now = Date.UTC(2026, 10, 5, 12, 0, 0);
+    addAllowedEmailManual(db, "temp@example.com", PERMANENT_OWNER_EMAIL, {
+      now,
+      expiresInDays: 30,
+    });
+    expect(isEmailActivelyAllowed(db, "temp@example.com", now)).toBe(true);
+    expect(isEmailActivelyAllowed(db, "temp@example.com", now + 31 * 86_400_000)).toBe(false);
+    const row = listAllowedEmails(db, { includeExpired: true, now: now + 31 * 86_400_000 }).find(
+      (item) => item.email === "temp@example.com",
+    );
+    expect(row?.expired).toBe(true);
+    expect(row?.expiresAt).toBe(now + 30 * 86_400_000);
+  });
+
+  it("seed nika123.z@mail.ru — временный 30 дней, не админ", () => {
+    const db = createDb();
+    seedIfEmpty(db);
+    expect(isEmailActivelyAllowed(db, "nika123.z@mail.ru")).toBe(true);
+    expect(canManageAccess("nika123.z@mail.ru")).toBe(false);
+    const row = listAllowedEmails(db).find((item) => item.email === "nika123.z@mail.ru");
+    expect(row?.expiresAt).toBeTruthy();
+    expect(row!.expiresAt! - row!.approvedAt).toBe(30 * 86_400_000);
+  });
