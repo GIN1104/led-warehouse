@@ -119,8 +119,38 @@ function clearStatements(): InStatement[] {
   return statements;
 }
 
+/** Columns added after first Turso create — CREATE IF NOT EXISTS won't alter old tables. */
+const REMOTE_ALTERS = [
+  "ALTER TABLE users ADD COLUMN email TEXT",
+  "ALTER TABLE users ADD COLUMN phone TEXT",
+  "ALTER TABLE users ADD COLUMN telegram_username TEXT",
+  "ALTER TABLE users ADD COLUMN telegram_chat_id TEXT",
+  "ALTER TABLE rental_orders ADD COLUMN source TEXT NOT NULL DEFAULT 'ui'",
+  "ALTER TABLE rental_orders ADD COLUMN external_id TEXT",
+  "ALTER TABLE rental_orders ADD COLUMN mount_date TEXT",
+  "ALTER TABLE rental_orders ADD COLUMN show_start TEXT",
+  "ALTER TABLE rental_orders ADD COLUMN show_end TEXT",
+  "ALTER TABLE rental_orders ADD COLUMN demount_date TEXT",
+  "ALTER TABLE rental_orders ADD COLUMN phase TEXT NOT NULL DEFAULT 'planning'",
+  "ALTER TABLE rental_lines ADD COLUMN qty_issued INTEGER NOT NULL DEFAULT 0",
+  "ALTER TABLE skus ADD COLUMN family_id TEXT",
+  "ALTER TABLE skus ADD COLUMN name_key TEXT",
+  "ALTER TABLE skus ADD COLUMN sort_order INTEGER NOT NULL DEFAULT 0",
+];
+
+async function ensureRemoteAlters(target: Client): Promise<void> {
+  for (const sql of REMOTE_ALTERS) {
+    try {
+      await target.execute(sql);
+    } catch {
+      // column already exists / unsupported — keep going
+    }
+  }
+}
+
 export async function migrateRemote(target: Client = remote()): Promise<void> {
   await target.executeMultiple(MIGRATION_SQL);
+  await ensureRemoteAlters(target);
   await target.execute(
     `INSERT INTO ledger_meta (key, value) VALUES ('revision', '0') ON CONFLICT(key) DO NOTHING`,
   );

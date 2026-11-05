@@ -85,12 +85,21 @@ export function enqueueLedger<T>(fn: (db: Sql) => T): Promise<T> {
     const journal: SqlStmt[] = [];
     replaceNeedsPush = false;
     const result = fn(journaled(current.handle, journal));
-    if (tursoEnabled() && replaceNeedsPush) await pushSnapshot(openLive().handle);
-    else if (tursoEnabled() && journal.length > 0) {
+    if (tursoEnabled() && replaceNeedsPush) {
+      try {
+        await pushSnapshot(openLive().handle);
+      } catch {
+        // Local ledger already replaced; Turso catch-up on next write/align.
+      }
+    } else if (tursoEnabled() && journal.length > 0) {
       try {
         await replayStatements(journal);
       } catch {
-        await pushSnapshot(current.handle);
+        try {
+          await pushSnapshot(current.handle);
+        } catch {
+          // keep local success
+        }
       }
     }
     return result;
