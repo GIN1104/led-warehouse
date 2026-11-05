@@ -581,6 +581,25 @@ export function setOrderStatus(db: Sql, orderId: string, status: "cancelled" | "
   });
 }
 
+/** Переименовать заказ (customer_name) — UI «название заказа». */
+export function renameOrder(db: Sql, orderId: string, customerName: string, actor: string): void {
+  const name = customerName.trim();
+  if (name.length < 2) throw new DomainError("Укажите заказчика");
+  const order = db.get<OrderRecord>(`${ORDER_SQL} WHERE id = ?`, [orderId]);
+  if (!order) throw new DomainError("Заказ не найден");
+  if (order.customerName === name) return;
+
+  inTx(db, (tx) => {
+    tx.run(`UPDATE rental_orders SET customer_name = ? WHERE id = ?`, [name, orderId]);
+    // Denormalized label on reserved equipment for this order.
+    tx.run(`UPDATE equipment_items SET customer_name = ? WHERE order_id = ?`, [name, orderId]);
+    audit(tx, actor, "order.rename", "rental_order", orderId, {
+      from: order.customerName,
+      to: name,
+    });
+  });
+}
+
 export function setHireStatus(
   db: Sql,
   hireId: string,
