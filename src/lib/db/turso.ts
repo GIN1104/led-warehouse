@@ -164,6 +164,11 @@ async function rebuildUsersForDriverRole(target: Client): Promise<void> {
   } catch {
     /* old CHECK without driver */
   }
+  try {
+    await target.execute("PRAGMA foreign_keys = OFF");
+  } catch {
+    /* ignore */
+  }
   await target.executeMultiple(`
 CREATE TABLE IF NOT EXISTS users__role_v2 (
   id TEXT PRIMARY KEY,
@@ -182,6 +187,11 @@ ALTER TABLE users__role_v2 RENAME TO users;
 CREATE UNIQUE INDEX IF NOT EXISTS uq_users_email ON users(email) WHERE email IS NOT NULL AND email != '';
 INSERT INTO ledger_meta (key, value) VALUES ('schema:users_role_driver', '1') ON CONFLICT(key) DO UPDATE SET value = '1';
 `);
+  try {
+    await target.execute("PRAGMA foreign_keys = ON");
+  } catch {
+    /* ignore */
+  }
 }
 
 async function rebuildLocationsForSiteKind(target: Client): Promise<void> {
@@ -200,6 +210,11 @@ async function rebuildLocationsForSiteKind(target: Client): Promise<void> {
   } catch {
     /* old CHECK */
   }
+  try {
+    await target.execute("PRAGMA foreign_keys = OFF");
+  } catch {
+    /* ignore */
+  }
   await target.executeMultiple(`
 CREATE TABLE IF NOT EXISTS locations__kind_v2 (
   id TEXT PRIMARY KEY,
@@ -214,6 +229,11 @@ DROP TABLE locations;
 ALTER TABLE locations__kind_v2 RENAME TO locations;
 INSERT INTO ledger_meta (key, value) VALUES ('schema:locations_kind_site', '1') ON CONFLICT(key) DO UPDATE SET value = '1';
 `);
+  try {
+    await target.execute("PRAGMA foreign_keys = ON");
+  } catch {
+    /* ignore */
+  }
 }
 
 export async function migrateRemote(target: Client = remote()): Promise<void> {
@@ -222,8 +242,16 @@ export async function migrateRemote(target: Client = remote()): Promise<void> {
   await target.execute(
     `INSERT INTO ledger_meta (key, value) VALUES ('revision', '0') ON CONFLICT(key) DO NOTHING`,
   );
-  await rebuildUsersForDriverRole(target);
-  await rebuildLocationsForSiteKind(target);
+  try {
+    await rebuildUsersForDriverRole(target);
+  } catch {
+    /* keep serving local if remote schema rebuild fails */
+  }
+  try {
+    await rebuildLocationsForSiteKind(target);
+  } catch {
+    /* same */
+  }
 }
 
 export async function remoteRevision(target: Client = remote()): Promise<number> {

@@ -38,12 +38,22 @@ function userCount(db: Sql): number {
 /** Облако подключается один раз за процесс. Локальный файл остаётся рабочей копией. */
 async function ensureCloud(): Promise<void> {
   if (!tursoEnabled() || cloudReady) return;
-  const current = openLive();
-  const direction = await alignWithRemote(current.handle, userCount(current.handle), readRevision(current.handle));
-  if (direction === "pull") current.revision = readRevision(current.handle);
-  if (userCount(current.handle) === 0) {
-    seedIfEmpty(current.handle);
-    if (userCount(current.handle) > 0) await pushSnapshot(current.handle);
+  try {
+    const current = openLive();
+    const direction = await alignWithRemote(current.handle, userCount(current.handle), readRevision(current.handle));
+    if (direction === "pull") current.revision = readRevision(current.handle);
+    if (userCount(current.handle) === 0) {
+      seedIfEmpty(current.handle);
+      if (userCount(current.handle) > 0) {
+        try {
+          await pushSnapshot(current.handle);
+        } catch {
+          /* local seed still usable */
+        }
+      }
+    }
+  } catch {
+    // Turso unreachable/schema lag — serve /data/warehouse.sqlite for this process.
   }
   cloudReady = true;
 }
