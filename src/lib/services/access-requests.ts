@@ -6,6 +6,7 @@ import {
   PERMANENT_OWNER_EMAIL,
 } from "@/lib/email-auth/allowlist-policy";
 import { isValidEmailShape, normalizeEmail } from "@/lib/email-auth/normalize";
+import { expiresAtFromDays, isAccessExpired } from "@/lib/email-auth/temp-access";
 import { newId, type Sql } from "@/lib/db/sql";
 import { createPerson } from "@/lib/services/people";
 import { findUserByEmail, type Role, type UserRow } from "@/lib/services/queries";
@@ -26,8 +27,12 @@ export type AllowedEmailRow = {
   approvedAt: number;
   approvedBy: string | null;
   revokedAt: number | null;
+  /** NULL = бессрочно до revoke. */
+  expiresAt: number | null;
   /** Hardcoded permanent — revoke UI скрыт. */
   permanent: boolean;
+  /** Срок вышел (ещё может быть в таблице до revoke). */
+  expired: boolean;
 };
 
 export type AccessLoginOutcome =
@@ -49,6 +54,7 @@ type AllowedEmailDbRow = {
   approved_at: number;
   approved_by: string | null;
   revoked_at: number | null;
+  expires_at: number | null;
 };
 
 function mapRequest(row: AccessRequestDbRow): AccessRequestRow {
@@ -62,14 +68,17 @@ function mapRequest(row: AccessRequestDbRow): AccessRequestRow {
   };
 }
 
-function mapAllowed(row: AllowedEmailDbRow): AllowedEmailRow {
+function mapAllowed(row: AllowedEmailDbRow, now = Date.now()): AllowedEmailRow {
   const email = normalizeEmail(row.email);
+  const expiresAt = row.expires_at == null ? null : Number(row.expires_at);
   return {
     email,
     approvedAt: row.approved_at,
     approvedBy: row.approved_by,
     revokedAt: row.revoked_at,
+    expiresAt,
     permanent: isPermanentOwnerEmail(email),
+    expired: isAccessExpired(expiresAt, now),
   };
 }
 
@@ -90,23 +99,31 @@ export function canManageAccess(actorEmail: string | null | undefined): boolean 
   return isAccessManagerEmail(actorEmail);
 }
 
-/** Активный допуск: permanent owner ИЛИ строка в allowed_emails без revoke. */
-export function isEmailActivelyAllowed(db: Sql, email: string): boolean {
+/** Активный допуск: permanent owner ИЛИ строка без revoke и без истекшего expires_at. */
+export function isEmailActivelyAllowed(db: Sql, email: string, now = Date.now()): boolean {
   const normalized = normalizeEmail(email);
   if (!normalized) return false;
   if (isPermanentOwnerEmail(normalized)) return true;
-  const row = db.get<{ email: string }>(
-    `SELECT email FROM allowed_emails WHERE email = ? AND revoked_at IS NULL`,
+  const row = db.get<{ email: string; expires_at: number | null }>(
+    `SELECT email, expires_at FROM allowed_emails WHERE email = ? AND revoked_at IS NULL`,
     [normalized],
   );
-  return Boolean(row);
+  if (!row) return false;
+  return !isAccessExpired(row.expires_at, now);
 }
 
-export function listAllowedEmails(db: Sql, opts?: { includeRevoked?: boolean }): AllowedEmailRow[] {
+export function listAllowedEmails(
+  db: Sql,
+  opts?: { includeRevoked?: boolean; includeExpired?: boolean; now?: number },
+): AllowedEmailRow[] {
+  const now = opts?.now ?? Date.now();
   const sql = opts?.includeRevoked
-    ? `SELECT email, approved_at, approved_by, revoked_at FROM allowed_emails ORDER BY approved_at DESC`
-    : `SELECT email, approved_at, approved_by, revoked_at FROM allowed_emails WHERE revoked_at IS NULL ORDER BY approved_at DESC`;
-  const rows = db.all<AllowedEmailDbRow>(sql).map(mapAllowed);
+    ? `SELECT email, approved_at, approved_by, revoked_at, expires_at FROM allowed_emails ORDER BY approved_at DESC`
+    : `SELECT email, approved_at, approved_by, revoked_at, expires_at FROM allowed_emails WHERE revoked_at IS NULL ORDER BY approved_at DESC`;
+  let rows = db.all<AllowedEmailDbRow>(sql).map((row) => mapAllowed(row, now));
+  if (!opts?.includeExpired) {
+    rows = rows.filter((row) => !row.expired);
+  }
   // Permanent owner всегда в UI-списке, даже без строки в таблице.
   if (!opts?.includeRevoked && !rows.some((row) => isPermanentOwnerEmail(row.email))) {
     rows.unshift({
@@ -114,15 +131,20 @@ export function listAllowedEmails(db: Sql, opts?: { includeRevoked?: boolean }):
       approvedAt: 0,
       approvedBy: "hardcoded",
       revokedAt: null,
+      expiresAt: null,
       permanent: true,
+      expired: false,
     });
   }
   return rows;
 }
 
-export function listDirectoryAllowEmails(db: Sql): string[] {
+export function listDirectoryAllowEmails(db: Sql, now = Date.now()): string[] {
   const fromTable = db
-    .all<{ email: string }>(`SELECT email FROM allowed_emails WHERE revoked_at IS NULL`)
+    .all<{ email: string; expires_at: number | null }>(
+      `SELECT email, expires_at FROM allowed_emails WHERE revoked_at IS NULL`,
+    )
+    .filter((row) => !isAccessExpired(row.expires_at, now))
     .map((row) => normalizeEmail(row.email));
   return [...new Set([PERMANENT_OWNER_EMAIL, ...fromTable])];
 }
@@ -158,12 +180,30 @@ export function findPendingRequest(db: Sql, email: string): AccessRequestRow | u
   return row ? mapRequest(row) : undefined;
 }
 
+export type EnsureAllowedOpts = {
+  now?: number;
+  /** Абсолютный expires_at; null = бессрочно. Игнорируется если задан expiresInDays. */
+  expiresAt?: number | null;
+  /** Срок в днях от now; приоритетнее expiresAt. */
+  expiresInDays?: number | null;
+};
+
 export function ensureAllowedEmail(
   db: Sql,
   email: string,
   approvedBy: string | null,
-  now = Date.now(),
+  opts: EnsureAllowedOpts | number = {},
 ): AllowedEmailRow {
+  // Обратная совместимость: 4-й аргумент мог быть now (number).
+  const options: EnsureAllowedOpts = typeof opts === "number" ? { now: opts } : opts;
+  const now = options.now ?? Date.now();
+  let expiresAt: number | null =
+    options.expiresInDays != null && options.expiresInDays > 0
+      ? expiresAtFromDays(options.expiresInDays, now)
+      : options.expiresAt === undefined
+        ? null
+        : options.expiresAt;
+
   const normalized = assertEmail(email);
   if (isPermanentOwnerEmail(normalized)) {
     return {
@@ -171,34 +211,50 @@ export function ensureAllowedEmail(
       approvedAt: now,
       approvedBy: approvedBy ?? "hardcoded",
       revokedAt: null,
+      expiresAt: null,
       permanent: true,
+      expired: false,
     };
   }
   const existing = db.get<AllowedEmailDbRow>(
-    `SELECT email, approved_at, approved_by, revoked_at FROM allowed_emails WHERE email = ?`,
+    `SELECT email, approved_at, approved_by, revoked_at, expires_at FROM allowed_emails WHERE email = ?`,
     [normalized],
   );
-  if (existing && existing.revoked_at == null) {
-    return mapAllowed(existing);
+  if (existing && existing.revoked_at == null && !isAccessExpired(existing.expires_at, now)) {
+    // Уже активен — при явном новом сроке обновляем expires_at.
+    if (options.expiresInDays != null || options.expiresAt !== undefined) {
+      db.run(`UPDATE allowed_emails SET expires_at = ?, approved_at = ?, approved_by = ? WHERE email = ?`, [
+        expiresAt,
+        now,
+        approvedBy,
+        normalized,
+      ]);
+      return mapAllowed(
+        { ...existing, approved_at: now, approved_by: approvedBy, expires_at: expiresAt },
+        now,
+      );
+    }
+    return mapAllowed(existing, now);
   }
   if (existing) {
     db.run(
-      `UPDATE allowed_emails SET approved_at = ?, approved_by = ?, revoked_at = NULL WHERE email = ?`,
-      [now, approvedBy, normalized],
+      `UPDATE allowed_emails SET approved_at = ?, approved_by = ?, revoked_at = NULL, expires_at = ? WHERE email = ?`,
+      [now, approvedBy, expiresAt, normalized],
     );
   } else {
-    db.run(`INSERT INTO allowed_emails (email, approved_at, approved_by, revoked_at) VALUES (?, ?, ?, NULL)`, [
-      normalized,
-      now,
-      approvedBy,
-    ]);
+    db.run(
+      `INSERT INTO allowed_emails (email, approved_at, approved_by, revoked_at, expires_at) VALUES (?, ?, ?, NULL, ?)`,
+      [normalized, now, approvedBy, expiresAt],
+    );
   }
   return {
     email: normalized,
     approvedAt: now,
     approvedBy,
     revokedAt: null,
+    expiresAt,
     permanent: false,
+    expired: false,
   };
 }
 
@@ -220,12 +276,16 @@ export function addAllowedEmailManual(
   db: Sql,
   email: string,
   actorEmail: string,
-  opts?: { role?: Role; now?: number },
+  opts?: { role?: Role; now?: number; expiresInDays?: number | null; expiresAt?: number | null },
 ): AllowedEmailRow {
   assertCanManageAccess(actorEmail);
   const now = opts?.now ?? Date.now();
   const normalized = assertEmail(email);
-  const row = ensureAllowedEmail(db, normalized, actorEmail, now);
+  const row = ensureAllowedEmail(db, normalized, actorEmail, {
+    now,
+    expiresInDays: opts?.expiresInDays,
+    expiresAt: opts?.expiresAt,
+  });
   if (!isPermanentOwnerEmail(normalized)) {
     ensurePersonForEmail(db, normalized, opts?.role ?? "warehouse");
   }
@@ -264,7 +324,7 @@ export function approveAccessRequest(
   db: Sql,
   requestId: string,
   actorEmail: string,
-  opts?: { role?: Role; now?: number },
+  opts?: { role?: Role; now?: number; expiresInDays?: number | null },
 ): AccessRequestRow {
   assertCanManageAccess(actorEmail);
   const now = opts?.now ?? Date.now();
@@ -275,7 +335,10 @@ export function approveAccessRequest(
   if (!row) throw new DomainError("Заявка не найдена");
   if (row.status !== "pending") throw new DomainError("Заявка уже обработана");
   const email = normalizeEmail(row.email);
-  ensureAllowedEmail(db, email, actorEmail, now);
+  ensureAllowedEmail(db, email, actorEmail, {
+    now,
+    expiresInDays: opts?.expiresInDays ?? null,
+  });
   ensurePersonForEmail(db, email, opts?.role ?? "warehouse");
   db.run(
     `UPDATE access_requests SET status = 'approved', decided_by = ?, decided_at = ? WHERE id = ?`,

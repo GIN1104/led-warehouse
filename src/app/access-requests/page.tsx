@@ -5,6 +5,7 @@ import { useEmailAuth } from "@/components/auth-gate";
 import { useI18n } from "@/components/i18n";
 import { useWarehouse } from "@/components/warehouse";
 import { Empty, Field, Flash, PageHeader, Panel, buttonClass, controlClass } from "@/components/ui";
+import { DEFAULT_TEMP_ACCESS_DAYS, TEMP_ACCESS_DAY_OPTIONS } from "@/lib/email-auth/temp-access";
 import { translateError } from "@/lib/i18n/messages";
 import {
   addAllowedEmailManual,
@@ -25,6 +26,13 @@ function formatWhen(ts: number, lang: string): string {
   }
 }
 
+type DurationChoice = "permanent" | "7" | "30";
+
+function daysFromChoice(choice: DurationChoice): number | null {
+  if (choice === "permanent") return null;
+  return Number(choice);
+}
+
 export default function AccessRequestsPage() {
   const { db, shared, refresh, revision } = useWarehouse();
   const { session: auth } = useEmailAuth();
@@ -32,15 +40,17 @@ export default function AccessRequestsPage() {
   const manager = canManageAccess(auth?.email);
   const [flash, setFlash] = useState<{ error?: string; ok?: string }>({});
   const [manualEmail, setManualEmail] = useState("");
+  const [manualDuration, setManualDuration] = useState<DurationChoice>(String(DEFAULT_TEMP_ACCESS_DAYS) as DurationChoice);
+  const [approveDuration, setApproveDuration] = useState<DurationChoice>(String(DEFAULT_TEMP_ACCESS_DAYS) as DurationChoice);
   void revision;
 
   const pending = listAccessRequests(db, { status: "pending" });
   const decided = listAccessRequests(db).filter((row) => row.status !== "pending").slice(0, 20);
-  const allowlist = listAllowedEmails(db);
+  const allowlist = listAllowedEmails(db, { includeExpired: true });
 
   async function onApprove(id: string) {
     try {
-      approveAccessRequest(db, id, auth!.email);
+      approveAccessRequest(db, id, auth!.email, { expiresInDays: daysFromChoice(approveDuration) });
       await refresh();
       setFlash({ ok: t("access.approved") });
     } catch (error) {
@@ -71,7 +81,9 @@ export default function AccessRequestsPage() {
   async function onManualAdd(event: FormEvent) {
     event.preventDefault();
     try {
-      addAllowedEmailManual(db, manualEmail, auth!.email);
+      addAllowedEmailManual(db, manualEmail, auth!.email, {
+        expiresInDays: daysFromChoice(manualDuration),
+      });
       setManualEmail("");
       await refresh();
       setFlash({ ok: t("access.added") });
@@ -88,6 +100,7 @@ export default function AccessRequestsPage() {
         description={t("access.description")}
       />
       {!shared ? <p className="text-sm text-ink/55">{t("access.browser")}</p> : null}
+      <p className="text-sm text-ink/60">{t("access.tempHelp")}</p>
       <Flash error={flash.error} ok={flash.ok} />
 
       {!manager ? (
@@ -96,6 +109,24 @@ export default function AccessRequestsPage() {
 
       <Panel>
         <h2 className="mb-3 text-sm font-semibold tracking-wide text-ink/70 uppercase">{t("access.pendingTitle")}</h2>
+        {manager && pending.length > 0 ? (
+          <div className="mb-3 max-w-xs">
+            <Field label={t("access.duration")}>
+              <select
+                className={controlClass}
+                value={approveDuration}
+                onChange={(event) => setApproveDuration(event.target.value as DurationChoice)}
+              >
+                <option value="permanent">{t("access.durationPermanent")}</option>
+                {TEMP_ACCESS_DAY_OPTIONS.map((days) => (
+                  <option key={days} value={String(days)}>
+                    {t("access.durationDays", { days })}
+                  </option>
+                ))}
+              </select>
+            </Field>
+          </div>
+        ) : null}
         {pending.length === 0 ? (
           <Empty>{t("access.pendingEmpty")}</Empty>
         ) : (
@@ -136,9 +167,20 @@ export default function AccessRequestsPage() {
                     {row.permanent ? (
                       <span className="ms-2 text-xs font-normal text-ink/50">({t("access.permanentBadge")})</span>
                     ) : null}
+                    {!row.permanent && row.expiresAt ? (
+                      <span className="ms-2 text-xs font-normal text-ink/50">
+                        ({row.expired ? t("access.expiredBadge") : t("access.temporaryBadge")})
+                      </span>
+                    ) : null}
                   </p>
                   <p className="text-xs text-ink/50">
                     {t("access.approvedAt")}: {formatWhen(row.approvedAt, lang)}
+                    {row.expiresAt ? (
+                      <>
+                        {" · "}
+                        {t("access.expiresAt")}: {formatWhen(row.expiresAt, lang)}
+                      </>
+                    ) : null}
                   </p>
                 </div>
                 {manager && !row.permanent ? (
@@ -166,6 +208,20 @@ export default function AccessRequestsPage() {
                 maxLength={120}
                 placeholder="name@company.com"
               />
+            </Field>
+            <Field label={t("access.duration")}>
+              <select
+                className={controlClass}
+                value={manualDuration}
+                onChange={(event) => setManualDuration(event.target.value as DurationChoice)}
+              >
+                <option value="permanent">{t("access.durationPermanent")}</option>
+                {TEMP_ACCESS_DAY_OPTIONS.map((days) => (
+                  <option key={days} value={String(days)}>
+                    {t("access.durationDays", { days })}
+                  </option>
+                ))}
+              </select>
             </Field>
             <button type="submit" className={buttonClass("primary")}>
               {t("access.add")}

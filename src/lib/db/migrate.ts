@@ -219,7 +219,8 @@ CREATE TABLE IF NOT EXISTS allowed_emails (
   email TEXT PRIMARY KEY,
   approved_at INTEGER NOT NULL,
   approved_by TEXT,
-  revoked_at INTEGER
+  revoked_at INTEGER,
+  expires_at INTEGER
 );
 
 CREATE TABLE IF NOT EXISTS kit_groups (
@@ -362,7 +363,8 @@ CREATE TABLE IF NOT EXISTS allowed_emails (
   email TEXT PRIMARY KEY,
   approved_at INTEGER NOT NULL,
   approved_by TEXT,
-  revoked_at INTEGER
+  revoked_at INTEGER,
+  expires_at INTEGER
 );
 `);
   db.exec(
@@ -373,6 +375,9 @@ CREATE TABLE IF NOT EXISTS allowed_emails (
   db.exec(
     `CREATE INDEX IF NOT EXISTS idx_allowed_emails_active ON allowed_emails(email) WHERE revoked_at IS NULL`,
   );
+  if (!columnExists(db, "allowed_emails", "expires_at")) {
+    db.exec(`ALTER TABLE allowed_emails ADD COLUMN expires_at INTEGER`);
+  }
   db.exec(`
 CREATE TABLE IF NOT EXISTS kit_groups (
   id TEXT PRIMARY KEY,
@@ -450,8 +455,21 @@ CREATE INDEX IF NOT EXISTS idx_order_accessories_order ON order_accessories(orde
   );
   if (!existingDefault) {
     db.run(
-      `INSERT INTO allowed_emails (email, approved_at, approved_by, revoked_at) VALUES (?, ?, 'seed:default', NULL)`,
+      `INSERT INTO allowed_emails (email, approved_at, approved_by, revoked_at, expires_at) VALUES (?, ?, 'seed:default', NULL, NULL)`,
       [defaultAllow, Date.now()],
+    );
+  }
+  // Временный доступ (не админ): nika123.z@mail.ru — 30 дней с момента первого migrate на устройстве.
+  // Не продлеваем при повторном migrate; revoke разрешён.
+  const tempEmail = "nika123.z@mail.ru";
+  const existingTemp = db.get<{ email: string }>(`SELECT email FROM allowed_emails WHERE email = ?`, [tempEmail]);
+  if (!existingTemp) {
+    const now = Date.now();
+    const dayMs = 86_400_000;
+    db.run(
+      `INSERT INTO allowed_emails (email, approved_at, approved_by, revoked_at, expires_at)
+       VALUES (?, ?, 'seed:temp-30d', NULL, ?)`,
+      [tempEmail, now, now + 30 * dayMs],
     );
   }
 }
