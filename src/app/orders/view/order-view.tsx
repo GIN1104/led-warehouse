@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useState, type FormEvent } from "react";
 import { useI18n } from "@/components/i18n";
 import { useWarehouse } from "@/components/warehouse";
@@ -9,7 +9,7 @@ import { Badge, Field, Flash, PageHeader, Panel, buttonClass, controlClass } fro
 import { assertCan, can } from "@/lib/auth";
 import { formatDate } from "@/lib/dates";
 import { translateError, type MessageKey } from "@/lib/i18n/messages";
-import { renameOrder, setOrderStatus } from "@/lib/services/ledger";
+import { deleteOrder, renameOrder, setOrderStatus } from "@/lib/services/ledger";
 import {
   cancelOrderAccessory,
   restoreOrderAccessory,
@@ -26,12 +26,14 @@ export function OrderFallback() {
 
 export function OrderView() {
   const params = useSearchParams();
+  const router = useRouter();
   const id = params.get("id") ?? "";
   const { db, session, refresh, revision } = useWarehouse();
   const { t, lang } = useI18n();
   const allowed = can(session.role, "order.write");
   const detail = id ? getOrderDetail(db, id) : null;
   const [flash, setFlash] = useState<{ error?: string; ok?: string }>({});
+  const [busy, setBusy] = useState(false);
   void revision;
 
   if (!detail) {
@@ -42,14 +44,17 @@ export function OrderView() {
   const activeAccessories = accessories.filter((row) => !row.cancelled);
   const cancelledAccessories = accessories.filter((row) => row.cancelled);
 
-  function changeStatus(status: "cancelled" | "closed") {
+  async function changeStatus(status: "cancelled" | "closed") {
     try {
+      setBusy(true);
       assertCan(session.role, "order.write");
       setOrderStatus(db, order.id, status, session.id);
-      refresh();
+      await refresh();
       setFlash({ ok: t("order.updated") });
     } catch (error) {
       setFlash({ error: translateError(lang, error) });
+    } finally {
+      setBusy(false);
     }
   }
 
@@ -102,16 +107,34 @@ export function OrderView() {
     }
   }
 
-  function onRename(event: FormEvent<HTMLFormElement>) {
+  async function onRename(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const data = new FormData(event.currentTarget);
     try {
+      setBusy(true);
       assertCan(session.role, "order.write");
       renameOrder(db, order.id, String(data.get("customerName") ?? ""), session.id);
-      refresh();
+      // Must await push to Fly/Turso — otherwise poll reloads the old name.
+      await refresh();
       setFlash({ ok: t("order.renamed") });
     } catch (error) {
       setFlash({ error: translateError(lang, error) });
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function onDelete() {
+    if (!window.confirm(t("order.deleteConfirm", { name: order.customerName }))) return;
+    try {
+      setBusy(true);
+      assertCan(session.role, "order.write");
+      deleteOrder(db, order.id, session.id);
+      await refresh();
+      router.push("/orders/");
+    } catch (error) {
+      setFlash({ error: translateError(lang, error) });
+      setBusy(false);
     }
   }
 
@@ -133,9 +156,9 @@ export function OrderView() {
         action={<Badge tone={order.status === "confirmed" ? "ok" : "neutral"}>{t(`orderStatus.${order.status}` as MessageKey)}</Badge>}
       />
       <Flash error={flash.error} ok={flash.ok} />
-      {allowed ? (
-        <Panel className="mb-4">
-          <form onSubmit={onRename} className="flex flex-col gap-3 sm:flex-row sm:items-end">
+      <Panel className="mb-4">
+        {allowed ? (
+          <form onSubmit={(event) => void onRename(event)} className="flex flex-col gap-3 sm:flex-row sm:items-end">
             <div className="min-w-0 flex-1">
               <Field label={t("order.rename")}>
                 <input
@@ -144,16 +167,19 @@ export function OrderView() {
                   required
                   minLength={2}
                   defaultValue={order.customerName}
+                  disabled={busy}
                   className={controlClass}
                 />
               </Field>
             </div>
-            <button type="submit" className={buttonClass("primary")}>
+            <button type="submit" disabled={busy} className={buttonClass("primary")}>
               {t("order.renameSave")}
             </button>
           </form>
-        </Panel>
-      ) : null}
+        ) : (
+          <p className="text-sm text-ink/60">{t("order.renameNeedManager")}</p>
+        )}
+      </Panel>
       {shortage > 0 ? (
         <p className="mb-4 rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-950">
           {t("order.savedShortage", { qty: shortage })}{" "}
@@ -302,13 +328,20 @@ export function OrderView() {
           </ul>
         </Panel>
       ) : null}
-      {allowed && order.status === "confirmed" ? (
+      {allowed ? (
         <div className="flex flex-wrap gap-2">
-          <button type="button" className={buttonClass("ghost")} onClick={() => changeStatus("closed")}>
-            {t("order.close")}
-          </button>
-          <button type="button" className={buttonClass("danger")} onClick={() => changeStatus("cancelled")}>
-            {t("order.cancel")}
+          {order.status === "confirmed" ? (
+            <>
+              <button type="button" disabled={busy} className={buttonClass("ghost")} onClick={() => void changeStatus("closed")}>
+                {t("order.close")}
+              </button>
+              <button type="button" disabled={busy} className={buttonClass("danger")} onClick={() => void changeStatus("cancelled")}>
+                {t("order.cancel")}
+              </button>
+            </>
+          ) : null}
+          <button type="button" disabled={busy} className={buttonClass("danger")} onClick={() => void onDelete()}>
+            {t("order.delete")}
           </button>
         </div>
       ) : null}

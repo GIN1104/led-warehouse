@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { createDb } from "@/lib/db/memory";
-import { applyMovement, createOrder, ingestScan, renameOrder, setOrderStatus } from "@/lib/services/ledger";
+import { applyMovement, createOrder, deleteOrder, ingestScan, renameOrder, setOrderStatus } from "@/lib/services/ledger";
 import { getOrderDetail, listAlerts, listExternalHires } from "@/lib/services/queries";
 
 function setup() {
@@ -152,6 +152,31 @@ describe("склад и заказы", () => {
     expect(audit?.action).toBe("order.rename");
     expect(JSON.parse(audit?.payload ?? "{}")).toMatchObject({ from: "Старое имя", to: "Новое имя" });
     expect(() => renameOrder(db, created.orderId, "x", "manager")).toThrow(/Укажите заказчика/);
+  });
+
+  it("жёстко удаляет заказ и связанные строки", () => {
+    const db = setup();
+    applyMovement(db, { skuId: "CAB-P25", locationId: "loc", type: "in", qty: 2, reason: "тест" }, "manager");
+    const created = createOrder(
+      db,
+      {
+        customerName: "Удалить меня",
+        startDate: "2026-11-01",
+        endDate: "2026-11-02",
+        lines: [{ skuId: "CAB-P25", qty: 1 }],
+        createdAt: 1,
+      },
+      "manager",
+    );
+    deleteOrder(db, created.orderId, "manager");
+    expect(getOrderDetail(db, created.orderId)).toBeNull();
+    expect(db.get(`SELECT id FROM rental_lines WHERE order_id = ?`, [created.orderId])).toBeUndefined();
+    const audit = db.get<{ action: string }>(
+      `SELECT action FROM audit_log WHERE entity_id = ? AND action = 'order.delete'`,
+      [created.orderId],
+    );
+    expect(audit?.action).toBe("order.delete");
+    expect(() => deleteOrder(db, created.orderId, "manager")).toThrow(/Заказ не найден/);
   });
 
   it("повтор скана с тем же event_id не двигает остаток", () => {

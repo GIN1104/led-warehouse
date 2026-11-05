@@ -183,6 +183,8 @@ export function removePerson(db: Sql, id: string, opts?: { currentUserId?: strin
   }
   const count = db.get<{ value: number }>(`SELECT COUNT(*) AS value FROM users`);
   if ((count?.value ?? 0) <= 1) throw new DomainError("Нельзя удалить последнего человека");
+  // Снять ссылки, чтобы FK (driver_user_id и т.п.) не блокировали DELETE.
+  db.run(`UPDATE stock_transfers SET driver_user_id = NULL WHERE driver_user_id = ?`, [id]);
   db.run(`DELETE FROM users WHERE id = ?`, [id]);
 }
 
