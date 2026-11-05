@@ -47,36 +47,24 @@
 
 ## Где общий учёт
 
-**Production:** Docker/`data/warehouse.sqlite` или Turso — см. [`docs/production-shared-db.md`](docs/production-shared-db.md).
+**Production (выбрано):** [Turso](https://turso.tech/pricing) + Docker/API host — runbook [`docs/production-shared-db.md`](docs/production-shared-db.md).
 
-В `npm run dev` и в Docker база одна: `data/warehouse.sqlite` (в контейнере `/data/warehouse.sqlite`). Браузер держит копию и записывает её обратно; mapper и рамка пишут в тот же файл.
-
-GitHub Pages эту базу не хостит — демо «только этот браузер».
-
-Облако: [Turso](https://turso.tech/pricing) (тот же SQLite). Токен только на сервере склада, не в Pages.
+В `.env.local` на сервере: `NEXT_PUBLIC_SHARED=1`, `TURSO_DATABASE_URL`, `TURSO_AUTH_TOKEN`. Локальный `data/warehouse.sqlite` — cache; sync с Turso при старте и на каждой записи. Токен **не** класть в Pages.
 
 ```bash
-# https://docs.turso.tech/quickstart — войти и создать базу
 turso db create led-warehouse
 turso db show led-warehouse --url
 turso db tokens create led-warehouse
+docker compose up --build   # прокидывает TURSO_* из env
 ```
 
-В `.env.local`: `TURSO_DATABASE_URL` и `TURSO_AUTH_TOKEN`. При старте сервер забирает более новую копию из Turso или отдаёт туда локальный файл, и каждая запись склада уходит туда же.
-
-Docker стоит завести сразу, если учёт должен переезжать с компьютера на компьютер: образ собирает окружение, а переносится каталог `data`.
-
-```bash
-docker compose up --build
-```
-
-Откройте http://localhost:3000. На другом компьютере скопируйте проект вместе с `data/` и снова выполните `docker compose up`.
+Dev без облака: `TURSO_DATABASE_URL=file:./data/turso-mock.db`. Health: `GET /api/v1/health/`.
 
 ## GitHub Pages
 
 Сайт: [https://GIN1104.github.io/led-warehouse/](https://GIN1104.github.io/led-warehouse/)
 
-Публикация идёт из GitHub Actions (`.github/workflows/pages.yml`): тесты и статическая сборка `npm run build:pages`. Источник Pages — **GitHub Actions**. Это личная копия в браузере, не общий склад.
+Static demo (IndexedDB). Общие заявки: задеплоить API host с Turso и задать GitHub Variable `NEXT_PUBLIC_ACCESS_API_BASE` (см. `pages.yml` + docs).
 
 ## Google Calendar (Pages)
 

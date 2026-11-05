@@ -1,3 +1,4 @@
+import { corsPreflight, withCors } from "@/lib/api/cors";
 import { DomainError } from "@/lib/domain/errors";
 import { enqueueLedger } from "@/lib/db/file-store";
 import { normalizeEmail } from "@/lib/email-auth/normalize";
@@ -9,6 +10,10 @@ import {
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
+
+export async function OPTIONS(request: Request) {
+  return corsPreflight(request);
+}
 
 /** POST { requestId?, email?, action, actorEmail, expiresInDays? } — approve/reject/manual-add на shared ledger. */
 export async function POST(request: Request) {
@@ -22,12 +27,12 @@ export async function POST(request: Request) {
   try {
     body = (await request.json()) as typeof body;
   } catch {
-    return Response.json({ error: "Нужен JSON" }, { status: 400 });
+    return withCors(request, Response.json({ error: "Нужен JSON" }, { status: 400 }));
   }
   const actorEmail = normalizeEmail(body.actorEmail ?? "");
   const action = body.action;
   if (!actorEmail || (action !== "approve" && action !== "reject" && action !== "add")) {
-    return Response.json({ error: "Нужны action и actorEmail" }, { status: 400 });
+    return withCors(request, Response.json({ error: "Нужны action и actorEmail" }, { status: 400 }));
   }
 
   try {
@@ -54,10 +59,10 @@ export async function POST(request: Request) {
       }
       return { kind: "reject" as const, request: rejectAccessRequest(db, requestId, actorEmail) };
     });
-    return Response.json({ ok: true, ...result });
+    return withCors(request, Response.json({ ok: true, ...result }));
   } catch (error) {
     const message = error instanceof DomainError ? error.message : error instanceof Error ? error.message : "error";
     const status = /Управлять доступом|не найден|обработана/i.test(message) ? 403 : 500;
-    return Response.json({ ok: false, error: message }, { status });
+    return withCors(request, Response.json({ ok: false, error: message }, { status }));
   }
 }
