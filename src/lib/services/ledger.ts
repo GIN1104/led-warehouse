@@ -5,6 +5,7 @@ import { normalizeEquipmentName } from "@/lib/domain/sku-code";
 import { newId, type Sql } from "@/lib/db/sql";
 import { findOrCreateFamily } from "@/lib/services/catalog-hierarchy";
 import { attachKitAccessoriesForOrder } from "@/lib/services/order-accessories";
+import { assertPhaseDates, type OrderPhase } from "@/lib/services/order-phases";
 import { notifyShortageTelegram } from "@/lib/telegram/notify";
 
 type SkuRecord = {
@@ -98,6 +99,11 @@ export type CreateOrderInput = {
   createdAt?: number;
   source?: "ui" | "mapper";
   externalId?: string;
+  mountDate?: string | null;
+  showStart?: string | null;
+  showEnd?: string | null;
+  demountDate?: string | null;
+  phase?: string;
 };
 
 export type ScanResult = {
@@ -192,7 +198,7 @@ export function createSku(
 
 export function createLocation(
   db: Sql,
-  input: { name: string; kind: "warehouse" | "zone" | "bin"; parentId?: string },
+  input: { name: string; kind: "warehouse" | "zone" | "bin" | "site"; parentId?: string },
   actor: string,
 ): string {
   const name = input.name.trim();
@@ -501,10 +507,22 @@ export function createOrder(
     if (!sku) throw new DomainError("В строке неизвестная номенклатура");
   }
 
+  const phaseFields = {
+    mountDate: input.mountDate?.trim() || null,
+    showStart: input.showStart?.trim() || null,
+    showEnd: input.showEnd?.trim() || null,
+    demountDate: input.demountDate?.trim() || null,
+  };
+  assertPhaseDates({ startDate: input.startDate, endDate: input.endDate }, phaseFields);
+  const phase = (input.phase?.trim() || "planning") as OrderPhase;
+
   const orderId = newId();
   return inTx(db, (tx) => {
     tx.run(
-      `INSERT INTO rental_orders (id, customer_name, start_date, end_date, status, notes, created_at, created_by, source, external_id) VALUES (?, ?, ?, ?, 'confirmed', ?, ?, ?, ?, ?)`,
+      `INSERT INTO rental_orders
+        (id, customer_name, start_date, end_date, status, notes, created_at, created_by, source, external_id,
+         mount_date, show_start, show_end, demount_date, phase)
+       VALUES (?, ?, ?, ?, 'confirmed', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         orderId,
         customerName,
@@ -515,6 +533,11 @@ export function createOrder(
         actor,
         input.source ?? "ui",
         input.externalId ?? null,
+        phaseFields.mountDate,
+        phaseFields.showStart,
+        phaseFields.showEnd,
+        phaseFields.demountDate,
+        phase,
       ],
     );
     for (const [skuId, qty] of merged) {

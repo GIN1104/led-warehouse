@@ -41,6 +41,11 @@ export function OrderForm({
           startDate: String(form.get("startDate") ?? ""),
           endDate: String(form.get("endDate") ?? ""),
           notes: String(form.get("notes") ?? ""),
+          mountDate: String(form.get("mountDate") ?? ""),
+          showStart: String(form.get("showStart") ?? ""),
+          showEnd: String(form.get("showEnd") ?? ""),
+          demountDate: String(form.get("demountDate") ?? ""),
+          phase: String(form.get("phase") ?? "planning"),
           lines,
         },
         session.id,
@@ -67,6 +72,27 @@ export function OrderForm({
         </Field>
         <Field label={t("form.end")}>
           <input name="endDate" type="date" required defaultValue={endDate} className={controlClass} />
+        </Field>
+        <Field label={t("phase.mount")}>
+          <input name="mountDate" type="date" defaultValue={startDate} className={controlClass} />
+        </Field>
+        <Field label={t("phase.showStart")}>
+          <input name="showStart" type="date" defaultValue={startDate} className={controlClass} />
+        </Field>
+        <Field label={t("phase.showEnd")}>
+          <input name="showEnd" type="date" defaultValue={endDate} className={controlClass} />
+        </Field>
+        <Field label={t("phase.demount")}>
+          <input name="demountDate" type="date" defaultValue={endDate} className={controlClass} />
+        </Field>
+        <Field label={t("phase.current")}>
+          <select name="phase" defaultValue="planning" className={controlClass}>
+            <option value="planning">{t("phase.planning")}</option>
+            <option value="mount">{t("phase.mountLabel")}</option>
+            <option value="show">{t("phase.showLabel")}</option>
+            <option value="demount">{t("phase.demountLabel")}</option>
+            <option value="done">{t("phase.done")}</option>
+          </select>
         </Field>
       </div>
       <div className="flex flex-col gap-2">

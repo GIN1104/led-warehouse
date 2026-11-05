@@ -2,10 +2,10 @@
 
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { useState } from "react";
+import { useState, type FormEvent } from "react";
 import { useI18n } from "@/components/i18n";
 import { useWarehouse } from "@/components/warehouse";
-import { Badge, Flash, PageHeader, Panel, buttonClass } from "@/components/ui";
+import { Badge, Field, Flash, PageHeader, Panel, buttonClass, controlClass } from "@/components/ui";
 import { assertCan, can } from "@/lib/auth";
 import { formatDate } from "@/lib/dates";
 import { translateError, type MessageKey } from "@/lib/i18n/messages";
@@ -15,6 +15,7 @@ import {
   restoreOrderAccessory,
   setOrderAccessoryAssembled,
 } from "@/lib/services/order-accessories";
+import { ORDER_PHASES, updateOrderPhases } from "@/lib/services/order-phases";
 import { getOrderDetail } from "@/lib/services/queries";
 import { cn } from "@/lib/utils";
 
@@ -82,6 +83,25 @@ export function OrderView() {
     }
   }
 
+  function onSavePhases(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const data = new FormData(event.currentTarget);
+    try {
+      assertCan(session.role, "order.write");
+      updateOrderPhases(db, order.id, {
+        mountDate: String(data.get("mountDate") ?? ""),
+        showStart: String(data.get("showStart") ?? ""),
+        showEnd: String(data.get("showEnd") ?? ""),
+        demountDate: String(data.get("demountDate") ?? ""),
+        phase: String(data.get("phase") ?? "planning"),
+      });
+      refresh();
+      setFlash({ ok: t("phase.saved") });
+    } catch (error) {
+      setFlash({ error: translateError(lang, error) });
+    }
+  }
+
   const note = [order.notes || t("order.noNote"), order.source === "mapper" ? t("order.fromMapper") : ""].filter(Boolean).join(" ");
 
   return (
@@ -109,6 +129,45 @@ export function OrderView() {
           .
         </p>
       ) : null}
+      <Panel className="mb-4">
+        <h2 className="mb-1 font-medium">{t("phase.title")}</h2>
+        <p className="mb-3 text-sm text-ink/60">{t("phase.help")}</p>
+        <p className="mb-3 text-sm">
+          <Badge tone="ok">{t(`phase.${order.phase === "mount" ? "mountLabel" : order.phase === "show" ? "showLabel" : order.phase === "demount" ? "demountLabel" : order.phase}` as MessageKey)}</Badge>
+        </p>
+        {allowed && order.status === "confirmed" ? (
+          <form onSubmit={onSavePhases} className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            <Field label={t("phase.mount")}>
+              <input name="mountDate" type="date" defaultValue={order.mountDate ?? ""} className={controlClass} />
+            </Field>
+            <Field label={t("phase.showStart")}>
+              <input name="showStart" type="date" defaultValue={order.showStart ?? ""} className={controlClass} />
+            </Field>
+            <Field label={t("phase.showEnd")}>
+              <input name="showEnd" type="date" defaultValue={order.showEnd ?? ""} className={controlClass} />
+            </Field>
+            <Field label={t("phase.demount")}>
+              <input name="demountDate" type="date" defaultValue={order.demountDate ?? ""} className={controlClass} />
+            </Field>
+            <Field label={t("phase.current")}>
+              <select name="phase" defaultValue={order.phase || "planning"} className={controlClass}>
+                {ORDER_PHASES.map((phase) => (
+                  <option key={phase} value={phase}>
+                    {t(
+                      `phase.${phase === "mount" ? "mountLabel" : phase === "show" ? "showLabel" : phase === "demount" ? "demountLabel" : phase}` as MessageKey,
+                    )}
+                  </option>
+                ))}
+              </select>
+            </Field>
+            <div className="flex items-end">
+              <button type="submit" className={buttonClass("primary")}>
+                {t("phase.save")}
+              </button>
+            </div>
+          </form>
+        ) : null}
+      </Panel>
       <Panel className="mb-4">
         <table className="w-full text-start text-sm">
           <thead className="text-xs tracking-wide text-ink/50 uppercase">

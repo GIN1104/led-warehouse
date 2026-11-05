@@ -4,13 +4,14 @@ import { newId, type Sql } from "@/lib/db/sql";
 import type { Role, UserRow } from "@/lib/services/queries";
 import { listUsers } from "@/lib/services/queries";
 
-export const PEOPLE_ROLES: readonly Role[] = ["warehouse", "manager", "logistics", "admin"] as const;
+export const PEOPLE_ROLES: readonly Role[] = ["warehouse", "manager", "logistics", "admin", "driver"] as const;
 
 export const DEFAULT_ROLE_LABELS: Record<Role, string> = {
-  warehouse: "Склад",
+  warehouse: "Кладовщик",
   logistics: "Логистика",
   manager: "Менеджер",
   admin: "Администратор",
+  driver: "Водитель",
 };
 
 const ROLE_LABEL_PREFIX = "role_label:";
@@ -23,7 +24,7 @@ function assertName(name: string): string {
 
 function assertRole(role: string): Role {
   if (!(PEOPLE_ROLES as readonly string[]).includes(role)) {
-    throw new DomainError("Выберите роль: склад, менеджер или логистика");
+    throw new DomainError("Выберите роль: кладовщик, менеджер, логистика, админ или водитель");
   }
   return role as Role;
 }
@@ -270,6 +271,7 @@ export function ensureDefaultRoleStockEdit(db: Sql): RoleStockEdit {
       warehouse: true,
       manager: false,
       logistics: false,
+      driver: false,
     });
   }
   return getRoleStockEdit(db);

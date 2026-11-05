@@ -25,6 +25,10 @@ const INSERT_ORDER = [
   "kit_subtypes",
   "kit_units",
   "kit_checklist_items",
+  "access_requests",
+  "allowed_emails",
+  "telegram_outbox",
+  "stock_transfers",
 ] as const;
 
 export type SqlStmt = { sql: string; args: unknown[] };

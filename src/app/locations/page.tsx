@@ -24,8 +24,16 @@ export default function LocationsPage() {
     const kind = String(form.get("kind") ?? "zone");
     try {
       assertCan(session.role, "location.write");
-      if (kind !== "warehouse" && kind !== "zone" && kind !== "bin") throw new Error("kind");
-      createLocation(db, { name: String(form.get("name") ?? ""), kind, parentId: String(form.get("parentId") ?? "") || undefined }, session.id);
+      if (kind !== "warehouse" && kind !== "zone" && kind !== "bin" && kind !== "site") throw new Error("kind");
+      createLocation(
+        db,
+        {
+          name: String(form.get("name") ?? ""),
+          kind: kind as "warehouse" | "zone" | "bin" | "site",
+          parentId: String(form.get("parentId") ?? "") || undefined,
+        },
+        session.id,
+      );
       refresh();
       event.currentTarget.reset();
       setFlash({ ok: t("locations.added") });
@@ -71,6 +79,7 @@ export default function LocationsPage() {
                   <option value="warehouse">{t("loc.warehouse")}</option>
                   <option value="zone">{t("loc.zone")}</option>
                   <option value="bin">{t("loc.bin")}</option>
+                  <option value="site">{t("loc.site")}</option>
                 </select>
               </Field>
               <Field label={t("locations.parent")}>

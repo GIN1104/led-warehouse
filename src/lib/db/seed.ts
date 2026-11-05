@@ -22,11 +22,20 @@ export function seedIfEmpty(db: Sql): void {
   db.run(`INSERT INTO users (id, name, role, email) VALUES (?, 'Дмитрий', 'manager', 'dmitry@led.local')`, [
     MANAGER_ID,
   ]);
+  db.run(`INSERT INTO users (id, name, role, email) VALUES (?, 'Игорь', 'driver', 'igor@led.local')`, [
+    "user_driver",
+  ]);
 
   db.run(`INSERT INTO locations (id, name, kind, parent_id) VALUES (?, 'Главный склад', 'warehouse', NULL)`, [LOC_MAIN]);
   db.run(`INSERT INTO locations (id, name, kind, parent_id) VALUES (?, 'Зона A — кабинеты', 'zone', ?)`, [LOC_A, LOC_MAIN]);
   db.run(`INSERT INTO locations (id, name, kind, parent_id) VALUES (?, 'Зона B — кабели', 'zone', ?)`, [LOC_B, LOC_MAIN]);
   db.run(`INSERT INTO locations (id, name, kind, parent_id) VALUES (?, 'Зона C — отгрузка', 'zone', ?)`, [LOC_C, LOC_MAIN]);
+  db.run(`INSERT INTO locations (id, name, kind, parent_id) VALUES (?, 'Площадка «Набережная»', 'site', NULL)`, [
+    "loc_site_embankment",
+  ]);
+  db.run(`INSERT INTO locations (id, name, kind, parent_id) VALUES (?, 'Площадка «Поле»', 'site', NULL)`, [
+    "loc_site_field",
+  ]);
 
   const catalog: [string, string, string, string][] = [
     ["CAB-P25", "Кабинет LED P2.5 500×500", "Кабинеты", "Арендуемый кабинет, учёт по количеству"],

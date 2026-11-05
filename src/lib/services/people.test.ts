@@ -79,15 +79,17 @@ describe("справочник людей и ярлыки ролей", () => {
 
   it("сохраняет кастомные названия ролей в ledger_meta", () => {
     const db = createDb();
-    expect(getRoleLabels(db).warehouse).toBe("Склад");
-    setRoleLabel(db, "warehouse", "Кладовщик");
-    setRoleLabels(db, { manager: "Менеджер зала", logistics: "Водитель" });
+    expect(getRoleLabels(db).warehouse).toBe("Кладовщик");
+    expect(getRoleLabels(db).driver).toBe("Водитель");
+    setRoleLabel(db, "warehouse", "Складской");
+    setRoleLabels(db, { manager: "Менеджер зала", logistics: "Логист", driver: "Курьер" });
     const labels = getRoleLabels(db);
     expect(labels).toMatchObject({
-      warehouse: "Кладовщик",
+      warehouse: "Складской",
       manager: "Менеджер зала",
-      logistics: "Водитель",
+      logistics: "Логист",
       admin: "Администратор",
+      driver: "Курьер",
     });
     expect(() => setRoleLabel(db, "manager", "  ")).toThrow(/название роли/);
   });

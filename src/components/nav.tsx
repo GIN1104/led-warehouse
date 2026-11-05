@@ -18,6 +18,7 @@ import {
   UserRound,
   Users,
   Warehouse,
+  ArrowLeftRight,
 } from "lucide-react";
 import { useI18n } from "@/components/i18n";
 import type { MessageKey } from "@/lib/i18n/messages";
@@ -28,6 +29,7 @@ const links: { href: string; label: MessageKey; icon: typeof LayoutDashboard }[]
   { href: "/catalog", label: "nav.catalog", icon: Boxes },
   { href: "/locations", label: "nav.locations", icon: MapPin },
   { href: "/stock", label: "nav.stock", icon: Warehouse },
+  { href: "/transfers", label: "nav.transfers", icon: ArrowLeftRight },
   { href: "/scan", label: "nav.scan", icon: ScanLine },
   { href: "/orders", label: "nav.orders", icon: ClipboardList },
   { href: "/occupancy", label: "nav.occupancy", icon: GanttChart },

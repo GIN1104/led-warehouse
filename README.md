@@ -20,6 +20,7 @@
 - [`docs/mvp-decisions.md`](docs/mvp-decisions.md) — краткая фиксация пяти решений заказчика (2026-10-07)
 - [`docs/email-auth.md`](docs/email-auth.md) — вход по email (заявка → approve → allowlist)
 - [`docs/people-telegram.md`](docs/people-telegram.md) — личный кабинет `/me` и Telegram (mock на Pages)
+- [`docs/peer-transfers-phases-sheets.md`](docs/peer-transfers-phases-sheets.md) — перемещения, фазы заказа, Sheets mirror
 
 ## Решение по доставке
 
