@@ -3,5 +3,11 @@ node_modules
 out
 data
 .git
+.env
+.env.local
+.env*.local
+coverage
+tmp
+.cursor
 *.log
-.api-hidden
+.next/dev
