@@ -69,12 +69,10 @@ docker compose up --build -d
 ## 4. Pages → заявки (`NEXT_PUBLIC_ACCESS_API_BASE`)
 
 1. Fly host жив (шаг 3).  
-2. В `.github/workflows/pages.yml` (env у `build:pages`) добавить:  
-   `NEXT_PUBLIC_ACCESS_API_BASE: ${{ vars.NEXT_PUBLIC_ACCESS_API_BASE }}`  
-3. GitHub repo **Settings → Variables** →  
-   `NEXT_PUBLIC_ACCESS_API_BASE` = `https://led-warehouse-api.fly.dev`  
-   (без trailing slash; подставьте фактический URL из `fly status`).  
-4. Пересобрать Pages (push на `main` или workflow_dispatch).  
+2. Repo Variable уже: `NEXT_PUBLIC_ACCESS_API_BASE=https://led-warehouse-api.fly.dev`.  
+3. `scripts/export-build.mjs` по умолчанию печёт этот URL в Pages (если Variable/env не задан).  
+   Опционально позже в `pages.yml`: `NEXT_PUBLIC_ACCESS_API_BASE: ${{ vars.NEXT_PUBLIC_ACCESS_API_BASE }}` (нужен GitHub `workflow` scope).  
+4. Пересобрать Pages (merge в `main` или workflow_dispatch).  
    Заявки → `{ACCESS_API_BASE}/api/v1/access-requests/`.
 
 Или вся команда ходит только на Fly URL — тогда Variable не нужна.
