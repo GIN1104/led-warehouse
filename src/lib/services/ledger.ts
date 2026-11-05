@@ -600,6 +600,30 @@ export function renameOrder(db: Sql, orderId: string, customerName: string, acto
   });
 }
 
+/** Жёстко удалить заказ и связанные строки (бронь пересчитывается). */
+export function deleteOrder(db: Sql, orderId: string, actor: string): void {
+  const order = db.get<OrderRecord>(`${ORDER_SQL} WHERE id = ?`, [orderId]);
+  if (!order) throw new DomainError("Заказ не найден");
+
+  inTx(db, (tx) => {
+    const lines = tx.all<LineRecord>(`${LINE_SQL} WHERE order_id = ?`, [orderId]);
+    const skuIds = [...new Set(lines.map((line) => line.skuId))];
+    tx.run(`UPDATE equipment_items SET order_id = NULL WHERE order_id = ?`, [orderId]);
+    tx.run(`DELETE FROM order_accessories WHERE order_id = ?`, [orderId]);
+    tx.run(`DELETE FROM shortage_signals WHERE order_id = ?`, [orderId]);
+    tx.run(`DELETE FROM alerts WHERE order_id = ?`, [orderId]);
+    tx.run(`DELETE FROM external_hires WHERE order_id = ?`, [orderId]);
+    tx.run(`UPDATE stock_transfers SET order_id = NULL WHERE order_id = ?`, [orderId]);
+    tx.run(`DELETE FROM rental_lines WHERE order_id = ?`, [orderId]);
+    tx.run(`DELETE FROM rental_orders WHERE id = ?`, [orderId]);
+    for (const skuId of skuIds) recalcSku(tx, skuId);
+    audit(tx, actor, "order.delete", "rental_order", orderId, {
+      customerName: order.customerName,
+      status: order.status,
+    });
+  });
+}
+
 export function setHireStatus(
   db: Sql,
   hireId: string,

@@ -58,6 +58,24 @@ describe("справочник людей и ярлыки ролей", () => {
     expect(listUsers(db)).toHaveLength(1);
   });
 
+  it("удаляет человека даже если он указан водителем в перевозке", () => {
+    const db = createDb();
+    const manager = createPerson(db, { name: "Менеджер", role: "manager" });
+    const driver = createPerson(db, { name: "turso-smoke-test", role: "warehouse" });
+    db.run(`INSERT INTO locations (id, name, kind, parent_id) VALUES ('loc', 'Склад', 'warehouse', NULL)`);
+    db.run(
+      `INSERT INTO skus (id, code, name, category, unit, track_mode, description) VALUES ('SKU1', 'SKU1', 'Каб', 'x', 'шт', 'quantity', '')`,
+    );
+    db.run(
+      `INSERT INTO stock_transfers (id, sku_id, qty, from_location_id, to_location_id, status, driver_user_id, created_at, created_by)
+       VALUES ('tr1', 'SKU1', 1, 'loc', 'loc', 'planned', ?, 1, ?)`,
+      [driver.id, manager.id],
+    );
+    removePerson(db, driver.id, { currentUserId: manager.id });
+    expect(listUsers(db).find((u) => u.id === driver.id)).toBeUndefined();
+    expect(db.get<{ driver: string | null }>(`SELECT driver_user_id AS driver FROM stock_transfers WHERE id = 'tr1'`)?.driver).toBeNull();
+  });
+
   it("личный кабинет: телефон и Telegram без смены роли", () => {
     const db = createDb();
     const person = createPerson(db, { name: "Ирина", role: "manager", email: "irina@led.local" });

@@ -10,7 +10,7 @@ import { sharedLedger, apiUrl } from "@/lib/api";
 import { formatDate } from "@/lib/dates";
 import { translateError } from "@/lib/i18n/messages";
 import { orderHref } from "@/lib/paths";
-import { renameOrder } from "@/lib/services/ledger";
+import { deleteOrder, renameOrder } from "@/lib/services/ledger";
 import { importMapperOrder } from "@/lib/services/mapper";
 import { parseMapperCsv } from "@/lib/services/mapper-sheet";
 import { listOrders } from "@/lib/services/queries";
@@ -23,19 +23,38 @@ export default function OrdersPage() {
   const manager = users.find((user) => user.role === "manager")?.name ?? "";
   const [flash, setFlash] = useState<{ error?: string; ok?: string }>({});
   const [renamingId, setRenamingId] = useState<string | null>(null);
+  const [busyId, setBusyId] = useState<string | null>(null);
   void revision;
 
-  function onRename(event: FormEvent<HTMLFormElement>, orderId: string) {
+  async function onRename(event: FormEvent<HTMLFormElement>, orderId: string) {
     event.preventDefault();
     const data = new FormData(event.currentTarget);
     try {
+      setBusyId(orderId);
       assertCan(session.role, "order.write");
       renameOrder(db, orderId, String(data.get("customerName") ?? ""), session.id);
+      await refresh();
       setRenamingId(null);
-      refresh();
       setFlash({ ok: t("order.renamed") });
     } catch (error) {
       setFlash({ error: translateError(lang, error) });
+    } finally {
+      setBusyId(null);
+    }
+  }
+
+  async function onDelete(orderId: string, name: string) {
+    if (!window.confirm(t("order.deleteConfirm", { name }))) return;
+    try {
+      setBusyId(orderId);
+      assertCan(session.role, "order.write");
+      deleteOrder(db, orderId, session.id);
+      await refresh();
+      setFlash({ ok: t("order.deleted") });
+    } catch (error) {
+      setFlash({ error: translateError(lang, error) });
+    } finally {
+      setBusyId(null);
     }
   }
 
@@ -100,7 +119,7 @@ export default function OrdersPage() {
                 <td className="px-3 py-2">
                   {renamingId === order.id ? (
                     <form
-                      onSubmit={(event) => onRename(event, order.id)}
+                      onSubmit={(event) => void onRename(event, order.id)}
                       className="flex flex-col gap-2 sm:flex-row sm:items-center"
                     >
                       <input
@@ -143,9 +162,24 @@ export default function OrdersPage() {
                 {allowed ? (
                   <td className="px-3 py-2">
                     {renamingId === order.id ? null : (
-                      <button type="button" className={buttonClass("ghost")} onClick={() => setRenamingId(order.id)}>
-                        {t("orders.rename")}
-                      </button>
+                      <div className="flex flex-wrap gap-1">
+                        <button
+                          type="button"
+                          disabled={busyId === order.id}
+                          className={buttonClass("ghost")}
+                          onClick={() => setRenamingId(order.id)}
+                        >
+                          {t("orders.rename")}
+                        </button>
+                        <button
+                          type="button"
+                          disabled={busyId === order.id}
+                          className={buttonClass("danger")}
+                          onClick={() => void onDelete(order.id, order.customerName)}
+                        >
+                          {t("orders.delete")}
+                        </button>
+                      </div>
                     )}
                   </td>
                 ) : null}
