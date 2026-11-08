@@ -13,6 +13,21 @@
   --color-sand: #fffdf8;
 }
 
+/* Базовый rem: на телефоне 16px, на десктопе чуть крупнее для списков/форм. */
+:root {
+  --app-font-size: 16px;
+}
+
+@media (min-width: 1024px) {
+  :root {
+    --app-font-size: 18px;
+  }
+}
+
+html {
+  font-size: var(--app-font-size);
+}
+
 body {
   background:
     radial-gradient(900px 320px at 100% -10%, rgb(180 83 42 / 0.1), transparent 55%),
