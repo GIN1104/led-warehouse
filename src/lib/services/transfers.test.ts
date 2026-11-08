@@ -1,7 +1,9 @@
 import { describe, expect, it } from "vitest";
 import { createDb } from "@/lib/db/memory";
 import { seedIfEmpty } from "@/lib/db/seed";
+import { createPerson } from "@/lib/services/people";
 import { cancelTransfer, listTransfers, planTransfer, receiveTransfer, shipTransfer } from "@/lib/services/transfers";
+import { listTelegramOutbox } from "@/lib/telegram/notify";
 
 describe("перемещения склад↔объект", () => {
   it("план → отправка → приём меняет остатки", () => {
@@ -21,6 +23,12 @@ describe("перемещения склад↔объект", () => {
     );
     expect(planned.status).toBe("planned");
 
+    createPerson(db, {
+      name: "TG Admin",
+      role: "admin",
+      email: "tg-admin@led.local",
+      telegramChatId: "42424242",
+    });
     shipTransfer(db, planned.id, "user_warehouse");
     const midFrom =
       db.get<{ qty: number }>(`SELECT qty_on_hand AS qty FROM stock_balances WHERE sku_id = 'CAB-P25' AND location_id = ?`, [
@@ -28,6 +36,9 @@ describe("перемещения склад↔объект", () => {
       ])?.qty ?? 0;
     expect(midFrom).toBe(before - 5);
     expect(listTransfers(db)[0]?.status).toBe("in_transit");
+    expect(listTelegramOutbox(db).some((row) => row.kind === "transfer" && row.payload.includes("отправлено"))).toBe(
+      true,
+    );
 
     receiveTransfer(db, planned.id, "user_driver");
     const atSite =
@@ -36,6 +47,7 @@ describe("перемещения склад↔объект", () => {
       ])?.qty ?? 0;
     expect(atSite).toBe(5);
     expect(listTransfers(db).find((row) => row.id === planned.id)?.status).toBe("received");
+    expect(listTelegramOutbox(db).some((row) => row.kind === "transfer" && row.payload.includes("принято"))).toBe(true);
   });
 
   it("объект↔объект и отмена из in_transit возвращает qty", () => {
