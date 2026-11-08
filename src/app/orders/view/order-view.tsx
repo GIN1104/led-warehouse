@@ -93,13 +93,18 @@ export function OrderView() {
     const data = new FormData(event.currentTarget);
     try {
       assertCan(session.role, "order.write");
-      updateOrderPhases(db, order.id, {
-        mountDate: String(data.get("mountDate") ?? ""),
-        showStart: String(data.get("showStart") ?? ""),
-        showEnd: String(data.get("showEnd") ?? ""),
-        demountDate: String(data.get("demountDate") ?? ""),
-        phase: String(data.get("phase") ?? "planning"),
-      });
+      updateOrderPhases(
+        db,
+        order.id,
+        {
+          mountDate: String(data.get("mountDate") ?? ""),
+          showStart: String(data.get("showStart") ?? ""),
+          showEnd: String(data.get("showEnd") ?? ""),
+          demountDate: String(data.get("demountDate") ?? ""),
+          phase: String(data.get("phase") ?? "planning"),
+        },
+        session.id,
+      );
       refresh();
       setFlash({ ok: t("phase.saved") });
     } catch (error) {

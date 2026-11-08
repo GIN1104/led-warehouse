@@ -1,5 +1,5 @@
 import { DomainError } from "@/lib/domain/errors";
-import type { Sql } from "@/lib/db/sql";
+import { newId, type Sql } from "@/lib/db/sql";
 import { notifyOrderPhaseTelegram } from "@/lib/telegram/notify";
 
 export const ORDER_PHASES = ["planning", "mount", "show", "demount", "done"] as const;
@@ -58,6 +58,7 @@ export function updateOrderPhases(
     demountDate?: string | null;
     phase?: string;
   },
+  actor = "system",
 ): OrderPhaseFields {
   const order = db.get<{ id: string; startDate: string; endDate: string; customerName: string }>(
     `SELECT id, start_date AS startDate, end_date AS endDate, customer_name AS customerName
@@ -95,6 +96,18 @@ export function updateOrderPhases(
     [next.mountDate, next.showStart, next.showEnd, next.demountDate, next.phase, orderId],
   );
   if (current.phase !== next.phase) {
+    db.run(
+      `INSERT INTO audit_log (id, actor, action, entity, entity_id, payload, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)`,
+      [
+        newId(),
+        actor,
+        "order.phase",
+        "rental_order",
+        orderId,
+        JSON.stringify({ from: current.phase, to: next.phase, phase: next.phase }),
+        Date.now(),
+      ],
+    );
     notifyOrderPhaseTelegram(db, {
       orderId,
       customerName: order.customerName,
