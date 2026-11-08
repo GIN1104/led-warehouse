@@ -31,7 +31,10 @@ CREATE TABLE IF NOT EXISTS locations (
   id TEXT PRIMARY KEY,
   name TEXT NOT NULL,
   kind TEXT NOT NULL CHECK (kind IN ('warehouse', 'zone', 'bin', 'site')),
-  parent_id TEXT REFERENCES locations(id)
+  parent_id TEXT REFERENCES locations(id),
+  address TEXT,
+  lat REAL,
+  lng REAL
 );
 
 CREATE TABLE IF NOT EXISTS stock_balances (
@@ -506,6 +509,15 @@ export function migrate(db: Sql): void {
   db.run(`INSERT INTO ledger_meta (key, value) VALUES ('revision', '0') ON CONFLICT(key) DO NOTHING`);
   ensureUsersRoleDriver(db);
   ensureLocationsSiteKind(db);
+  if (!columnExists(db, "locations", "address")) {
+    db.exec(`ALTER TABLE locations ADD COLUMN address TEXT`);
+  }
+  if (!columnExists(db, "locations", "lat")) {
+    db.exec(`ALTER TABLE locations ADD COLUMN lat REAL`);
+  }
+  if (!columnExists(db, "locations", "lng")) {
+    db.exec(`ALTER TABLE locations ADD COLUMN lng REAL`);
+  }
   if (!columnExists(db, "rental_orders", "mount_date")) {
     db.exec(`ALTER TABLE rental_orders ADD COLUMN mount_date TEXT`);
   }
@@ -684,12 +696,14 @@ CREATE INDEX IF NOT EXISTS idx_order_accessories_order ON order_accessories(orde
     }
     if (!db.get<{ id: string }>(`SELECT id FROM locations WHERE id = 'loc_site_embankment'`)) {
       db.run(
-        `INSERT INTO locations (id, name, kind, parent_id) VALUES ('loc_site_embankment', 'Площадка «Набережная»', 'site', NULL)`,
+        `INSERT INTO locations (id, name, kind, parent_id, address, lat, lng)
+         VALUES ('loc_site_embankment', 'Площадка «Набережная»', 'site', NULL, 'Namal Tel Aviv, Tel Aviv-Yafo', 32.096, 34.773)`,
       );
     }
     if (!db.get<{ id: string }>(`SELECT id FROM locations WHERE id = 'loc_site_field'`)) {
       db.run(
-        `INSERT INTO locations (id, name, kind, parent_id) VALUES ('loc_site_field', 'Площадка «Поле»', 'site', NULL)`,
+        `INSERT INTO locations (id, name, kind, parent_id, address, lat, lng)
+         VALUES ('loc_site_field', 'Площадка «Поле»', 'site', NULL, 'HaYarkon Park, Tel Aviv-Yafo', 32.1, 34.81)`,
       );
     }
   }

@@ -196,28 +196,113 @@ export function createSku(
   return id;
 }
 
-export function createLocation(
-  db: Sql,
-  input: { name: string; kind: "warehouse" | "zone" | "bin" | "site"; parentId?: string },
-  actor: string,
-): string {
+export type LocationKind = "warehouse" | "zone" | "bin" | "site";
+
+export type LocationGeoInput = {
+  name: string;
+  kind: LocationKind;
+  parentId?: string;
+  address?: string;
+  lat?: number | null;
+  lng?: number | null;
+};
+
+function normalizeLocationGeo(input: {
+  address?: string | null;
+  lat?: number | null;
+  lng?: number | null;
+}): { address: string | null; lat: number | null; lng: number | null } {
+  const address = input.address?.trim() || null;
+  const lat = input.lat == null || Number.isNaN(input.lat) ? null : Number(input.lat);
+  const lng = input.lng == null || Number.isNaN(input.lng) ? null : Number(input.lng);
+  if (lat != null && !Number.isFinite(lat)) throw new DomainError("Некорректная широта");
+  if (lng != null && !Number.isFinite(lng)) throw new DomainError("Некорректная долгота");
+  if ((lat == null) !== (lng == null)) {
+    throw new DomainError("Укажите и широту, и долготу — или оставьте оба поля пустыми");
+  }
+  if (lat != null && (lat < -90 || lat > 90)) throw new DomainError("Широта должна быть от −90 до 90");
+  if (lng != null && (lng < -180 || lng > 180)) throw new DomainError("Долгота должна быть от −180 до 180");
+  return { address, lat, lng };
+}
+
+export function createLocation(db: Sql, input: LocationGeoInput, actor: string): string {
   const name = input.name.trim();
   if (name.length < 2) throw new DomainError("Укажите название локации");
   if (input.parentId) {
     const parent = db.get(`SELECT id FROM locations WHERE id = ?`, [input.parentId]);
     if (!parent) throw new DomainError("Родительская локация не найдена");
   }
+  const geo = normalizeLocationGeo(input);
   const id = newId();
   inTx(db, (tx) => {
-    tx.run(`INSERT INTO locations (id, name, kind, parent_id) VALUES (?, ?, ?, ?)`, [
+    tx.run(`INSERT INTO locations (id, name, kind, parent_id, address, lat, lng) VALUES (?, ?, ?, ?, ?, ?, ?)`, [
       id,
       name,
       input.kind,
       input.parentId || null,
+      geo.address,
+      geo.lat,
+      geo.lng,
     ]);
-    audit(tx, actor, "location.create", "location", id, { name, kind: input.kind });
+    audit(tx, actor, "location.create", "location", id, { name, kind: input.kind, ...geo });
   });
   return id;
+}
+
+export function updateLocation(
+  db: Sql,
+  id: string,
+  input: LocationGeoInput,
+  actor: string,
+): void {
+  const existing = db.get(`SELECT id FROM locations WHERE id = ?`, [id]);
+  if (!existing) throw new DomainError("Локация не найдена");
+  const name = input.name.trim();
+  if (name.length < 2) throw new DomainError("Укажите название локации");
+  if (input.parentId === id) throw new DomainError("Локация не может быть родителем самой себе");
+  if (input.parentId) {
+    const parent = db.get(`SELECT id FROM locations WHERE id = ?`, [input.parentId]);
+    if (!parent) throw new DomainError("Родительская локация не найдена");
+  }
+  const geo = normalizeLocationGeo(input);
+  inTx(db, (tx) => {
+    tx.run(
+      `UPDATE locations SET name = ?, kind = ?, parent_id = ?, address = ?, lat = ?, lng = ? WHERE id = ?`,
+      [name, input.kind, input.parentId || null, geo.address, geo.lat, geo.lng, id],
+    );
+    audit(tx, actor, "location.update", "location", id, { name, kind: input.kind, ...geo });
+  });
+}
+
+/** Удаляет локацию, если нет остатков, движений, детей и перемещений. */
+export function deleteLocation(db: Sql, id: string, actor: string): void {
+  const existing = db.get<{ kind: string }>(`SELECT kind FROM locations WHERE id = ?`, [id]);
+  if (!existing) throw new DomainError("Локация не найдена");
+  const child = db.get(`SELECT id FROM locations WHERE parent_id = ? LIMIT 1`, [id]);
+  if (child) throw new DomainError("Сначала удалите вложенные локации");
+  const busy = db.get(
+    `SELECT 1 AS ok FROM stock_balances
+     WHERE location_id = ? AND (qty_on_hand != 0 OR qty_reserved != 0) LIMIT 1`,
+    [id],
+  );
+  if (busy) throw new DomainError("На локации есть остаток — удалить нельзя");
+  db.run(`DELETE FROM stock_balances WHERE location_id = ? AND qty_on_hand = 0 AND qty_reserved = 0`, [id]);
+  const movement = db.get(
+    `SELECT id FROM stock_movements WHERE location_id = ? OR from_location_id = ? LIMIT 1`,
+    [id, id],
+  );
+  if (movement) throw new DomainError("По локации есть движения склада — удалить нельзя");
+  const transfer = db.get(
+    `SELECT id FROM stock_transfers WHERE from_location_id = ? OR to_location_id = ? LIMIT 1`,
+    [id, id],
+  );
+  if (transfer) throw new DomainError("По локации есть перемещения — удалить нельзя");
+  const equipment = db.get(`SELECT id FROM equipment_items WHERE location_id = ? LIMIT 1`, [id]);
+  if (equipment) throw new DomainError("На локации есть единицы оборудования — удалить нельзя");
+  inTx(db, (tx) => {
+    tx.run(`DELETE FROM locations WHERE id = ?`, [id]);
+    audit(tx, actor, "location.delete", "location", id, { kind: existing.kind });
+  });
 }
 
 function balanceOf(tx: Sql, skuId: string, locationId: string): number {

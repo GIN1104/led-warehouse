@@ -1,22 +1,49 @@
 "use client";
 
 import Link from "next/link";
-import { useState, type FormEvent } from "react";
+import { useEffect, useState, type FormEvent } from "react";
 import { useI18n } from "@/components/i18n";
 import { useWarehouse } from "@/components/warehouse";
 import { Badge, Empty, Field, Flash, PageHeader, Panel, buttonClass, controlClass } from "@/components/ui";
+import { apiUrl, sharedLedger } from "@/lib/api";
 import { formatDateTime } from "@/lib/dates";
 import { translateError, type MessageKey } from "@/lib/i18n/messages";
 import { getRoleLabels, updateOwnCabinet } from "@/lib/services/people";
 import { flushTelegramOutbox, listTelegramOutbox, sendTestTelegram } from "@/lib/telegram/notify";
+
+type BotStatus = "configured" | "mock" | "unknown";
 
 export default function MePage() {
   const { db, session, refresh, revision } = useWarehouse();
   const { t, lang } = useI18n();
   const labels = getRoleLabels(db);
   const [flash, setFlash] = useState<{ error?: string; ok?: string }>({});
+  const [botStatus, setBotStatus] = useState<BotStatus>("unknown");
   const outbox = listTelegramOutbox(db, 20);
+  const bound = Boolean(session.telegramChatId?.trim());
   void revision;
+
+  useEffect(() => {
+    let cancelled = false;
+    async function loadStatus() {
+      if (!sharedLedger) {
+        if (!cancelled) setBotStatus("unknown");
+        return;
+      }
+      try {
+        const response = await fetch(apiUrl("/api/v1/telegram/notify"));
+        if (!response.ok) throw new Error("status");
+        const data = (await response.json()) as { configured?: boolean };
+        if (!cancelled) setBotStatus(data.configured ? "configured" : "mock");
+      } catch {
+        if (!cancelled) setBotStatus("unknown");
+      }
+    }
+    void loadStatus();
+    return () => {
+      cancelled = true;
+    };
+  }, [revision]);
 
   async function onSave(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -35,6 +62,10 @@ export default function MePage() {
   }
 
   async function onTest() {
+    if (!session.telegramChatId?.trim()) {
+      setFlash({ error: t("me.needChatId") });
+      return;
+    }
     try {
       await sendTestTelegram(db, session);
       await flushTelegramOutbox(db);
@@ -67,6 +98,21 @@ export default function MePage() {
               <dd className="font-medium">{session.email || "—"}</dd>
             </div>
           </dl>
+
+          <div className="mb-4 rounded-md border border-line bg-white/70 p-3">
+            <div className="mb-2 flex flex-wrap items-center gap-2">
+              <h3 className="font-medium">{t("me.bindTitle")}</h3>
+              <Badge tone={bound ? "ok" : "warn"}>{bound ? t("me.bindStatusBound") : t("me.bindStatusUnbound")}</Badge>
+              <Badge tone={botStatus === "configured" ? "ok" : botStatus === "mock" ? "warn" : "neutral"}>
+                {botStatus === "configured"
+                  ? t("me.serverConfigured")
+                  : botStatus === "mock"
+                    ? t("me.serverMock")
+                    : t("me.serverUnknown")}
+              </Badge>
+            </div>
+            <p className="text-sm leading-6 text-ink/70">{t("me.bindSteps")}</p>
+          </div>
 
           <form onSubmit={(event) => void onSave(event)} className="grid gap-3 border-t border-line pt-4">
             <Field label={t("me.phone")}>
@@ -101,7 +147,13 @@ export default function MePage() {
               <button type="submit" className={buttonClass("primary")}>
                 {t("me.save")}
               </button>
-              <button type="button" className={buttonClass("ghost")} onClick={() => void onTest()}>
+              <button
+                type="button"
+                className={buttonClass("ghost")}
+                onClick={() => void onTest()}
+                disabled={!bound}
+                title={!bound ? t("me.needChatId") : undefined}
+              >
                 {t("me.test")}
               </button>
               <Link href="/people/" className={buttonClass("ghost")}>

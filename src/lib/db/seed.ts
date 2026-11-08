@@ -30,12 +30,14 @@ export function seedIfEmpty(db: Sql): void {
   db.run(`INSERT INTO locations (id, name, kind, parent_id) VALUES (?, 'Зона A — кабинеты', 'zone', ?)`, [LOC_A, LOC_MAIN]);
   db.run(`INSERT INTO locations (id, name, kind, parent_id) VALUES (?, 'Зона B — кабели', 'zone', ?)`, [LOC_B, LOC_MAIN]);
   db.run(`INSERT INTO locations (id, name, kind, parent_id) VALUES (?, 'Зона C — отгрузка', 'zone', ?)`, [LOC_C, LOC_MAIN]);
-  db.run(`INSERT INTO locations (id, name, kind, parent_id) VALUES (?, 'Площадка «Набережная»', 'site', NULL)`, [
-    "loc_site_embankment",
-  ]);
-  db.run(`INSERT INTO locations (id, name, kind, parent_id) VALUES (?, 'Площадка «Поле»', 'site', NULL)`, [
-    "loc_site_field",
-  ]);
+  db.run(
+    `INSERT INTO locations (id, name, kind, parent_id, address, lat, lng) VALUES (?, 'Площадка «Набережная»', 'site', NULL, ?, ?, ?)`,
+    ["loc_site_embankment", "Namal Tel Aviv, Tel Aviv-Yafo", 32.096, 34.773],
+  );
+  db.run(
+    `INSERT INTO locations (id, name, kind, parent_id, address, lat, lng) VALUES (?, 'Площадка «Поле»', 'site', NULL, ?, ?, ?)`,
+    ["loc_site_field", "HaYarkon Park, Tel Aviv-Yafo", 32.1, 34.81],
+  );
 
   const catalog: [string, string, string, string][] = [
     ["CAB-P25", "Кабинет LED P2.5 500×500", "Кабинеты", "Арендуемый кабинет, учёт по количеству"],

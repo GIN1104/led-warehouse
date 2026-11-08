@@ -136,6 +136,9 @@ const REMOTE_ALTERS = [
   "ALTER TABLE skus ADD COLUMN family_id TEXT",
   "ALTER TABLE skus ADD COLUMN name_key TEXT",
   "ALTER TABLE skus ADD COLUMN sort_order INTEGER NOT NULL DEFAULT 0",
+  "ALTER TABLE locations ADD COLUMN address TEXT",
+  "ALTER TABLE locations ADD COLUMN lat REAL",
+  "ALTER TABLE locations ADD COLUMN lng REAL",
 ];
 
 async function ensureRemoteAlters(target: Client): Promise<void> {

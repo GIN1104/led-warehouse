@@ -9,7 +9,11 @@
 3. В приложении откройте **Кабинет** (`/me`): сохраните `@username` и **chatId**.
 4. Нажмите **Тест Telegram** — в журнале должна появиться запись (`mock` без токена на сервере, `sent` если `TELEGRAM_BOT_TOKEN` задан).
 
+На `/me` видны статусы: **chatId сохранён / нет** и **API: токен задан / mock** (через `GET /api/v1/telegram/notify` при shared ledger / ACCESS_API_BASE). Кнопка теста неактивна без chatId.
+
 То же можно задать менеджеру в `/people` (право people.write).
+
+**Fly (проверка без утечки токена):** `GET https://led-warehouse-api.fly.dev/api/v1/telegram/notify/` → `configured: true|false`. Токен в чат не вставлять — только `fly secrets set` на app `led-warehouse-api`.
 
 ## Уведомления
 

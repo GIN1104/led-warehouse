@@ -10,7 +10,7 @@ export type SheetsMirrorSnapshot = {
 export function buildSheetsMirrorSnapshot(db: Sql): SheetsMirrorSnapshot {
   const tables: Record<string, Record<string, unknown>[]> = {
     users: db.all(`SELECT id, name, role, email, phone, telegram_username, telegram_chat_id FROM users`),
-    locations: db.all(`SELECT id, name, kind, parent_id FROM locations`),
+    locations: db.all(`SELECT id, name, kind, parent_id, address, lat, lng FROM locations`),
     skus: db.all(`SELECT id, code, name, category, unit FROM skus`),
     stock_balances: db.all(`SELECT sku_id, location_id, qty_on_hand, qty_reserved FROM stock_balances`),
     rental_orders: db.all(
