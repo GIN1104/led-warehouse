@@ -49,7 +49,7 @@ export function Nav({ compact = false, onNavigate }: { compact?: boolean; onNavi
   const pathname = usePathname();
   const { t } = useI18n();
   return (
-    <nav className={cn(compact ? "flex gap-2 overflow-x-auto px-4 py-3" : "flex flex-col gap-1")}>
+    <nav className={cn(compact ? "flex gap-2 overflow-x-auto px-4 py-3" : "flex flex-col gap-0")}>
       {links.map((link) => {
         const path = pathname.length > 1 && pathname.endsWith("/") ? pathname.slice(0, -1) : pathname;
         const active = link.href === "/" ? path === "/" : path.startsWith(link.href);
@@ -60,7 +60,10 @@ export function Nav({ compact = false, onNavigate }: { compact?: boolean; onNavi
             href={link.href}
             onClick={onNavigate}
             className={cn(
-              "flex items-center gap-2 rounded-md px-3 py-2 text-sm whitespace-nowrap [@media(max-height:520px)]:py-1.5",
+              "flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-base leading-snug tracking-tight whitespace-nowrap [@media(max-height:520px)]:py-1",
+              compact
+                ? "gap-2 px-3 py-2 text-sm"
+                : null,
               compact
                 ? active
                   ? "bg-ink text-paper"
@@ -70,7 +73,7 @@ export function Nav({ compact = false, onNavigate }: { compact?: boolean; onNavi
                   : "text-white/75 hover:bg-white/5 hover:text-white",
             )}
           >
-            <Icon size={16} aria-hidden />
+            <Icon size={compact ? 16 : 17} aria-hidden className="shrink-0" />
             {t(link.label)}
           </Link>
         );
