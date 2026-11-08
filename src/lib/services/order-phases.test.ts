@@ -1,8 +1,10 @@
 import { describe, expect, it } from "vitest";
 import { createDb } from "@/lib/db/memory";
 import { seedIfEmpty } from "@/lib/db/seed";
+import { createPerson } from "@/lib/services/people";
 import { updateOrderPhases } from "@/lib/services/order-phases";
 import { listOrders } from "@/lib/services/queries";
+import { listTelegramOutbox } from "@/lib/telegram/notify";
 
 describe("фазы заказа монтаж/шоу/демонтаж", () => {
   it("сохраняет даты фаз внутри периода", () => {
@@ -10,6 +12,12 @@ describe("фазы заказа монтаж/шоу/демонтаж", () => {
     seedIfEmpty(db);
     const order = listOrders(db)[0];
     if (!order) throw new Error("no order");
+    createPerson(db, {
+      name: "Phase TG",
+      role: "manager",
+      email: "phase-tg@led.local",
+      telegramChatId: "99887766",
+    });
     const next = updateOrderPhases(
       db,
       order.id,
@@ -32,6 +40,11 @@ describe("фазы заказа монтаж/шоу/демонтаж", () => {
     );
     expect(audit?.action).toBe("order.phase");
     expect(JSON.parse(audit?.payload ?? "{}")).toMatchObject({ to: "show" });
+    expect(
+      listTelegramOutbox(db).some(
+        (row) => row.kind === "order_phase" && row.payload.includes("→ show") && row.chatId === "99887766",
+      ),
+    ).toBe(true);
   });
 
   it("отклоняет даты вне периода", () => {

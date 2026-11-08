@@ -6,6 +6,8 @@ import {
   flushTelegramOutbox,
   listTelegramOutbox,
   notifyAccessRequestTelegram,
+  notifyOrderPhaseTelegram,
+  notifyTransferTelegram,
   sendTelegramMessage,
 } from "@/lib/telegram/notify";
 
@@ -60,6 +62,33 @@ describe("telegram notify + outbox", () => {
     });
     expect(sent.mode).toBe("sent");
     expect(fetchImpl).toHaveBeenCalledOnce();
+  });
+
+  it("transfer и order_phase пишут outbox", () => {
+    const db = createDb();
+    createPerson(db, {
+      name: "М",
+      role: "manager",
+      email: "m2@led.local",
+      telegramChatId: "555666777",
+    });
+    const transfer = notifyTransferTelegram(db, {
+      action: "shipped",
+      skuCode: "CAB-P25",
+      qty: 2,
+      fromName: "Склад",
+      toName: "Площадка",
+      transferId: "tr_test",
+    });
+    expect(transfer[0]).toMatchObject({ kind: "transfer", mode: "mock", chatId: "555666777" });
+    const phase = notifyOrderPhaseTelegram(db, {
+      orderId: "ord_1",
+      customerName: "Клиент",
+      fromPhase: "planning",
+      toPhase: "mount",
+    });
+    expect(phase[0]).toMatchObject({ kind: "order_phase", mode: "mock" });
+    expect(phase[0]?.payload).toContain("planning → mount");
   });
 
   it("flush на Pages (без shared) не меняет mock", async () => {

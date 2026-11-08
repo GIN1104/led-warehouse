@@ -1,6 +1,7 @@
 import { DomainError } from "@/lib/domain/errors";
 import { newId, type Sql } from "@/lib/db/sql";
 import { applyMovement } from "@/lib/services/ledger";
+import { notifyTransferTelegram } from "@/lib/telegram/notify";
 
 export type TransferStatus = "planned" | "in_transit" | "received" | "cancelled";
 
@@ -130,7 +131,16 @@ export function shipTransfer(db: Sql, id: string, actor: string): StockTransferR
     actor,
   );
   db.run(`UPDATE stock_transfers SET status = 'in_transit', shipped_at = ? WHERE id = ?`, [Date.now(), id]);
-  return readTransfer(db, id);
+  const shipped = readTransfer(db, id);
+  notifyTransferTelegram(db, {
+    action: "shipped",
+    skuCode: shipped.skuCode,
+    qty: shipped.qty,
+    fromName: shipped.fromLocationName,
+    toName: shipped.toLocationName,
+    transferId: shipped.id,
+  });
+  return shipped;
 }
 
 /** Приход на to — received. */
@@ -150,7 +160,16 @@ export function receiveTransfer(db: Sql, id: string, actor: string): StockTransf
     actor,
   );
   db.run(`UPDATE stock_transfers SET status = 'received', received_at = ? WHERE id = ?`, [Date.now(), id]);
-  return readTransfer(db, id);
+  const received = readTransfer(db, id);
+  notifyTransferTelegram(db, {
+    action: "received",
+    skuCode: received.skuCode,
+    qty: received.qty,
+    fromName: received.fromLocationName,
+    toName: received.toLocationName,
+    transferId: received.id,
+  });
+  return received;
 }
 
 export function cancelTransfer(db: Sql, id: string, actor: string): StockTransferRow {
@@ -173,5 +192,14 @@ export function cancelTransfer(db: Sql, id: string, actor: string): StockTransfe
     );
   }
   db.run(`UPDATE stock_transfers SET status = 'cancelled' WHERE id = ?`, [id]);
-  return readTransfer(db, id);
+  const cancelled = readTransfer(db, id);
+  notifyTransferTelegram(db, {
+    action: "cancelled",
+    skuCode: cancelled.skuCode,
+    qty: cancelled.qty,
+    fromName: cancelled.fromLocationName,
+    toName: cancelled.toLocationName,
+    transferId: cancelled.id,
+  });
+  return cancelled;
 }

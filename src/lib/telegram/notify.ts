@@ -1,9 +1,14 @@
 import { apiUrl, sharedLedger } from "@/lib/api";
 import { newId, type Sql } from "@/lib/db/sql";
-import { getTelegramBotToken } from "@/lib/telegram/config";
+import { getTelegramAdminChatIds, getTelegramBotToken } from "@/lib/telegram/config";
 import { listUsers, type UserRow } from "@/lib/services/queries";
 
-export type TelegramNotifyKind = "access_request" | "shortage" | "check_in";
+export type TelegramNotifyKind =
+  | "access_request"
+  | "shortage"
+  | "check_in"
+  | "transfer"
+  | "order_phase";
 export type TelegramOutboxMode = "sent" | "mock" | "skipped";
 
 export type TelegramOutboxRow = {
@@ -95,6 +100,7 @@ function updateOutboxMode(db: Sql, id: string, mode: TelegramOutboxMode, error: 
 
 /**
  * Ставит уведомление менеджерам с Telegram в outbox.
+ * Дополнительно — chat id из TELEGRAM_ADMIN_CHAT_IDS (Fly), если ещё не в списке users.
  * Без получателей — одна запись mode=skipped (аудит). Без токена/API — mode=mock.
  */
 export function notifyManagersTelegram(
@@ -104,7 +110,32 @@ export function notifyManagersTelegram(
   const text = input.text.trim();
   if (!text) return [];
   const recipients = listTelegramNotifyRecipients(db);
-  if (recipients.length === 0) {
+  const seen = new Set(recipients.map((user) => user.telegramChatId).filter(Boolean) as string[]);
+  const rows: TelegramOutboxRow[] = recipients.map((user) =>
+    insertOutbox(db, {
+      kind: input.kind,
+      chatId: user.telegramChatId,
+      username: user.telegramUsername,
+      payload: text,
+      mode: "mock",
+      now: input.now,
+    }),
+  );
+  for (const chatId of getTelegramAdminChatIds()) {
+    if (seen.has(chatId)) continue;
+    seen.add(chatId);
+    rows.push(
+      insertOutbox(db, {
+        kind: input.kind,
+        chatId,
+        username: null,
+        payload: text,
+        mode: "mock",
+        now: input.now,
+      }),
+    );
+  }
+  if (rows.length === 0) {
     return [
       insertOutbox(db, {
         kind: input.kind,
@@ -116,16 +147,7 @@ export function notifyManagersTelegram(
       }),
     ];
   }
-  return recipients.map((user) =>
-    insertOutbox(db, {
-      kind: input.kind,
-      chatId: user.telegramChatId,
-      username: user.telegramUsername,
-      payload: text,
-      mode: "mock",
-      now: input.now,
-    }),
-  );
+  return rows;
 }
 
 export function notifyAccessRequestTelegram(db: Sql, requestEmail: string, now = Date.now()): TelegramOutboxRow[] {
@@ -140,6 +162,39 @@ export function notifyShortageTelegram(db: Sql, message: string, now = Date.now(
   return notifyManagersTelegram(db, {
     kind: "shortage",
     text: `LED Warehouse: ${message}`,
+    now,
+  });
+}
+
+export function notifyTransferTelegram(
+  db: Sql,
+  input: {
+    action: "shipped" | "received" | "cancelled";
+    skuCode: string;
+    qty: number;
+    fromName: string;
+    toName: string;
+    transferId: string;
+  },
+  now = Date.now(),
+): TelegramOutboxRow[] {
+  const verb =
+    input.action === "shipped" ? "отправлено" : input.action === "received" ? "принято" : "отменено";
+  return notifyManagersTelegram(db, {
+    kind: "transfer",
+    text: `LED Warehouse: перемещение ${verb}: ${input.skuCode} ×${input.qty} (${input.fromName} → ${input.toName}) [${input.transferId}]`,
+    now,
+  });
+}
+
+export function notifyOrderPhaseTelegram(
+  db: Sql,
+  input: { orderId: string; customerName: string; fromPhase: string; toPhase: string },
+  now = Date.now(),
+): TelegramOutboxRow[] {
+  return notifyManagersTelegram(db, {
+    kind: "order_phase",
+    text: `LED Warehouse: фаза заказа «${input.customerName}»: ${input.fromPhase} → ${input.toPhase} [${input.orderId}]`,
     now,
   });
 }

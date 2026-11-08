@@ -1,5 +1,6 @@
 import { DomainError } from "@/lib/domain/errors";
 import { newId, type Sql } from "@/lib/db/sql";
+import { notifyOrderPhaseTelegram } from "@/lib/telegram/notify";
 
 export const ORDER_PHASES = ["planning", "mount", "show", "demount", "done"] as const;
 export type OrderPhase = (typeof ORDER_PHASES)[number];
@@ -59,8 +60,9 @@ export function updateOrderPhases(
   },
   actor = "system",
 ): OrderPhaseFields {
-  const order = db.get<{ id: string; startDate: string; endDate: string }>(
-    `SELECT id, start_date AS startDate, end_date AS endDate FROM rental_orders WHERE id = ?`,
+  const order = db.get<{ id: string; startDate: string; endDate: string; customerName: string }>(
+    `SELECT id, start_date AS startDate, end_date AS endDate, customer_name AS customerName
+     FROM rental_orders WHERE id = ?`,
     [orderId],
   );
   if (!order) throw new DomainError("Заказ не найден");
@@ -106,6 +108,12 @@ export function updateOrderPhases(
         Date.now(),
       ],
     );
+    notifyOrderPhaseTelegram(db, {
+      orderId,
+      customerName: order.customerName,
+      fromPhase: current.phase || "planning",
+      toPhase: next.phase,
+    });
   }
   return next;
 }

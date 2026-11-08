@@ -284,7 +284,7 @@ CREATE INDEX IF NOT EXISTS idx_order_accessories_order ON order_accessories(orde
 
 CREATE TABLE IF NOT EXISTS telegram_outbox (
   id TEXT PRIMARY KEY,
-  kind TEXT NOT NULL CHECK (kind IN ('access_request', 'shortage', 'check_in')),
+  kind TEXT NOT NULL CHECK (kind IN ('access_request', 'shortage', 'check_in', 'transfer', 'order_phase')),
   chat_id TEXT,
   username TEXT,
   payload TEXT NOT NULL,
@@ -355,6 +355,44 @@ CREATE UNIQUE INDEX IF NOT EXISTS uq_users_email ON users(email) WHERE email IS 
 `);
   db.exec(`PRAGMA foreign_keys=ON`);
   setMetaFlag(db, "schema:users_role_driver");
+}
+
+/** Расширяет CHECK kind в telegram_outbox (transfer, order_phase). */
+function ensureTelegramOutboxKinds(db: Sql): void {
+  if (metaFlag(db, "schema:telegram_outbox_kinds_v2")) return;
+  try {
+    const id = "__probe_tg_kind__";
+    db.run(
+      `INSERT INTO telegram_outbox (id, kind, chat_id, username, payload, mode, created_at, error)
+       VALUES (?, 'transfer', NULL, NULL, 'probe', 'skipped', ?, NULL)`,
+      [id, Date.now()],
+    );
+    db.run(`DELETE FROM telegram_outbox WHERE id = ?`, [id]);
+    setMetaFlag(db, "schema:telegram_outbox_kinds_v2");
+    return;
+  } catch {
+    /* старый CHECK — пересоздаём таблицу */
+  }
+  db.exec(`PRAGMA foreign_keys=OFF`);
+  db.exec(`
+CREATE TABLE telegram_outbox__v2 (
+  id TEXT PRIMARY KEY,
+  kind TEXT NOT NULL CHECK (kind IN ('access_request', 'shortage', 'check_in', 'transfer', 'order_phase')),
+  chat_id TEXT,
+  username TEXT,
+  payload TEXT NOT NULL,
+  mode TEXT NOT NULL CHECK (mode IN ('sent', 'mock', 'skipped')),
+  created_at INTEGER NOT NULL,
+  error TEXT
+);
+INSERT INTO telegram_outbox__v2 (id, kind, chat_id, username, payload, mode, created_at, error)
+  SELECT id, kind, chat_id, username, payload, mode, created_at, error FROM telegram_outbox;
+DROP TABLE telegram_outbox;
+ALTER TABLE telegram_outbox__v2 RENAME TO telegram_outbox;
+CREATE INDEX IF NOT EXISTS idx_telegram_outbox_created ON telegram_outbox(created_at);
+`);
+  db.exec(`PRAGMA foreign_keys=ON`);
+  setMetaFlag(db, "schema:telegram_outbox_kinds_v2");
 }
 
 /** Расширяет CHECK локаций (site = объект/площадка). */
@@ -504,7 +542,7 @@ CREATE INDEX IF NOT EXISTS idx_stock_transfers_status ON stock_transfers(status)
   db.exec(`
 CREATE TABLE IF NOT EXISTS telegram_outbox (
   id TEXT PRIMARY KEY,
-  kind TEXT NOT NULL CHECK (kind IN ('access_request', 'shortage', 'check_in')),
+  kind TEXT NOT NULL CHECK (kind IN ('access_request', 'shortage', 'check_in', 'transfer', 'order_phase')),
   chat_id TEXT,
   username TEXT,
   payload TEXT NOT NULL,
@@ -514,6 +552,7 @@ CREATE TABLE IF NOT EXISTS telegram_outbox (
 );
 CREATE INDEX IF NOT EXISTS idx_telegram_outbox_created ON telegram_outbox(created_at);
 `);
+  ensureTelegramOutboxKinds(db);
   db.exec(`
 CREATE TABLE IF NOT EXISTS access_requests (
   id TEXT PRIMARY KEY,
