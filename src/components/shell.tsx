@@ -156,7 +156,7 @@ export function Shell({ children }: { children: ReactNode }) {
           <p className="text-lg font-semibold tracking-tight">LED Warehouse</p>
           <p className="text-xs text-white/55">{t("brand.tagline")}</p>
         </div>
-        <div className="min-h-0 flex-1 overflow-y-auto overscroll-y-contain px-3">
+        <div className="scrollbar-none min-h-0 flex-1 overflow-y-auto overscroll-y-contain px-3">
           <Nav onNavigate={closeMobileNav} />
         </div>
         <div className="shrink-0 border-t border-white/10 px-4 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
