@@ -71,7 +71,12 @@ export function listLocations(db: Sql) {
     name: string;
     kind: "warehouse" | "zone" | "bin" | "site";
     parentId: string | null;
-  }>(`SELECT id, name, kind, parent_id AS parentId FROM locations`);
+    address: string | null;
+    lat: number | null;
+    lng: number | null;
+  }>(
+    `SELECT id, name, kind, parent_id AS parentId, address, lat, lng FROM locations`,
+  );
   const byId = new Map(rows.map((row) => [row.id, row]));
   return rows
     .map((row) => ({
