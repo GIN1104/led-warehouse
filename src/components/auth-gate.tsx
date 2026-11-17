@@ -105,12 +105,24 @@ export function AuthGate({ children }: { children: ReactNode }) {
       const outcome = requestAccessOrLogin(db, email);
       if (outcome.kind === "logged_in") {
         finishLogin(db, switchUser, outcome.email, outcome.userId, setSession);
-        await refresh();
+        try {
+          await refresh();
+        } catch {
+          // Offline / last-known: вход по локальному снимку без push.
+        }
       } else if (outcome.kind === "pending") {
         // Shared/Docker/Turso или NEXT_PUBLIC_ACCESS_API_BASE: дублируем заявку на сервер + Telegram админам.
         await postSharedAccessRequest(outcome.email);
-        await flushTelegramOutbox(db);
-        await refresh();
+        try {
+          await flushTelegramOutbox(db);
+        } catch {
+          // сеть недоступна — заявка уже в локальном ledger
+        }
+        try {
+          await refresh();
+        } catch {
+          // offline write blocked — browse-only
+        }
       }
       return outcome;
     },
