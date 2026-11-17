@@ -9,11 +9,17 @@
 3. В приложении откройте **Кабинет** (`/me`): сохраните `@username` и **chatId**.
 4. Нажмите **Тест Telegram** — в журнале должна появиться запись (`mock` без токена на сервере, `sent` если `TELEGRAM_BOT_TOKEN` задан).
 
-На `/me` видны статусы: **chatId сохранён / нет** и **API: токен задан / mock** (через `GET /api/v1/telegram/notify` при shared ledger / ACCESS_API_BASE). Кнопка теста неактивна без chatId.
+На `/me` видны статусы: **chatId сохранён / нет** и **API: токен задан / mock** (через `GET /api/v1/telegram/notify` при shared ledger / `NEXT_PUBLIC_ACCESS_API_BASE`). Кнопка теста неактивна без chatId.
+
+«chatId ещё не задан» — **ожидаемый UX**, пока пользователь не сохранил числовой chatId после `/start` боту (не баг бандла).
+
+Если badge говорит, что API недоступен, а Variable уже в бандле — смотрите CORS на `/api/v1/telegram/notify` (нужен `Access-Control-Allow-Origin` для `https://gin1104.github.io`) или cold start Render.
 
 То же можно задать менеджеру в `/people` (право people.write).
 
-**Fly (проверка без утечки токена):** `GET https://led-warehouse-api.fly.dev/api/v1/telegram/notify/` → `configured: true|false`. Токен в чат не вставлять — только `fly secrets set` на app `led-warehouse-api`.
+**Render (проверка без утечки токена):**  
+`curl -sS -H 'Origin: https://gin1104.github.io' https://led-warehouse-api.onrender.com/api/v1/telegram/notify/`  
+→ JSON `configured` + заголовок `access-control-allow-origin`. Токен в чат не вставлять — только Render Environment / secrets.
 
 ## Уведомления
 
@@ -34,15 +40,14 @@
 
 ## Fly / Docker — что задать на сервере
 
-Только на API-хосте (например `led-warehouse-api.fly.dev`), **не** в GitHub Pages и не в `NEXT_PUBLIC_*`:
+Только на API-хосте (сейчас Render `led-warehouse-api.onrender.com`), **не** в GitHub Pages и не в `NEXT_PUBLIC_*`:
 
 ```bash
-# Fly secrets (пример)
-fly secrets set TELEGRAM_BOT_TOKEN=123456:ABC-DEF... TELEGRAM_ADMIN_CHAT_IDS=123456789 -a led-warehouse-api
-
-# или .env.local / Docker
+# Render Dashboard → Environment (или Fly/Oracle secrets)
 TELEGRAM_BOT_TOKEN=123456:ABC-DEF...
 TELEGRAM_ADMIN_CHAT_IDS=123456789,987654321
+
+# локально / Docker
 NEXT_PUBLIC_SHARED=1
 ```
 
