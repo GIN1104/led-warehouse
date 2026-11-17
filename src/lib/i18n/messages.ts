@@ -7,6 +7,9 @@ export const ru = {
   "shell.browser": "Данные хранятся в этом браузере.",
   "shell.shared": "Склад и задания пишутся в подключённую базу, а не остаются только в этом браузере.",
   "shell.conflict": "Общий учёт изменился на другом компьютере. Показана свежая копия, повторите действие.",
+  "shell.offline": "Нет связи с сервером — показаны данные от {when}.",
+  "shell.offlineUnknownWhen": "последней успешной синхронизации",
+  "shell.offlineWrite": "Нет связи с сервером — изменение данных недоступно. Можно только просматривать.",
   "shell.menu": "Меню",
   "shell.close": "Закрыть меню",
   "shell.hide": "Скрыть панель",
@@ -740,6 +743,7 @@ export const ru = {
   "err.accessRevoke": "Email не в списке допущенных",
   "err.accessPermanent": "Этот email нельзя отозвать",
   "err.accessManagers": "Управлять доступом могут только starchenkogin@gmail.com и ledvision2026.il@gmail.com",
+  "err.offlineWrite": "Нет связи с сервером — запись отключена",
 } as const;
 
 export type MessageKey = keyof typeof ru;
@@ -753,6 +757,9 @@ export const en: Record<MessageKey, string> = {
   "shell.browser": "Data stays in this browser.",
   "shell.shared": "Stock and tasks are saved in the connected database, not only in this browser.",
   "shell.conflict": "The shared ledger changed on another computer. Showing the fresh copy, repeat the action.",
+  "shell.offline": "No server connection — showing data from {when}.",
+  "shell.offlineUnknownWhen": "the last successful sync",
+  "shell.offlineWrite": "No server connection — edits are disabled. Browse only.",
   "shell.menu": "Menu",
   "shell.close": "Close menu",
   "shell.hide": "Hide sidebar",
@@ -1484,6 +1491,7 @@ export const en: Record<MessageKey, string> = {
   "err.accessRevoke": "Email is not on the allowlist",
   "err.accessPermanent": "This email cannot be revoked",
   "err.accessManagers": "Only starchenkogin@gmail.com and ledvision2026.il@gmail.com can manage access",
+  "err.offlineWrite": "No server connection — writes are disabled",
 };
 
 export const he: Record<MessageKey, string> = {
@@ -1495,6 +1503,9 @@ export const he: Record<MessageKey, string> = {
   "shell.browser": "הנתונים נשמרים בדפדפן הזה.",
   "shell.shared": "המלאי והמשימות נשמרים במסד המחובר, לא רק בדפדפן הזה.",
   "shell.conflict": "המלאי המשותף השתנה במחשב אחר. מוצג העותק העדכני, חזור על הפעולה.",
+  "shell.offline": "אין חיבור לשרת — מוצגים נתונים מ־{when}.",
+  "shell.offlineUnknownWhen": "הסנכרון האחרון שהצליח",
+  "shell.offlineWrite": "אין חיבור לשרת — לא ניתן לשנות נתונים. ניתן רק לצפות.",
   "shell.menu": "תפריט",
   "shell.close": "סגור תפריט",
   "shell.hide": "הסתר סרגל",
@@ -2226,6 +2237,7 @@ export const he: Record<MessageKey, string> = {
   "err.accessRevoke": "האימייל לא ברשימת המאושרים",
   "err.accessPermanent": "לא ניתן לבטל אימייל זה",
   "err.accessManagers": "רק starchenkogin@gmail.com ו-ledvision2026.il@gmail.com יכולים לנהל גישה",
+  "err.offlineWrite": "אין חיבור לשרת — הכתיבה כבויה",
 };
 
 export type Lang = "ru" | "en" | "he";
@@ -2295,6 +2307,7 @@ const errorRules: [RegExp, MessageKey][] = [
   [/не в списке допущенных/, "err.accessRevoke"],
   [/нельзя отозвать/, "err.accessPermanent"],
   [/Управлять доступом могут только/, "err.accessManagers"],
+  [/Нет связи с сервером — запись отключена|LedgerOfflineWriteError/, "err.offlineWrite"],
   [/Неизвестный статус оборудования/, "err.eqStatus"],
   [/Позиция оборудования не найдена/, "err.eqItem"],
   [/Нельзя сменить статус/, "err.eqTransition"],

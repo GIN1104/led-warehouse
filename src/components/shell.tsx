@@ -7,6 +7,7 @@ import { useEmailAuth } from "@/components/auth-gate";
 import { useI18n } from "@/components/i18n";
 import { Nav } from "@/components/nav";
 import { useWarehouse } from "@/components/warehouse";
+import { formatSnapshotWhen } from "@/lib/db/ledger-snapshot";
 import type { Lang, MessageKey } from "@/lib/i18n/messages";
 import { getRoleLabels } from "@/lib/services/people";
 import type { Role } from "@/lib/services/queries";
@@ -87,9 +88,9 @@ function isDesktop(): boolean {
 }
 
 export function Shell({ children }: { children: ReactNode }) {
-  const { db, session, shared, notice, revision } = useWarehouse();
+  const { db, session, shared, notice, revision, offline, snapshotSavedAt } = useWarehouse();
   const { session: auth, logout } = useEmailAuth();
-  const { t } = useI18n();
+  const { t, lang } = useI18n();
   // На телефоне по умолчанию закрыта — иначе сайдбар съедает ~72vw.
   const [open, setOpen] = useState(false);
   const labels = getRoleLabels(db);
@@ -207,6 +208,16 @@ export function Shell({ children }: { children: ReactNode }) {
         <main className="min-w-0 flex-1 overflow-x-clip px-3 py-5 sm:px-4 md:px-8 md:py-8">
           {notice === "conflict" ? (
             <p className="mb-4 rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-sm">{t("shell.conflict")}</p>
+          ) : null}
+          {offline || notice === "offline" || notice === "offline-write" ? (
+            <p className="mb-4 rounded-md border border-rose-300 bg-rose-50 px-3 py-2 text-sm text-rose-950" role="status">
+              {notice === "offline-write"
+                ? t("shell.offlineWrite")
+                : t("shell.offline").replace(
+                    "{when}",
+                    snapshotSavedAt ? formatSnapshotWhen(snapshotSavedAt, lang) : t("shell.offlineUnknownWhen"),
+                  )}
+            </p>
           ) : null}
           {children}
         </main>
