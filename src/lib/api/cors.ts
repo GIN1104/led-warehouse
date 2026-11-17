@@ -1,4 +1,7 @@
-/** Origins that may call the Node API from a static Pages host (ACCESS_API_BASE). */
+/** Origins that may call the Node API from a static Pages host (ACCESS_API_BASE).
+ *  Default includes production Pages. Temporary API hosts (Render/Oracle/Fly) do not
+ *  need their own origin here — the browser Origin is the Pages site, not the API host.
+ */
 
 const DEFAULT_ORIGINS = [
   "https://gin1104.github.io",
