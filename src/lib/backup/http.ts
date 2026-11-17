@@ -1,4 +1,4 @@
-import { getBackupCronSecret, type BackupTarget } from "@/lib/backup/config";
+import { getBackupCronSecret } from "@/lib/backup/config";
 import { assertBackupOwnerEmail } from "@/lib/backup/owner";
 import { normalizeEmail } from "@/lib/email-auth/normalize";
 
@@ -15,20 +15,4 @@ export function assertOwnerOrCron(request: Request, actorEmail: string, forCreat
   if (forCreate && cron && bearer && bearer === cron) return "cron";
   assertBackupOwnerEmail(actorEmail);
   return "owner";
-}
-
-export function parseTarget(raw: string | null | undefined): BackupTarget | null {
-  const value = String(raw ?? "").trim().toLowerCase();
-  if (value === "r2" || value === "drive") return value;
-  return null;
-}
-
-export function parseTargets(raw: unknown): BackupTarget[] | null {
-  if (!Array.isArray(raw)) return null;
-  const out: BackupTarget[] = [];
-  for (const item of raw) {
-    const t = parseTarget(String(item));
-    if (t) out.push(t);
-  }
-  return out.length ? out : null;
 }

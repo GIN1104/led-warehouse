@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { backupDumpFileName, isBackupDumpName, parseBackupDumpName } from "@/lib/backup/naming";
 import { keysToDeleteForRetention } from "@/lib/backup/retention";
 import { assertBackupOwnerEmail, assertRestoreConfirm, isBackupOwnerEmail } from "@/lib/backup/owner";
-import { getDriveBackupConfig, getR2Config, hasDriveBackupConfig, hasR2Config } from "@/lib/backup/config";
+import { getDriveBackupConfig, hasDriveBackupConfig } from "@/lib/backup/config";
 
 describe("backup naming", () => {
   it("форматирует UTC-имя dump", () => {
@@ -42,26 +42,11 @@ describe("backup owner", () => {
 
 describe("backup config", () => {
   it("без secrets — не configured", () => {
-    const empty = {};
-    expect(hasR2Config(empty)).toBe(false);
-    expect(hasDriveBackupConfig(empty)).toBe(false);
-    expect(getR2Config(empty)).toBeNull();
-    expect(getDriveBackupConfig(empty)).toBeNull();
+    expect(hasDriveBackupConfig({})).toBe(false);
+    expect(getDriveBackupConfig({})).toBeNull();
   });
 
-  it("собирает R2 и Drive из env", () => {
-    expect(
-      getR2Config({
-        R2_ACCOUNT_ID: "acc",
-        R2_ACCESS_KEY_ID: "key",
-        R2_SECRET_ACCESS_KEY: "sec",
-        R2_BUCKET: "ledvision-backups",
-      }),
-    ).toMatchObject({
-      accountId: "acc",
-      bucket: "ledvision-backups",
-      endpoint: "https://acc.r2.cloudflarestorage.com",
-    });
+  it("собирает Drive из env", () => {
     expect(
       getDriveBackupConfig({
         GOOGLE_SERVICE_ACCOUNT_JSON: '{"client_email":"a@b","private_key":"x"}',

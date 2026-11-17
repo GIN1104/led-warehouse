@@ -14,7 +14,7 @@
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
-    "backup": "node scripts/backup-to-r2.mjs"
+    "backup": "node scripts/backup-to-drive.mjs"
   },
   "dependencies": {
     "@libsql/client": "^0.18.0",

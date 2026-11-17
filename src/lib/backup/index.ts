@@ -1,12 +1,7 @@
 export {
-  backupTargetsConfigured,
   getBackupCronSecret,
   getDriveBackupConfig,
-  getR2Config,
   hasDriveBackupConfig,
-  hasR2Config,
-  r2BucketName,
-  type BackupTarget,
 } from "@/lib/backup/config";
 export { runBackupJob } from "@/lib/backup/job";
 export {
@@ -20,10 +15,9 @@ export { backupDumpFileName, isBackupDumpName, parseBackupDumpName } from "@/lib
 export { restoreFromBackup } from "@/lib/backup/restore";
 export {
   downloadBackup,
+  driveBackupStatus,
   listBackups,
-  resolveBackupTargets,
   targetStatus,
-  uploadBackupToTarget,
-  uploadBackupToTargets,
+  uploadBackup,
   type BackupEntry,
 } from "@/lib/backup/store";

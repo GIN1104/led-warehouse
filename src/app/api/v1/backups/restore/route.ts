@@ -1,5 +1,5 @@
 import { corsPreflight, withCors } from "@/lib/api/cors";
-import { assertOwnerOrCron, parseTarget, readActorEmail } from "@/lib/backup/http";
+import { assertOwnerOrCron, readActorEmail } from "@/lib/backup/http";
 import { assertRestoreConfirm } from "@/lib/backup/owner";
 import { restoreFromBackup } from "@/lib/backup/restore";
 
@@ -11,11 +11,11 @@ export async function OPTIONS(request: Request) {
 }
 
 /**
- * POST { actorEmail, target: 'r2'|'drive', key, confirm: 'CONFIRM' }
+ * POST { actorEmail, key, confirm: 'CONFIRM' }
  * Опасная операция: заменяет ledger + bump revision + push Turso.
  */
 export async function POST(request: Request) {
-  let body: { actorEmail?: string; target?: string; key?: string; confirm?: string };
+  let body: { actorEmail?: string; key?: string; confirm?: string };
   try {
     body = (await request.json()) as typeof body;
   } catch {
@@ -32,14 +32,13 @@ export async function POST(request: Request) {
     return withCors(request, Response.json({ ok: false, error: message }, { status }));
   }
 
-  const target = parseTarget(body.target);
   const key = String(body.key ?? "").trim();
-  if (!target || !key) {
-    return withCors(request, Response.json({ ok: false, error: "Нужны target и key" }, { status: 400 }));
+  if (!key) {
+    return withCors(request, Response.json({ ok: false, error: "Нужен key" }, { status: 400 }));
   }
 
   try {
-    const result = await restoreFromBackup(target, key);
+    const result = await restoreFromBackup(key);
     return withCors(request, Response.json(result));
   } catch (error) {
     const message = error instanceof Error ? error.message : "restore_failed";

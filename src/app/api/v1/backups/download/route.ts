@@ -1,5 +1,5 @@
 import { corsPreflight, withCors } from "@/lib/api/cors";
-import { assertOwnerOrCron, parseTarget, readActorEmail } from "@/lib/backup/http";
+import { assertOwnerOrCron, readActorEmail } from "@/lib/backup/http";
 import { downloadBackup } from "@/lib/backup/store";
 
 export const runtime = "nodejs";
@@ -9,7 +9,7 @@ export async function OPTIONS(request: Request) {
   return corsPreflight(request);
 }
 
-/** GET ?target=r2|drive&key=…&actorEmail=… — скачать dump (owner). */
+/** GET ?key=…&actorEmail=… — скачать dump с Drive (owner). */
 export async function GET(request: Request) {
   const url = new URL(request.url);
   const actorEmail = readActorEmail(request, url.searchParams.get("actorEmail"));
@@ -20,14 +20,13 @@ export async function GET(request: Request) {
     return withCors(request, Response.json({ ok: false, error: message }, { status: 403 }));
   }
 
-  const target = parseTarget(url.searchParams.get("target"));
   const key = String(url.searchParams.get("key") ?? "").trim();
-  if (!target || !key) {
-    return withCors(request, Response.json({ ok: false, error: "Нужны target и key" }, { status: 400 }));
+  if (!key) {
+    return withCors(request, Response.json({ ok: false, error: "Нужен key" }, { status: 400 }));
   }
 
   try {
-    const { bytes, name } = await downloadBackup(target, key);
+    const { bytes, name } = await downloadBackup(key);
     return withCors(
       request,
       new Response(Buffer.from(bytes), {

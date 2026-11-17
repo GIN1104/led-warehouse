@@ -1,18 +1,17 @@
-# Бэкап Turso/SQLite → Cloudflare R2 + Google Drive
+# Бэкап Turso/SQLite → Google Drive
 
-Daily / on-demand dump общего ledger (файл на Fly + sync Turso) в object storage. **Restore UI** видит только `starchenkogin@gmail.com` (permanent owner). `ledvision2026.il@gmail.com` кнопку не видит.
+Daily / on-demand dump общего ledger (файл на Fly + sync Turso) в папку Google Drive. **Restore UI** видит только `starchenkogin@gmail.com` (permanent owner). `ledvision2026.il@gmail.com` кнопку не видит.
 
-## Targets
+**Cloudflare R2 не используем** (нужна банковская карта — отказ).
+
+## Target
 
 | Target | Когда пишет | Auth |
 |--------|-------------|------|
-| **Cloudflare R2** | secrets R2 заданы | S3 API keys |
 | **Google Drive** | service account + folder id | JSON SA на сервере |
-| **mock** | secrets нет | локально `data/backups-mock/{r2,drive}/` |
+| **mock** | secrets нет | локально `data/backups-mock/drive/` |
 
-Один on-demand/cron job пишет **во все настроенные** targets (или оба mock).
-
-## Почему не GIS browser token для Drive
+## Почему не GIS browser token
 
 В проекте уже есть GIS OAuth для **Calendar** (`NEXT_PUBLIC_GOOGLE_CLIENT_ID`) и stub Excel→Drive. Токен живёт в памяти вкладки и не подходит для Fly cron.
 
@@ -20,25 +19,7 @@ Daily / on-demand dump общего ledger (файл на Fly + sync Turso) в o
 
 ## Secrets (значения не в git)
 
-### Cloudflare R2 (Fly / Cursor Secrets)
-
-Evgeny создаёт bucket в [Cloudflare R2](https://dash.cloudflare.com/) сам (агент аккаунт CF создать не может):
-
-1. R2 → Create bucket (имя по умолчанию `ledvision-backups`)
-2. Manage R2 API Tokens → Create API token (Object Read & Write на bucket)
-3. Account ID из правой панели R2 overview
-
-```bash
-fly secrets set \
-  R2_ACCOUNT_ID='…' \
-  R2_ACCESS_KEY_ID='…' \
-  R2_SECRET_ACCESS_KEY='…' \
-  R2_BUCKET='ledvision-backups' \
-  -a led-warehouse-api
-# опционально: R2_ENDPOINT=https://<ACCOUNT_ID>.r2.cloudflarestorage.com
-```
-
-### Google Drive
+### Google Drive (Fly / Cursor Secrets)
 
 1. Google Cloud Console → Service Account → JSON key
 2. На Drive аккаунта проекта создайте папку например `LED Warehouse / Backups`
@@ -65,14 +46,14 @@ fly secrets set BACKUP_CRON_SECRET='длинная-случайная-строк
 
 ## API (только Fly / Node host)
 
-Все list/download/restore требуют `X-Actor-Email: starchenkogin@gmail.com` (как и access-decide). Create также принимает `Authorization: Bearer $BACKUP_CRON_SECRET`.
+List/download/restore требуют `X-Actor-Email: starchenkogin@gmail.com`. Create также принимает `Authorization: Bearer $BACKUP_CRON_SECRET`.
 
 | Method | Path | Назначение |
 |--------|------|------------|
-| GET | `/api/v1/backups/?target=r2\|drive\|all` | список |
+| GET | `/api/v1/backups/` | список dump на Drive |
 | POST | `/api/v1/backups/` | on-demand backup |
-| GET | `/api/v1/backups/download/?target=&key=` | скачать dump |
-| POST | `/api/v1/backups/restore/` | `{ target, key, confirm: "CONFIRM" }` |
+| GET | `/api/v1/backups/download/?key=` | скачать dump |
+| POST | `/api/v1/backups/restore/` | `{ key, confirm: "CONFIRM" }` |
 
 Restore: download → проверка SQLite header → `forceReplaceLedger` (bump revision) → push в Turso.
 
@@ -80,8 +61,7 @@ Restore: download → проверка SQLite header → `forceReplaceLedger` (b
 
 `/me` → блок «Бэкап и восстановление» **только** для owner:
 
-- «Восстановить из Google Drive»
-- «Восстановить из Cloudflare»
+- одна кнопка «Восстановить из Google Drive»
 
 Список dump → выбор → ввод `CONFIRM` → restore.
 
@@ -89,24 +69,24 @@ Restore: download → проверка SQLite header → `forceReplaceLedger` (b
 
 ```bat
 REM Windows
-scripts\backup-to-r2.cmd
+scripts\backup-to-drive.cmd
 ```
 
 ```powershell
 $env:BACKUP_API_URL = "https://led-warehouse-api.fly.dev"
 $env:BACKUP_CRON_SECRET = "…"
-.\scripts\backup-to-r2.ps1
+.\scripts\backup-to-drive.ps1
 ```
 
 ```bash
 # Fly cron / machine schedule (пример)
-BACKUP_API_URL=http://127.0.0.1:8080 BACKUP_CRON_SECRET=… node scripts/backup-to-r2.mjs
+BACKUP_API_URL=http://127.0.0.1:8080 BACKUP_CRON_SECRET=… node scripts/backup-to-drive.mjs
 ```
 
-## Ручной restore (если UI/API недоступны)
+## Ручной restore
 
-1. Owner скачивает dump (`download` или из R2/Drive консоли)
-2. Остановить запись / сделать свежий бэкап текущего состояния
-3. Через UI restore с `CONFIRM` **или** положить файл как новый ledger и bump revision (агентский API предпочтительнее)
+1. Owner скачивает dump (`download` или из Drive UI)
+2. Свежий бэкап текущего состояния
+3. UI restore с `CONFIRM`
 
-Health: `GET /api/v1/health/` → `{ backups: { r2, drive } }` без утечки секретов.
+Health: `GET /api/v1/health/` → `{ backups: { drive } }` без утечки секретов.
