@@ -23,6 +23,8 @@
 - [`docs/peer-transfers-phases-sheets.md`](docs/peer-transfers-phases-sheets.md) — перемещения, фазы заказа, Sheets mirror
 - [`docs/backup-restore.md`](docs/backup-restore.md) — бэкап Turso → Google Drive, owner-only restore
 
+**Файлы заказа** (`/files/?orderId=`): список оборудования, вложения (до 10, 8 МБ / 10 МБ batch) и ссылки на Google Таблицы — зеркало peer `view=files`. Сейчас mock + точки `orderFilesApi` под ledger/HTTP; вход с карточки заказа «Файлы и ссылки».
+
 ## Решение по доставке
 
 **Старт: Progressive Web App (Next.js + TypeScript)** — единый веб-клиент для склада (планшеты/телефоны) и менеджеров (десктоп).
