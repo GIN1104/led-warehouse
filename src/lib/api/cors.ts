@@ -19,7 +19,7 @@ export function corsHeaders(request: Request): HeadersInit {
   const allowed = accessCorsOrigins();
   const headers: Record<string, string> = {
     "Access-Control-Allow-Methods": "GET, POST, PUT, OPTIONS",
-    "Access-Control-Allow-Headers": "Content-Type, X-Base-Revision",
+    "Access-Control-Allow-Headers": "Content-Type, X-Base-Revision, X-Actor-Email, Authorization",
     "Access-Control-Expose-Headers": "X-Revision",
     "Access-Control-Max-Age": "86400",
   };

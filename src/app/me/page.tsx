@@ -9,6 +9,7 @@ import { apiUrl, sharedLedger } from "@/lib/api";
 import { formatDateTime } from "@/lib/dates";
 import { translateError, type MessageKey } from "@/lib/i18n/messages";
 import { getRoleLabels, updateOwnCabinet } from "@/lib/services/people";
+import { OwnerBackupRestore } from "@/components/owner-backup-restore";
 import { flushTelegramOutbox, listTelegramOutbox, sendTestTelegram } from "@/lib/telegram/notify";
 
 type BotStatus = "configured" | "mock" | "unknown";
@@ -190,6 +191,8 @@ export default function MePage() {
           </ul>
         </Panel>
       </div>
+
+      <OwnerBackupRestore />
     </div>
   );
 }

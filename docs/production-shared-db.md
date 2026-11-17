@@ -1,28 +1,32 @@
-# Production: shared DB = **Turso** + **Fly.io**
+# Production: shared DB = **Turso** + **API host**
 
-**Команда открывает Pages или Fly — данные одни и те же** (весь ledger: заказы, оборудование, заявки). Source of truth = Turso `ledvision` на API host; клиент синхронизирует через `/api/v1/ledger`.
+**Выбрано (2026-11-17):** Oracle Cloud Always Free VM (Fly trial ended).  
+Деплой: [`../deploy/oracle/README.md`](../deploy/oracle/README.md) + Project runbook `oracle-always-free-api.md`.
+
+**Команда открывает Pages или API host — данные одни и те же** (весь ledger). Source of truth = Turso `ledvision` на API host; клиент синхронизирует через `/api/v1/ledger`.
 
 | Клиент | Как видит данные |
 |--------|------------------|
-| **Fly UI** https://led-warehouse-api.fly.dev | same-origin API, `NEXT_PUBLIC_SHARED=1` |
-| **Pages** https://gin1104.github.io/led-warehouse/ | `NEXT_PUBLIC_ACCESS_API_BASE` → Fly ledger API (не IndexedDB) |
+| **Oracle API** `https://<API_DOMAIN>` | same-origin API, `NEXT_PUBLIC_SHARED=1` |
+| **Pages** https://gin1104.github.io/led-warehouse/ | `NEXT_PUBLIC_ACCESS_API_BASE` → Oracle ledger API (не IndexedDB) |
 | Телефон / ПК | любой из двух URL — один Turso ledger |
+
+`fly.toml` оставлен исторически; app на Fly сейчас недоступен без карты.
 
 ## Credentials (не в git)
 
 | Secret | Где |
 |--------|-----|
-| `TURSO_DATABASE_URL` / `TURSO_AUTH_TOKEN` | Fly secrets + локальный `.env.local` |
+| `TURSO_DATABASE_URL` / `TURSO_AUTH_TOKEN` | `deploy/oracle/.env` на VM + локальный `.env.local` |
 | DB name | `ledvision` |
 
-## Fly.io API host
-
-App `led-warehouse-api`, region `lhr`. Config: `fly.toml`, `Dockerfile`.
+## Oracle API host
 
 ```bash
-fly secrets set TURSO_DATABASE_URL='…' TURSO_AUTH_TOKEN='…'
-fly deploy
-curl -sS https://led-warehouse-api.fly.dev/api/v1/health/
+cd deploy/oracle
+cp .env.example .env   # API_DOMAIN + TURSO_* только на VM
+docker compose up -d --build
+curl -sS https://<API_DOMAIN>/api/v1/health/
 # → shared + tursoConfigured
 ```
 
@@ -30,13 +34,13 @@ CORS: `https://gin1104.github.io` (+ localhost). Ledger GET/PUT и revision от
 
 ## Pages → весь ledger
 
-1. Repo Variable: `NEXT_PUBLIC_ACCESS_API_BASE=https://led-warehouse-api.fly.dev`
-2. `scripts/export-build.mjs` печёт этот URL в static bundle (и включает shared client).
-3. После merge в `main` → GitHub Pages rebuild.
+1. Repo Variable: `NEXT_PUBLIC_ACCESS_API_BASE=https://<API_DOMAIN>`
+2. `pages.yml` + `scripts/export-build.mjs` пекут URL в static bundle.
+3. После merge / workflow_dispatch → GitHub Pages rebuild.
 4. Клиент: `openSharedDb` / `pushSharedDb` → `{ACCESS_API_BASE}/api/v1/ledger/`.
 5. После успешного sync клиент сохраняет снимок (revision + bytes) в IndexedDB (+ meta в localStorage). Если API/Turso недоступны — SPA открывается на last-known с баннером offline; запись в общий ledger отключена, просмотр доступен.
 
-Без Variable/ACCESS_API_BASE Pages = IndexedDB per-browser (демо без shared API).
+Без Variable/ACCESS_API_BASE Pages = IndexedDB per-browser (демо без shared API); с ACCESS_API_BASE при падении API — last-known snapshot (offline banner).
 
 ## Локальный Docker
 
@@ -46,6 +50,12 @@ TURSO_DATABASE_URL=…  TURSO_AUTH_TOKEN=…   # из .env.local
 docker compose up --build
 ```
 
+Или production-схема: `deploy/oracle` (порт 8080 + Caddy).
+
 Mock без облака: `TURSO_DATABASE_URL=file:./data/turso-mock.db`.
+
+## Бэкапы Google Drive
+
+Daily/on-demand dump ledger → Google Drive (без Cloudflare R2). Restore только для `starchenkogin@gmail.com` на `/me`. Runbook: [`backup-restore.md`](./backup-restore.md).
 
 См. [`email-auth.md`](./email-auth.md), README § «Где общий учёт».

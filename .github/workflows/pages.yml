@@ -29,6 +29,8 @@ jobs:
         env:
           NEXT_PUBLIC_BASE_PATH: /led-warehouse
           NEXT_PUBLIC_SHARED: ""
+          # Repo Variable → Oracle (или иной) API host; пусто = Pages без remote ledger.
+          NEXT_PUBLIC_ACCESS_API_BASE: ${{ vars.NEXT_PUBLIC_ACCESS_API_BASE }}
       - uses: actions/upload-pages-artifact@v3
         with:
           path: out

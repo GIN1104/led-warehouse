@@ -21,6 +21,7 @@
 - [`docs/email-auth.md`](docs/email-auth.md) — вход по email (заявка → approve → allowlist)
 - [`docs/people-telegram.md`](docs/people-telegram.md) — личный кабинет `/me` и Telegram (mock на Pages)
 - [`docs/peer-transfers-phases-sheets.md`](docs/peer-transfers-phases-sheets.md) — перемещения, фазы заказа, Sheets mirror
+- [`docs/backup-restore.md`](docs/backup-restore.md) — бэкап Turso → Google Drive, owner-only restore
 
 ## Решение по доставке
 
