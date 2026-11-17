@@ -1,14 +1,15 @@
 # Production: shared DB = **Turso** + **API host**
 
-**Выбрано (2026-11-17):** Oracle Cloud Always Free VM (Fly trial ended).  
-Деплой: [`../deploy/oracle/README.md`](../deploy/oracle/README.md) + Project runbook `oracle-always-free-api.md`.
+**Цель (prod):** Oracle Cloud Always Free VM (Fly trial ended).  
+**Временно (cold start OK):** Render Free — [`../render.yaml`](../render.yaml) + [`render-free-api.md`](./render-free-api.md).  
+Oracle: [`../deploy/oracle/README.md`](../deploy/oracle/README.md) + Project runbook `oracle-always-free-api.md`.
 
 **Команда открывает Pages или API host — данные одни и те же** (весь ledger). Source of truth = Turso `ledvision` на API host; клиент синхронизирует через `/api/v1/ledger`.
 
 | Клиент | Как видит данные |
 |--------|------------------|
-| **Oracle API** `https://<API_DOMAIN>` | same-origin API, `NEXT_PUBLIC_SHARED=1` |
-| **Pages** https://gin1104.github.io/led-warehouse/ | `NEXT_PUBLIC_ACCESS_API_BASE` → Oracle ledger API (не IndexedDB) |
+| **API host** (Render временно / Oracle цель) | same-origin API, `NEXT_PUBLIC_SHARED=1` |
+| **Pages** https://gin1104.github.io/led-warehouse/ | `NEXT_PUBLIC_ACCESS_API_BASE` → ledger API (не IndexedDB) |
 | Телефон / ПК | любой из двух URL — один Turso ledger |
 
 `fly.toml` оставлен исторически; app на Fly сейчас недоступен без карты.
@@ -17,7 +18,7 @@
 
 | Secret | Где |
 |--------|-----|
-| `TURSO_DATABASE_URL` / `TURSO_AUTH_TOKEN` | `deploy/oracle/.env` на VM + локальный `.env.local` |
+| `TURSO_DATABASE_URL` / `TURSO_AUTH_TOKEN` | Render Environment **или** `deploy/oracle/.env` на VM + локальный `.env.local` |
 | DB name | `ledvision` |
 
 ## Oracle API host
