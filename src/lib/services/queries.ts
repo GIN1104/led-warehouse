@@ -330,9 +330,40 @@ export function getDashboard(db: Sql) {
   const openOrders = orders.filter((order) => order.status === "confirmed");
   const alertRows = listAlerts(db, "open");
   const hires = listExternalHires(db);
+  const peopleCount = listUsers(db).length;
+  const equipmentUnits = skuRows.reduce((sum, sku) => sum + sku.onHand, 0);
+  const transfersInTransit =
+    db.get<{ n: number }>(`SELECT COUNT(*) AS n FROM stock_transfers WHERE status = 'in_transit'`)?.n ?? 0;
+  const transfersPlanned =
+    db.get<{ n: number }>(`SELECT COUNT(*) AS n FROM stock_transfers WHERE status = 'planned'`)?.n ?? 0;
+  const inTransitPreview = db.all<{
+    id: string;
+    skuCode: string;
+    qty: number;
+    unit: string;
+    fromName: string;
+    toName: string;
+    driverName: string | null;
+  }>(
+    `SELECT t.id AS id, s.code AS skuCode, t.qty AS qty, s.unit AS unit,
+            f.name AS fromName, d.name AS toName, u.name AS driverName
+     FROM stock_transfers t
+     INNER JOIN skus s ON s.id = t.sku_id
+     INNER JOIN locations f ON f.id = t.from_location_id
+     INNER JOIN locations d ON d.id = t.to_location_id
+     LEFT JOIN users u ON u.id = t.driver_user_id
+     WHERE t.status = 'in_transit'
+     ORDER BY t.shipped_at DESC, t.created_at DESC
+     LIMIT 5`,
+  );
   return {
     skuCount: skuRows.length,
+    equipmentUnits,
     openOrders: openOrders.length,
+    peopleCount,
+    transfersInTransit,
+    transfersPlanned,
+    inTransitPreview,
     openAlerts: alertRows.length,
     hiresNeeded: hires.filter((hire) => hire.status === "needed").length,
     shortageUnits: openOrders.reduce((sumQty, order) => sumQty + order.shortage, 0),
