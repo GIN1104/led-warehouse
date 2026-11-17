@@ -274,28 +274,50 @@ export function revokeAllowedEmail(db: Sql, email: string, actorEmail: string, n
 }
 
 /**
- * Закрывает pending-заявку того же email как approved (после ручного add / sync).
+ * Закрывает pending-заявку того же email (после remote decide / ручного add / sync).
  * Не создаёт allowlist — только статус заявки. Permanent owner не трогаем.
+ * Локальный и shared pending часто имеют разные id — закрываем по email.
  */
-export function closePendingAccessRequestAsApproved(
+export function closePendingAccessRequest(
   db: Sql,
   email: string,
   actorEmail: string,
+  status: "approved" | "rejected",
   now = Date.now(),
 ): AccessRequestRow | null {
   const normalized = assertEmail(email);
   const pending = findPendingRequest(db, normalized);
   if (!pending) return null;
   db.run(
-    `UPDATE access_requests SET status = 'approved', decided_by = ?, decided_at = ? WHERE id = ? AND status = 'pending'`,
-    [normalizeEmail(actorEmail), now, pending.id],
+    `UPDATE access_requests SET status = ?, decided_by = ?, decided_at = ? WHERE id = ? AND status = 'pending'`,
+    [status, normalizeEmail(actorEmail), now, pending.id],
   );
   return {
     ...pending,
-    status: "approved",
+    status,
     decidedBy: normalizeEmail(actorEmail),
     decidedAt: now,
   };
+}
+
+/** @deprecated используйте closePendingAccessRequest(..., "approved") */
+export function closePendingAccessRequestAsApproved(
+  db: Sql,
+  email: string,
+  actorEmail: string,
+  now = Date.now(),
+): AccessRequestRow | null {
+  return closePendingAccessRequest(db, email, actorEmail, "approved", now);
+}
+
+/** Закрыть локальный pending после remote reject (другой id). */
+export function closePendingAccessRequestAsRejected(
+  db: Sql,
+  email: string,
+  actorEmail: string,
+  now = Date.now(),
+): AccessRequestRow | null {
+  return closePendingAccessRequest(db, email, actorEmail, "rejected", now);
 }
 
 export function addAllowedEmailManual(
@@ -374,6 +396,8 @@ export function approveAccessRequest(
     `UPDATE access_requests SET status = 'approved', decided_by = ?, decided_at = ? WHERE id = ?`,
     [actorEmail, now, requestId],
   );
+  // Другие pending того же email (локальный id ≠ shared id) тоже закрываем.
+  closePendingAccessRequest(db, email, actorEmail, "approved", now);
   return {
     id: row.id,
     email,
@@ -397,18 +421,61 @@ export function rejectAccessRequest(
   );
   if (!row) throw new DomainError("Заявка не найдена");
   if (row.status !== "pending") throw new DomainError("Заявка уже обработана");
+  const email = normalizeEmail(row.email);
   db.run(
     `UPDATE access_requests SET status = 'rejected', decided_by = ?, decided_at = ? WHERE id = ?`,
     [actorEmail, now, requestId],
   );
+  closePendingAccessRequest(db, email, actorEmail, "rejected", now);
   return {
     id: row.id,
-    email: normalizeEmail(row.email),
+    email,
     status: "rejected",
     createdAt: row.created_at,
     decidedBy: actorEmail,
     decidedAt: now,
   };
+}
+
+/**
+ * Одобрить/отклонить по id, иначе по email (когда UI держит remote id, а в локальной БД другой).
+ */
+export function decideAccessRequestLocally(
+  db: Sql,
+  input: {
+    requestId?: string;
+    email?: string;
+    action: "approve" | "reject";
+    actorEmail: string;
+    expiresInDays?: number | null;
+  },
+): AccessRequestRow {
+  const actorEmail = normalizeEmail(input.actorEmail);
+  if (input.requestId) {
+    const byId = db.get<AccessRequestDbRow>(
+      `SELECT id, email, status, created_at, decided_by, decided_at FROM access_requests WHERE id = ?`,
+      [input.requestId],
+    );
+    if (byId?.status === "pending") {
+      return input.action === "approve"
+        ? approveAccessRequest(db, input.requestId, actorEmail, {
+            expiresInDays: input.expiresInDays,
+          })
+        : rejectAccessRequest(db, input.requestId, actorEmail);
+    }
+  }
+  const email = normalizeEmail(input.email ?? "");
+  if (!email) throw new DomainError("Заявка не найдена");
+  const pending = findPendingRequest(db, email);
+  if (!pending) {
+    // Remote уже решил — выравниваем локальный статус, если вдруг ещё pending.
+    const closed = closePendingAccessRequest(db, email, actorEmail, input.action === "approve" ? "approved" : "rejected");
+    if (closed) return closed;
+    throw new DomainError("Заявка не найдена");
+  }
+  return input.action === "approve"
+    ? approveAccessRequest(db, pending.id, actorEmail, { expiresInDays: input.expiresInDays })
+    : rejectAccessRequest(db, pending.id, actorEmail);
 }
 
 /**

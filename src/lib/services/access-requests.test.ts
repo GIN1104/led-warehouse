@@ -9,6 +9,7 @@ import {
   addAllowedEmailManual,
   approveAccessRequest,
   canManageAccess,
+  decideAccessRequestLocally,
   isEmailActivelyAllowed,
   listAccessRequests,
   listAllowedEmails,
@@ -118,5 +119,49 @@ describe("access requests и allowlist policy", () => {
     expect(listAccessRequests(db, { status: "pending" }).some((row) => row.email === "ghost@company.com")).toBe(false);
     expect(listAccessRequests(db, { status: "approved" }).some((row) => row.email === "ghost@company.com")).toBe(true);
     expect(isEmailActivelyAllowed(db, "ghost@company.com")).toBe(true);
+  });
+
+  it("decide по email закрывает локальный pending с другим id; revoke убирает из allowlist", () => {
+    const db = createDb();
+    seedIfEmpty(db);
+    const pending = requestAccessOrLogin(db, "dual-id@company.com");
+    expect(pending.kind).toBe("pending");
+    if (pending.kind !== "pending") throw new Error("ожидали pending");
+
+    // Имитация: UI держит remote id, локально другой — решаем по email.
+    decideAccessRequestLocally(db, {
+      requestId: "ar_remote_only_id",
+      email: "dual-id@company.com",
+      action: "approve",
+      actorEmail: PERMANENT_OWNER_EMAIL,
+      expiresInDays: null,
+    });
+    expect(listAccessRequests(db, { status: "pending" }).some((row) => row.email === "dual-id@company.com")).toBe(
+      false,
+    );
+    expect(isEmailActivelyAllowed(db, "dual-id@company.com")).toBe(true);
+
+    revokeAllowedEmail(db, "dual-id@company.com", PERMANENT_OWNER_EMAIL);
+    expect(isEmailActivelyAllowed(db, "dual-id@company.com")).toBe(false);
+    expect(listAllowedEmails(db).some((row) => row.email === "dual-id@company.com")).toBe(false);
+  });
+
+  it("reject по чужому id + email убирает из pending в rejected", () => {
+    const db = createDb();
+    seedIfEmpty(db);
+    const pending = requestAccessOrLogin(db, "reject-dual@company.com");
+    expect(pending.kind).toBe("pending");
+    decideAccessRequestLocally(db, {
+      requestId: "ar_not_in_local",
+      email: "reject-dual@company.com",
+      action: "reject",
+      actorEmail: PERMANENT_OWNER_EMAIL,
+    });
+    expect(listAccessRequests(db, { status: "pending" }).some((row) => row.email === "reject-dual@company.com")).toBe(
+      false,
+    );
+    expect(listAccessRequests(db, { status: "rejected" }).some((row) => row.email === "reject-dual@company.com")).toBe(
+      true,
+    );
   });
 });

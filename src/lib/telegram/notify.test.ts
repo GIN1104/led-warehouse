@@ -13,27 +13,34 @@ import {
 
 describe("telegram notify + outbox", () => {
   it("без получателей пишет skipped; с chatId — mock", () => {
-    const db = createDb();
-    const skipped = notifyAccessRequestTelegram(db, "new@company.com");
-    expect(skipped).toHaveLength(1);
-    expect(skipped[0]?.mode).toBe("skipped");
+    const prevAdmin = process.env.TELEGRAM_ADMIN_CHAT_IDS;
+    delete process.env.TELEGRAM_ADMIN_CHAT_IDS;
+    try {
+      const db = createDb();
+      const skipped = notifyAccessRequestTelegram(db, "new@company.com");
+      expect(skipped).toHaveLength(1);
+      expect(skipped[0]?.mode).toBe("skipped");
 
-    createPerson(db, {
-      name: "Дмитрий TG",
-      role: "manager",
-      email: "dm-tg@led.local",
-      telegramUsername: "dm_manager",
-      telegramChatId: "987654321",
-    });
-    const mocked = notifyAccessRequestTelegram(db, "another@company.com");
-    expect(mocked).toHaveLength(1);
-    expect(mocked[0]).toMatchObject({
-      mode: "mock",
-      kind: "access_request",
-      chatId: "987654321",
-      username: "dm_manager",
-    });
-    expect(listTelegramOutbox(db).length).toBeGreaterThanOrEqual(2);
+      createPerson(db, {
+        name: "Дмитрий TG",
+        role: "manager",
+        email: "dm-tg@led.local",
+        telegramUsername: "dm_manager",
+        telegramChatId: "987654321",
+      });
+      const mocked = notifyAccessRequestTelegram(db, "another@company.com");
+      expect(mocked).toHaveLength(1);
+      expect(mocked[0]).toMatchObject({
+        mode: "mock",
+        kind: "access_request",
+        chatId: "987654321",
+        username: "dm_manager",
+      });
+      expect(listTelegramOutbox(db).length).toBeGreaterThanOrEqual(2);
+    } finally {
+      if (prevAdmin === undefined) delete process.env.TELEGRAM_ADMIN_CHAT_IDS;
+      else process.env.TELEGRAM_ADMIN_CHAT_IDS = prevAdmin;
+    }
   });
 
   it("createAccessRequest ставит outbox", () => {
