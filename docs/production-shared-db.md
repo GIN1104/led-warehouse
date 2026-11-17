@@ -38,9 +38,9 @@ CORS: `https://gin1104.github.io` (+ localhost). Ledger GET/PUT и revision от
 2. `pages.yml` + `scripts/export-build.mjs` пекут URL в static bundle.
 3. После merge / workflow_dispatch → GitHub Pages rebuild.
 4. Клиент: `openSharedDb` / `pushSharedDb` → `{ACCESS_API_BASE}/api/v1/ledger/`.
-5. После успешного sync клиент сохраняет снимок (revision + bytes) в IndexedDB (+ meta в localStorage). Если API/Turso недоступны — SPA открывается на last-known с баннером offline; запись в общий ledger отключена, просмотр доступен.
+5. После успешного sync клиент сохраняет снимок (revision + bytes) в IndexedDB (+ meta в localStorage). Если API/Turso недоступны — last-known snapshot (browse-only) **или**, если снимка нет, soft-disable shared → локальный IndexedDB (пустой/seed), как раньше без ACCESS_API_BASE. Poll вернёт shared, когда API оживёт.
 
-Без Variable/ACCESS_API_BASE Pages = IndexedDB per-browser (демо без shared API); с ACCESS_API_BASE при падении API — last-known snapshot (offline banner).
+Без Variable/ACCESS_API_BASE Pages = IndexedDB per-browser (демо без shared API).
 
 ## Локальный Docker
 
