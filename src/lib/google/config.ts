@@ -13,6 +13,12 @@ export const PROJECT_GOOGLE_EMAIL = "ledvision2026.il@gmail.com";
 /** Рекомендуемая папка Excel на Drive (создаёт пользователь вручную). */
 export const PROJECT_DRIVE_EXCEL_FOLDER = "LED Warehouse / Excel";
 
+/**
+ * Серверные бэкапы ledger — отдельная папка + service account (не GIS token).
+ * См. docs/backup-restore.md и GOOGLE_DRIVE_BACKUP_FOLDER_ID.
+ */
+export const PROJECT_DRIVE_BACKUP_FOLDER = "LED Warehouse / Backups";
+
 /** Публичный OAuth Web Client ID из env (вшивается в production Pages build). */
 /** Публичный Web Client ID проекта (не secret). Fallback для Pages, если env не прокинут. */
 export const PUBLIC_GOOGLE_CLIENT_ID =
