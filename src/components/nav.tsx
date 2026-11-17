@@ -13,6 +13,7 @@ import {
   LayoutDashboard,
   ListTodo,
   MapPin,
+  Paperclip,
   ScanLine,
   TriangleAlert,
   Truck,
@@ -38,6 +39,7 @@ const groups: NavGroup[] = [
     items: [
       { href: "/calendar", label: "nav.calendar", icon: CalendarDays },
       { href: "/orders", label: "nav.orders", icon: ClipboardList },
+      { href: "/files", label: "nav.files", icon: Paperclip },
       { href: "/occupancy", label: "nav.occupancy", icon: GanttChart },
       { href: "/shortages", label: "nav.shortages", icon: TriangleAlert },
       { href: "/external-hires", label: "nav.hires", icon: Truck },

@@ -9,6 +9,7 @@ import { Badge, Field, Flash, PageHeader, Panel, buttonClass, controlClass } fro
 import { assertCan, can } from "@/lib/auth";
 import { formatDate } from "@/lib/dates";
 import { translateError, type MessageKey } from "@/lib/i18n/messages";
+import { filesHref } from "@/lib/paths";
 import { deleteOrder, renameOrder, setOrderStatus } from "@/lib/services/ledger";
 import {
   cancelOrderAccessory,
@@ -161,6 +162,12 @@ export function OrderView() {
         action={<Badge tone={order.status === "confirmed" ? "ok" : "neutral"}>{t(`orderStatus.${order.status}` as MessageKey)}</Badge>}
       />
       <Flash error={flash.error} ok={flash.ok} />
+      <Panel className="mb-4 flex flex-wrap items-center gap-2">
+        <Link href={filesHref(order.id)} className={buttonClass("primary")}>
+          {t("order.filesLink")}
+        </Link>
+        <p className="text-sm text-ink/60">{t("files.description")}</p>
+      </Panel>
       <Panel className="mb-4">
         {allowed ? (
           <form onSubmit={(event) => void onRename(event)} className="flex flex-col gap-3 sm:flex-row sm:items-end">
