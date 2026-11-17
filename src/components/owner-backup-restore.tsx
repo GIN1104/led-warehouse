@@ -67,7 +67,11 @@ export function OwnerBackupRestore() {
     try {
       const result = await postBackupNow(email);
       if (!result.ok) throw new Error(result.error ?? t("me.backup.createError"));
-      setOk(t("me.backup.created"));
+      const mode = result.mode ?? status.mode;
+      setOk(t(mode === "live" ? "me.backup.created" : "me.backup.createdMock"));
+      if (result.mode) {
+        setStatus({ configured: result.mode === "live", mode: result.mode });
+      }
       await load();
     } catch (err) {
       setError(translateError(lang, err));
@@ -150,7 +154,9 @@ export function OwnerBackupRestore() {
             <div className="rounded-md border border-line bg-white/80 p-3">
               <h3 className="mb-2 font-medium">{t("me.backup.restoreDrive")}</h3>
               <p className="mb-3 text-sm text-ink/65">{t("me.backup.danger")}</p>
-              {backups.length === 0 ? <Empty>{t("me.backup.empty")}</Empty> : null}
+              {backups.length === 0 ? (
+                <Empty>{t(status.configured ? "me.backup.empty" : "me.backup.emptyMock")}</Empty>
+              ) : null}
               <ul className="mb-3 flex max-h-56 flex-col gap-2 overflow-auto">
                 {backups.map((row) => (
                   <li key={row.key}>
