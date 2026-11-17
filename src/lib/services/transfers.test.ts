@@ -2,7 +2,15 @@ import { describe, expect, it } from "vitest";
 import { createDb } from "@/lib/db/memory";
 import { seedIfEmpty } from "@/lib/db/seed";
 import { createPerson } from "@/lib/services/people";
-import { cancelTransfer, listTransfers, planTransfer, receiveTransfer, shipTransfer } from "@/lib/services/transfers";
+import {
+  cancelTransfer,
+  countTransfersByStatus,
+  isSiteToSite,
+  listTransfers,
+  planTransfer,
+  receiveTransfer,
+  shipTransfer,
+} from "@/lib/services/transfers";
 import { listTelegramOutbox } from "@/lib/telegram/notify";
 
 describe("перемещения склад↔объект", () => {
@@ -22,6 +30,8 @@ describe("перемещения склад↔объект", () => {
       "user_warehouse",
     );
     expect(planned.status).toBe("planned");
+    expect(isSiteToSite(planned)).toBe(false);
+    expect(countTransfersByStatus(db).planned).toBeGreaterThanOrEqual(1);
 
     createPerson(db, {
       name: "TG Admin",
@@ -76,7 +86,9 @@ describe("перемещения склад↔объект", () => {
       },
       "user_warehouse",
     );
+    expect(isSiteToSite(hop)).toBe(true);
     shipTransfer(db, hop.id, "user_driver");
+    expect(countTransfersByStatus(db).in_transit).toBeGreaterThanOrEqual(1);
     cancelTransfer(db, hop.id, "user_warehouse");
     const back =
       db.get<{ qty: number }>(
