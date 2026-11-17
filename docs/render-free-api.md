@@ -13,11 +13,7 @@ Project Context `docs/render-free-api.md`.
 | `NEXT_PUBLIC_SHARED=1` | Blueprint |
 | `TURSO_DATABASE_URL` / `TURSO_AUTH_TOKEN` | Render secret |
 | `TELEGRAM_BOT_TOKEN` / `TELEGRAM_ADMIN_CHAT_IDS` | Render secret (опц.) |
-| `GOOGLE_SERVICE_ACCOUNT_JSON` / `GOOGLE_DRIVE_BACKUP_FOLDER_ID` | Render secret — папка на **ledvision2026** Drive; иначе `backups.drive:false` + mock |
-| `BACKUP_CRON_SECRET` | Render secret (опц., cron/script) |
 | CORS | `https://gin1104.github.io` в коде |
-
-Бэкап: [`backup-restore.md`](./backup-restore.md). После secrets: `GET /api/v1/health/` → `backups.drive: true`.
 
 ## Pages
 

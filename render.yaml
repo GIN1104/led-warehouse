@@ -36,11 +36,3 @@ services:
         sync: false
       - key: TELEGRAM_ADMIN_CHAT_IDS
         sync: false
-      # Google Drive backup (папка на ledvision2026; share Editor на SA email).
-      # Без этих ключей health.backups.drive=false и upload идёт в mock на диске контейнера.
-      - key: GOOGLE_SERVICE_ACCOUNT_JSON
-        sync: false
-      - key: GOOGLE_DRIVE_BACKUP_FOLDER_ID
-        sync: false
-      - key: BACKUP_CRON_SECRET
-        sync: false

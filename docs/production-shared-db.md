@@ -57,6 +57,6 @@ Mock без облака: `TURSO_DATABASE_URL=file:./data/turso-mock.db`.
 
 ## Бэкапы Google Drive
 
-Daily/on-demand dump ledger → папка Google Drive на аккаунте **ledvision2026** (LED Vision), через service account (без Cloudflare R2). На Render задайте `GOOGLE_SERVICE_ACCOUNT_JSON` + `GOOGLE_DRIVE_BACKUP_FOLDER_ID` — иначе `backups.drive: false` и mock. Restore только для `starchenkogin@gmail.com` на `/me`. Runbook: [`backup-restore.md`](./backup-restore.md).
+Daily/on-demand dump ledger → Google Drive (без Cloudflare R2). Restore только для `starchenkogin@gmail.com` на `/me`. Runbook: [`backup-restore.md`](./backup-restore.md).
 
 См. [`email-auth.md`](./email-auth.md), README § «Где общий учёт».

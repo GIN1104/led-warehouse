@@ -26,24 +26,16 @@ export async function fetchBackupList(actorEmail: string): Promise<BackupStatusR
   return data;
 }
 
-export async function postBackupNow(
-  actorEmail: string,
-): Promise<{ ok: boolean; mode?: "live" | "mock"; error?: string }> {
+export async function postBackupNow(actorEmail: string): Promise<{ ok: boolean; error?: string }> {
   if (!sharedLedger) return { ok: false, error: "shared_disabled" };
   const response = await fetch(apiUrl("/api/v1/backups"), {
     method: "POST",
     headers: headers(actorEmail),
     body: JSON.stringify({ actorEmail }),
   });
-  const data = (await response.json()) as {
-    ok?: boolean;
-    error?: string;
-    status?: { configured: boolean; mode: "live" | "mock" };
-    upload?: { mode?: "live" | "mock" };
-  };
+  const data = (await response.json()) as { ok?: boolean; error?: string };
   if (!response.ok) return { ok: false, error: data.error ?? `HTTP ${response.status}` };
-  const mode = data.upload?.mode ?? data.status?.mode;
-  return { ok: true, mode };
+  return { ok: true };
 }
 
 export async function postRestoreBackup(input: {

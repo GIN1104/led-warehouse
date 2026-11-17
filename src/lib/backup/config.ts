@@ -8,8 +8,7 @@ export type DriveBackupConfig = {
 
 /**
  * Серверный бэкап на Drive — через service account JSON + id папки.
- * Целевая папка: Google Drive аккаунта LED Vision (ledvision2026), shared Editor на SA.
- * GIS-токены браузера (Calendar) для server cron не подходят.
+ * GIS-токены браузера (Calendar) для cron на Fly не подходят.
  * Cloudflare R2 не используем (нужна карта — отказ Evgeny).
  */
 export function getDriveBackupConfig(
