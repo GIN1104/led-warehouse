@@ -139,6 +139,31 @@ export function exportLedger(): Promise<{ revision: number; bytes: Uint8Array }>
   });
 }
 
+function applyLedgerBytes(bytes: Uint8Array, nextRevision: number): number {
+  const current = openLive();
+  const tmp = `${filePath}.upload`;
+  writeFileSync(tmp, bytes);
+  const probe = openBetterSqlite(tmp);
+  try {
+    migrate(probe);
+    probe.run(
+      `INSERT INTO ledger_meta (key, value) VALUES ('revision', ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value`,
+      [String(nextRevision)],
+    );
+  } catch (error) {
+    probe.close();
+    throw error;
+  }
+  probe.close();
+  current.handle.close();
+  live = null;
+  renameSync(tmp, filePath);
+  const reopened = openLive();
+  reopened.revision = readRevision(reopened.handle);
+  replaceNeedsPush = true;
+  return reopened.revision;
+}
+
 export function replaceLedger(
   baseRevision: number,
   bytes: Uint8Array,
@@ -146,27 +171,19 @@ export function replaceLedger(
   return enqueueLedger(() => {
     const current = openLive();
     if (baseRevision !== current.revision) return { ok: false as const, revision: current.revision };
-    const tmp = `${filePath}.upload`;
-    writeFileSync(tmp, bytes);
-    const probe = openBetterSqlite(tmp);
-    const next = current.revision + 1;
-    try {
-      migrate(probe);
-      probe.run(
-        `INSERT INTO ledger_meta (key, value) VALUES ('revision', ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value`,
-        [String(next)],
-      );
-    } catch (error) {
-      probe.close();
-      throw error;
-    }
-    probe.close();
-    current.handle.close();
-    live = null;
-    renameSync(tmp, filePath);
-    const reopened = openLive();
-    reopened.revision = readRevision(reopened.handle);
-    replaceNeedsPush = true;
-    return { ok: true as const, revision: reopened.revision };
+    const revision = applyLedgerBytes(bytes, current.revision + 1);
+    return { ok: true as const, revision };
+  });
+}
+
+/**
+ * Восстановление из dump: всегда заменяет локальный ledger, bump revision, затем push в Turso.
+ * Опасная операция — только owner API.
+ */
+export function forceReplaceLedger(bytes: Uint8Array): Promise<{ revision: number }> {
+  return enqueueLedger(() => {
+    const current = openLive();
+    const revision = applyLedgerBytes(bytes, current.revision + 1);
+    return { revision };
   });
 }

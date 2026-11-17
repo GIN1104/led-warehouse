@@ -47,4 +47,8 @@ docker compose up --build
 
 Mock без облака: `TURSO_DATABASE_URL=file:./data/turso-mock.db`.
 
+## Бэкапы R2 + Drive
+
+Daily/on-demand dump ledger → Cloudflare R2 и/или Google Drive. Restore только для `starchenkogin@gmail.com` на `/me`. Runbook: [`backup-restore.md`](./backup-restore.md).
+
 См. [`email-auth.md`](./email-auth.md), README § «Где общий учёт».
