@@ -77,7 +77,9 @@ Seed `alexey@led.local` / `dmitry@led.local` остаются в People для �
 Сервер: `TELEGRAM_BOT_TOKEN` + `TELEGRAM_ADMIN_CHAT_IDS` → notify (опционально).  
 **Ручной add email** закрывает pending того же адреса (`approved`).
 
-API: `GET/POST /api/v1/access-requests`, `…/decide`, probe `GET /api/v1/health`. Runbook: [`production-shared-db.md`](./production-shared-db.md).
+API: `GET/POST /api/v1/access-requests`, `POST …/decide` (`approve`|`reject`|`add`|`revoke`), probe `GET /api/v1/health`.  
+Pages `apiUrl` кладёт trailing `/` **перед** query (`/?status=pending`), иначе фильтр pending ломается.  
+Revoke на Pages идёт через decide API (не только локальный IndexedDB). Runbook: [`production-shared-db.md`](./production-shared-db.md).
 
 ## Безопасность MVP
 

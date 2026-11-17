@@ -15,6 +15,10 @@ export function apiUrl(path: string): string {
   const base = remote || (process.env.NEXT_PUBLIC_API_BASE ?? "");
   // Remote Fly host has no /led-warehouse basePath; local Pages/static prefix only for same-origin.
   const prefix = remote ? "" : (process.env.NEXT_PUBLIC_BASE_PATH ?? "");
-  const normalized = path.endsWith("/") ? path : `${path}/`;
-  return `${base}${prefix}${normalized}`;
+  // trailingSlash: добавляем `/` перед query (`/path/?q=1`), не после (`?q=1/` ломает status=pending).
+  const q = path.indexOf("?");
+  const pathname = q >= 0 ? path.slice(0, q) : path;
+  const search = q >= 0 ? path.slice(q) : "";
+  const withSlash = pathname.endsWith("/") ? pathname : `${pathname}/`;
+  return `${base}${prefix}${withSlash}${search}`;
 }

@@ -37,6 +37,17 @@ describe("apiUrl / sharedLedger", () => {
     process.env.NEXT_PUBLIC_BASE_PATH = "/led-warehouse";
     expect(apiUrl("/api/v1/ledger")).toBe("/led-warehouse/api/v1/ledger/");
   });
+
+  it("query string: slash перед ?status, не после значения", () => {
+    process.env.NEXT_PUBLIC_ACCESS_API_BASE = "https://led-warehouse-api.onrender.com";
+    process.env.NEXT_PUBLIC_BASE_PATH = "/led-warehouse";
+    expect(apiUrl("/api/v1/access-requests/?status=pending")).toBe(
+      "https://led-warehouse-api.onrender.com/api/v1/access-requests/?status=pending",
+    );
+    expect(apiUrl("/api/v1/access-requests?status=approved")).toBe(
+      "https://led-warehouse-api.onrender.com/api/v1/access-requests/?status=approved",
+    );
+  });
 });
 
 // sharedLedger is evaluated at import — test via fresh env in subprocess-like reset:

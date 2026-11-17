@@ -41,14 +41,16 @@ export async function postSharedAccessRequest(
   }
 }
 
-/** GET pending с shared backend (для админа на другом устройстве). */
-export async function fetchSharedPendingRequests(opts?: {
-  fetchImpl?: typeof fetch;
-}): Promise<AccessRequestRow[] | null> {
+/** GET заявки с shared backend (для админа на другом устройстве). */
+export async function fetchSharedAccessRequests(
+  status?: "pending" | "approved" | "rejected",
+  opts?: { fetchImpl?: typeof fetch },
+): Promise<AccessRequestRow[] | null> {
   if (!accessApiEnabled()) return null;
   const fetchImpl = opts?.fetchImpl ?? fetch;
   try {
-    const response = await fetchImpl(accessEndpoint("/api/v1/access-requests/?status=pending"));
+    const path = status ? `/api/v1/access-requests/?status=${status}` : "/api/v1/access-requests/";
+    const response = await fetchImpl(accessEndpoint(path));
     if (!response.ok) return null;
     const data = (await response.json()) as { ok?: boolean; requests?: AccessRequestRow[] };
     return data.requests ?? [];
@@ -57,8 +59,15 @@ export async function fetchSharedPendingRequests(opts?: {
   }
 }
 
+/** GET pending с shared backend (для админа на другом устройстве). */
+export async function fetchSharedPendingRequests(opts?: {
+  fetchImpl?: typeof fetch;
+}): Promise<AccessRequestRow[] | null> {
+  return fetchSharedAccessRequests("pending", opts);
+}
+
 export async function postSharedAccessDecision(input: {
-  action: "approve" | "reject" | "add";
+  action: "approve" | "reject" | "add" | "revoke";
   actorEmail: string;
   requestId?: string;
   email?: string;
@@ -80,7 +89,9 @@ export async function postSharedAccessDecision(input: {
       }),
     });
     const data = (await response.json()) as { ok?: boolean; error?: string };
-    if (!response.ok) return { ok: false, error: data.error ?? `HTTP ${response.status}` };
+    if (!response.ok || data.ok === false) {
+      return { ok: false, error: data.error ?? `HTTP ${response.status}` };
+    }
     return { ok: true };
   } catch (error) {
     return { ok: false, error: error instanceof Error ? error.message : "network" };

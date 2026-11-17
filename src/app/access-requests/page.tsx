@@ -7,18 +7,19 @@ import { useWarehouse } from "@/components/warehouse";
 import { Empty, Field, Flash, PageHeader, Panel, buttonClass, controlClass } from "@/components/ui";
 import {
   accessApiEnabled,
+  fetchSharedAccessRequests,
   fetchSharedPendingRequests,
   postSharedAccessDecision,
 } from "@/lib/email-auth/access-api";
+import { mergePending } from "@/lib/email-auth/merge-pending";
 import { DEFAULT_TEMP_ACCESS_DAYS, TEMP_ACCESS_DAY_OPTIONS } from "@/lib/email-auth/temp-access";
 import { translateError } from "@/lib/i18n/messages";
 import {
   addAllowedEmailManual,
-  approveAccessRequest,
   canManageAccess,
+  decideAccessRequestLocally,
   listAccessRequests,
   listAllowedEmails,
-  rejectAccessRequest,
   revokeAllowedEmail,
   type AccessRequestRow,
 } from "@/lib/services/access-requests";
@@ -39,17 +40,8 @@ function daysFromChoice(choice: DurationChoice): number | null {
   return Number(choice);
 }
 
-function mergePending(local: AccessRequestRow[], remote: AccessRequestRow[] | null): AccessRequestRow[] {
-  const byEmail = new Map<string, AccessRequestRow>();
-  for (const row of [...(remote ?? []), ...local]) {
-    const prev = byEmail.get(row.email);
-    if (!prev || row.createdAt >= prev.createdAt) byEmail.set(row.email, row);
-  }
-  return [...byEmail.values()].sort((a, b) => b.createdAt - a.createdAt);
-}
-
 export default function AccessRequestsPage() {
-  const { db, shared, refresh, revision } = useWarehouse();
+  const { db, shared, offline, refresh, reloadShared, revision } = useWarehouse();
   const { session: auth } = useEmailAuth();
   const { t, lang } = useI18n();
   const manager = canManageAccess(auth?.email);
@@ -59,20 +51,37 @@ export default function AccessRequestsPage() {
   const [manualDuration, setManualDuration] = useState<DurationChoice>(String(DEFAULT_TEMP_ACCESS_DAYS) as DurationChoice);
   const [approveDuration, setApproveDuration] = useState<DurationChoice>(String(DEFAULT_TEMP_ACCESS_DAYS) as DurationChoice);
   const [remotePending, setRemotePending] = useState<AccessRequestRow[] | null>(null);
+  const [remoteDecided, setRemoteDecided] = useState<AccessRequestRow[] | null>(null);
   void revision;
 
   const localPending = listAccessRequests(db, { status: "pending" });
   const pending = useMemo(() => mergePending(localPending, remotePending), [localPending, remotePending]);
-  const decided = listAccessRequests(db).filter((row) => row.status !== "pending").slice(0, 20);
+  const localDecided = listAccessRequests(db).filter((row) => row.status !== "pending").slice(0, 20);
+  const decided = useMemo(() => {
+    if (remoteDecided !== null) {
+      return [...remoteDecided]
+        .filter((row) => row.status !== "pending")
+        .sort((a, b) => (b.decidedAt ?? b.createdAt) - (a.decidedAt ?? a.createdAt))
+        .slice(0, 20);
+    }
+    return localDecided;
+  }, [remoteDecided, localDecided]);
   const allowlist = listAllowedEmails(db, { includeExpired: true });
 
   const pullRemote = useCallback(async () => {
     if (!apiOn) {
       setRemotePending(null);
+      setRemoteDecided(null);
       return;
     }
-    const rows = await fetchSharedPendingRequests();
-    setRemotePending(rows);
+    const [pendingRows, allRows] = await Promise.all([
+      fetchSharedPendingRequests(),
+      fetchSharedAccessRequests(),
+    ]);
+    setRemotePending(pendingRows);
+    if (allRows) {
+      setRemoteDecided(allRows.filter((row) => row.status !== "pending"));
+    }
   }, [apiOn]);
 
   useEffect(() => {
@@ -82,45 +91,71 @@ export default function AccessRequestsPage() {
     return () => clearInterval(timer);
   }, [apiOn, pullRemote, revision]);
 
-  async function onApprove(id: string) {
+  async function afterSharedMutation() {
+    if (apiOn && shared && !offline) {
+      // Decide/revoke уже в Turso через access API — не пушим старый revision поверх.
+      reloadShared();
+      await new Promise((resolve) => setTimeout(resolve, 500));
+    } else {
+      await refresh();
+    }
+    await pullRemote();
+  }
+
+  async function onApprove(row: AccessRequestRow) {
     try {
       if (apiOn) {
-        await postSharedAccessDecision({
-          requestId: id,
+        const remote = await postSharedAccessDecision({
+          requestId: row.id,
+          email: row.email,
           action: "approve",
           actorEmail: auth!.email,
           expiresInDays: daysFromChoice(approveDuration),
         });
+        if (!remote.ok) throw new Error(remote.error ?? "api");
       }
       try {
-        approveAccessRequest(db, id, auth!.email, { expiresInDays: daysFromChoice(approveDuration) });
+        decideAccessRequestLocally(db, {
+          requestId: row.id,
+          email: row.email,
+          action: "approve",
+          actorEmail: auth!.email,
+          expiresInDays: daysFromChoice(approveDuration),
+        });
       } catch {
-        /* заявка могла быть только на сервере */
+        /* заявка могла быть только на сервере — remote уже ок */
       }
-      await refresh();
-      await pullRemote();
+      setRemotePending((prev) => (prev ? prev.filter((item) => item.email !== row.email) : prev));
+      await afterSharedMutation();
       setFlash({ ok: t("access.approved") });
     } catch (error) {
       setFlash({ error: translateError(lang, error) });
     }
   }
 
-  async function onReject(id: string) {
+  async function onReject(row: AccessRequestRow) {
     try {
       if (apiOn) {
-        await postSharedAccessDecision({
-          requestId: id,
+        const remote = await postSharedAccessDecision({
+          requestId: row.id,
+          email: row.email,
           action: "reject",
           actorEmail: auth!.email,
         });
+        if (!remote.ok) throw new Error(remote.error ?? "api");
       }
       try {
-        rejectAccessRequest(db, id, auth!.email);
+        decideAccessRequestLocally(db, {
+          requestId: row.id,
+          email: row.email,
+          action: "reject",
+          actorEmail: auth!.email,
+        });
       } catch {
         /* only on server */
       }
-      await refresh();
-      await pullRemote();
+      setRemotePending((prev) => (prev ? prev.filter((item) => item.email !== row.email) : prev));
+      await afterSharedMutation();
       setFlash({ ok: t("access.rejected") });
     } catch (error) {
       setFlash({ error: translateError(lang, error) });
@@ -129,8 +164,20 @@ export default function AccessRequestsPage() {
 
   async function onRevoke(email: string) {
     try {
-      revokeAllowedEmail(db, email, auth!.email);
-      await refresh();
+      if (apiOn) {
+        const remote = await postSharedAccessDecision({
+          action: "revoke",
+          actorEmail: auth!.email,
+          email,
+        });
+        if (!remote.ok) throw new Error(remote.error ?? "api");
+      }
+      try {
+        revokeAllowedEmail(db, email, auth!.email);
+      } catch {
+        /* remote уже отозвал; локально строки могло не быть */
+      }
+      await afterSharedMutation();
       setFlash({ ok: t("access.revoked") });
     } catch (error) {
       setFlash({ error: translateError(lang, error) });
@@ -141,19 +188,22 @@ export default function AccessRequestsPage() {
     event.preventDefault();
     try {
       if (apiOn) {
-        await postSharedAccessDecision({
+        const remote = await postSharedAccessDecision({
           action: "add",
           actorEmail: auth!.email,
           email: manualEmail,
           expiresInDays: daysFromChoice(manualDuration),
         });
+        if (!remote.ok) throw new Error(remote.error ?? "api");
       }
       addAllowedEmailManual(db, manualEmail, auth!.email, {
         expiresInDays: daysFromChoice(manualDuration),
       });
       setManualEmail("");
-      await refresh();
-      await pullRemote();
+      setRemotePending((prev) =>
+        prev ? prev.filter((item) => item.email !== manualEmail.trim().toLowerCase()) : prev,
+      );
+      await afterSharedMutation();
       setFlash({ ok: t("access.added") });
     } catch (error) {
       setFlash({ error: translateError(lang, error) });
@@ -216,10 +266,10 @@ export default function AccessRequestsPage() {
                 </div>
                 {manager ? (
                   <div className="flex gap-2">
-                    <button type="button" className={buttonClass("primary")} onClick={() => void onApprove(row.id)}>
+                    <button type="button" className={buttonClass("primary")} onClick={() => void onApprove(row)}>
                       {t("access.approve")}
                     </button>
-                    <button type="button" className={buttonClass("ghost")} onClick={() => void onReject(row.id)}>
+                    <button type="button" className={buttonClass("ghost")} onClick={() => void onReject(row)}>
                       {t("access.reject")}
                     </button>
                   </div>
@@ -300,9 +350,11 @@ export default function AccessRequestsPage() {
         ) : null}
       </Panel>
 
-      {decided.length > 0 ? (
-        <Panel>
-          <h2 className="mb-3 text-sm font-semibold tracking-wide text-ink/70 uppercase">{t("access.historyTitle")}</h2>
+      <Panel>
+        <h2 className="mb-3 text-sm font-semibold tracking-wide text-ink/70 uppercase">{t("access.historyTitle")}</h2>
+        {decided.length === 0 ? (
+          <Empty>{t("access.historyEmpty")}</Empty>
+        ) : (
           <ul className="divide-y divide-line text-sm">
             {decided.map((row) => (
               <li key={row.id} className="flex justify-between gap-3 py-2">
@@ -314,8 +366,8 @@ export default function AccessRequestsPage() {
               </li>
             ))}
           </ul>
-        </Panel>
-      ) : null}
+        )}
+      </Panel>
     </div>
   );
 }
