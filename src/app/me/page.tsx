@@ -12,14 +12,14 @@ import { getRoleLabels, updateOwnCabinet } from "@/lib/services/people";
 import { OwnerBackupRestore } from "@/components/owner-backup-restore";
 import { flushTelegramOutbox, listTelegramOutbox, sendTestTelegram } from "@/lib/telegram/notify";
 
-type BotStatus = "configured" | "mock" | "unknown";
+type BotStatus = "configured" | "mock" | "no-shared" | "unreachable";
 
 export default function MePage() {
   const { db, session, refresh, revision } = useWarehouse();
   const { t, lang } = useI18n();
   const labels = getRoleLabels(db);
   const [flash, setFlash] = useState<{ error?: string; ok?: string }>({});
-  const [botStatus, setBotStatus] = useState<BotStatus>("unknown");
+  const [botStatus, setBotStatus] = useState<BotStatus>(sharedLedger ? "unreachable" : "no-shared");
   const outbox = listTelegramOutbox(db, 20);
   const bound = Boolean(session.telegramChatId?.trim());
   void revision;
@@ -28,7 +28,7 @@ export default function MePage() {
     let cancelled = false;
     async function loadStatus() {
       if (!sharedLedger) {
-        if (!cancelled) setBotStatus("unknown");
+        if (!cancelled) setBotStatus("no-shared");
         return;
       }
       try {
@@ -37,7 +37,8 @@ export default function MePage() {
         const data = (await response.json()) as { configured?: boolean };
         if (!cancelled) setBotStatus(data.configured ? "configured" : "mock");
       } catch {
-        if (!cancelled) setBotStatus("unknown");
+        // ACCESS_API_BASE уже в бандле — чаще CORS/cold start, не «нет Variable».
+        if (!cancelled) setBotStatus("unreachable");
       }
     }
     void loadStatus();
@@ -104,12 +105,18 @@ export default function MePage() {
             <div className="mb-2 flex flex-wrap items-center gap-2">
               <h3 className="font-medium">{t("me.bindTitle")}</h3>
               <Badge tone={bound ? "ok" : "warn"}>{bound ? t("me.bindStatusBound") : t("me.bindStatusUnbound")}</Badge>
-              <Badge tone={botStatus === "configured" ? "ok" : botStatus === "mock" ? "warn" : "neutral"}>
+              <Badge
+                tone={
+                  botStatus === "configured" ? "ok" : botStatus === "mock" || botStatus === "unreachable" ? "warn" : "neutral"
+                }
+              >
                 {botStatus === "configured"
                   ? t("me.serverConfigured")
                   : botStatus === "mock"
                     ? t("me.serverMock")
-                    : t("me.serverUnknown")}
+                    : botStatus === "no-shared"
+                      ? t("me.serverNoShared")
+                      : t("me.serverUnreachable")}
               </Badge>
             </div>
             <p className="text-sm leading-6 text-ink/70">{t("me.bindSteps")}</p>
