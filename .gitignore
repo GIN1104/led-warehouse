@@ -11,5 +11,7 @@ data
 *.log
 .env
 .env.local
+deploy/oracle/.env
+deploy/oracle/oci.env
 public/sql-wasm.wasm
 .api-hidden
