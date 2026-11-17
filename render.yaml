@@ -1,0 +1,38 @@
+# LED Warehouse — временный API host на Render Free (пока нет Oracle Always Free VM).
+# Blueprint: Dashboard → New → Blueprint → этот repo / ветка с render.yaml.
+# Карта для Free Web Service не нужна. Sleep ~15 мин idle → cold start ~30–60 с.
+# Секреты (sync: false) задайте в Dashboard при создании — не коммитьте значения.
+#
+# Health: GET /api/v1/health/
+# После деплоя: https://<service>.onrender.com
+# Pages Variable NEXT_PUBLIC_ACCESS_API_BASE — только после подтверждения URL Евгением.
+#
+# CORS: https://gin1104.github.io уже в DEFAULT_ORIGINS (src/lib/api/cors.ts).
+# Доп. origins: Environment → ACCESS_CORS_ORIGINS=https://preview.example.com
+
+services:
+  - type: web
+    name: led-warehouse-api
+    runtime: docker
+    plan: free
+    region: frankfurt
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+    healthCheckPath: /api/v1/health/
+    # Free: нет persistent disk. /data ephemeral; source of truth = Turso.
+    envVars:
+      - key: NEXT_PUBLIC_SHARED
+        value: "1"
+      - key: LEDGER_PATH
+        value: /data/warehouse.sqlite
+      - key: HOSTNAME
+        value: "0.0.0.0"
+      # PORT задаёт Render runtime (обычно 10000); Next читает process.env.PORT.
+      - key: TURSO_DATABASE_URL
+        sync: false
+      - key: TURSO_AUTH_TOKEN
+        sync: false
+      - key: TELEGRAM_BOT_TOKEN
+        sync: false
+      - key: TELEGRAM_ADMIN_CHAT_IDS
+        sync: false
