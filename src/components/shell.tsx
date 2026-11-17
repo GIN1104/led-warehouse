@@ -209,7 +209,11 @@ export function Shell({ children }: { children: ReactNode }) {
           {notice === "conflict" ? (
             <p className="mb-4 rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-sm">{t("shell.conflict")}</p>
           ) : null}
-          {offline || notice === "offline" || notice === "offline-write" ? (
+          {notice === "local-fallback" ? (
+            <p className="mb-4 rounded-md border border-rose-300 bg-rose-50 px-3 py-2 text-sm text-rose-950" role="status">
+              {t("shell.localFallback")}
+            </p>
+          ) : offline || notice === "offline" || notice === "offline-write" ? (
             <p className="mb-4 rounded-md border border-rose-300 bg-rose-50 px-3 py-2 text-sm text-rose-950" role="status">
               {notice === "offline-write"
                 ? t("shell.offlineWrite")
