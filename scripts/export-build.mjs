@@ -22,9 +22,9 @@ try {
       ...process.env,
       STATIC_EXPORT: "1",
       NEXT_PUBLIC_SHARED: "",
-      // Default Fly shared API; override via env/Variable when pages.yml wires it.
+      // Pages → remote API (Oracle Always Free и т.п.). Задаётся Variable / env; без URL = IndexedDB.
       NEXT_PUBLIC_ACCESS_API_BASE:
-        process.env.NEXT_PUBLIC_ACCESS_API_BASE || "https://led-warehouse-api.fly.dev",
+        process.env.NEXT_PUBLIC_ACCESS_API_BASE || "",
     },
   });
   status = result.status ?? 1;
