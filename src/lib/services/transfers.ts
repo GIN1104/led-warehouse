@@ -5,6 +5,8 @@ import { notifyTransferTelegram } from "@/lib/telegram/notify";
 
 export type TransferStatus = "planned" | "in_transit" | "received" | "cancelled";
 
+export type LocationKind = "warehouse" | "zone" | "bin" | "site";
+
 export type StockTransferRow = {
   id: string;
   skuId: string;
@@ -14,8 +16,10 @@ export type StockTransferRow = {
   qty: number;
   fromLocationId: string;
   fromLocationName: string;
+  fromLocationKind: LocationKind;
   toLocationId: string;
   toLocationName: string;
+  toLocationKind: LocationKind;
   status: TransferStatus;
   orderId: string | null;
   driverUserId: string | null;
@@ -29,8 +33,8 @@ export type StockTransferRow = {
 
 const LIST_SQL = `
 SELECT t.id AS id, t.sku_id AS skuId, s.code AS skuCode, s.name AS skuName, s.unit AS unit, t.qty AS qty,
-       t.from_location_id AS fromLocationId, f.name AS fromLocationName,
-       t.to_location_id AS toLocationId, d.name AS toLocationName,
+       t.from_location_id AS fromLocationId, f.name AS fromLocationName, f.kind AS fromLocationKind,
+       t.to_location_id AS toLocationId, d.name AS toLocationName, d.kind AS toLocationKind,
        t.status AS status, t.order_id AS orderId, t.driver_user_id AS driverUserId,
        u.name AS driverName, t.note AS note, t.created_at AS createdAt, t.created_by AS createdBy,
        t.shipped_at AS shippedAt, t.received_at AS receivedAt
@@ -40,6 +44,24 @@ INNER JOIN locations f ON f.id = t.from_location_id
 INNER JOIN locations d ON d.id = t.to_location_id
 LEFT JOIN users u ON u.id = t.driver_user_id
 `;
+
+export function isSiteToSite(row: Pick<StockTransferRow, "fromLocationKind" | "toLocationKind">) {
+  return row.fromLocationKind === "site" && row.toLocationKind === "site";
+}
+
+export function countTransfersByStatus(db: Sql): Record<TransferStatus, number> {
+  const rows = db.all<{ status: TransferStatus; n: number }>(
+    `SELECT status, COUNT(*) AS n FROM stock_transfers GROUP BY status`,
+  );
+  const counts: Record<TransferStatus, number> = {
+    planned: 0,
+    in_transit: 0,
+    received: 0,
+    cancelled: 0,
+  };
+  for (const row of rows) counts[row.status] = row.n;
+  return counts;
+}
 
 export function listTransfers(db: Sql): StockTransferRow[] {
   return db.all<StockTransferRow>(`${LIST_SQL} ORDER BY t.created_at DESC`);
