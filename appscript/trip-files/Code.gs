@@ -57,9 +57,20 @@ function include(filename) {
  * @param {string} tripId
  * @returns {Object}
  */
+/**
+ * Первый запрос сам создаёт Drive-папку + meta-таблицу, если Script Properties пусты.
+ */
+function ensureStorageReady_() {
+  var c = getConfig();
+  if (!c.driveRootFolderId || !c.metaSpreadsheetId) {
+    setupTripFilesStorage();
+  }
+}
+
 function getTripFilesBundle(tripId) {
   tripId = String(tripId || '').trim();
   if (!tripId) throw new Error('tripId обязателен');
+  ensureStorageReady_();
   var meta = loadTripMeta(tripId);
   return {
     tripId: tripId,
@@ -140,6 +151,7 @@ function saveAndSendTripFiles(tripId, input) {
   tripId = String(tripId || '').trim();
   if (!tripId) throw new Error('tripId обязателен');
   input = input || {};
+  ensureStorageReady_();
 
   var current = loadTripMeta(tripId);
   var sheetLinks = parseSheetLinks_(input.sheetLinksText);

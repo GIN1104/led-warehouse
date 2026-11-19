@@ -9,6 +9,29 @@
 
 ---
 
+## Live deploy (ledvision2026.il@gmail.com)
+
+| | |
+|--|--|
+| **Exec base** | `https://script.google.com/macros/s/AKfycbxJpOOtsCZgRIHjesbWZtrOxkm4ctibx6L65TNHEmTT-dAlXQ6X5MecKyr1p6RU96Nm/exec` |
+| **Пример** | […/exec?trip=test-deploy-1&view=files](https://script.google.com/macros/s/AKfycbxJpOOtsCZgRIHjesbWZtrOxkm4ctibx6L65TNHEmTT-dAlXQ6X5MecKyr1p6RU96Nm/exec?trip=test-deploy-1&view=files) |
+| **Редактор** | `https://script.google.com/home/projects/<scriptId>/edit` (scriptId в локальном `.clasp.json`, не в git) |
+| **Аккаунт** | `ledvision2026.il@gmail.com` |
+| **Drive** | папка `LED Trip Files (ledvision2026)` создаётся при первом `getTripFilesBundle` / `setupTripFilesStorage` |
+
+### Склад: `NEXT_PUBLIC_TRIP_FILES_GAS_EXEC_URL`
+
+В Pages Variables / `.env.local` (без query, без секретов в чат):
+
+```bash
+NEXT_PUBLIC_TRIP_FILES_GAS_EXEC_URL=https://script.google.com/macros/s/AKfycbxJpOOtsCZgRIHjesbWZtrOxkm4ctibx6L65TNHEmTT-dAlXQ6X5MecKyr1p6RU96Nm/exec
+```
+
+Хелпер `tripFilesGasHref(orderId)` → `{exec}?trip={orderId}&view=files`.  
+По умолчанию без env склад остаётся на `/files/?orderId=` (mock).
+
+---
+
 ## Что внутри
 
 | Файл | Роль |
