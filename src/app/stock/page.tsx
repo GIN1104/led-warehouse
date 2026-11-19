@@ -7,7 +7,7 @@ import { KitSummaryNest } from "@/components/kit-summary-nest";
 import { useI18n } from "@/components/i18n";
 import { useWarehouse } from "@/components/warehouse";
 import { Badge, Field, Flash, PageHeader, Panel, buttonClass, controlClass } from "@/components/ui";
-import { can } from "@/lib/auth";
+import { assertCan, can } from "@/lib/auth";
 import { formatDateTime } from "@/lib/dates";
 import { cabinetPackFromText } from "@/lib/domain/cabinet-pack";
 import { EQUIPMENT_STATUSES, EQUIPMENT_TRANSITIONS, type EquipmentStatus } from "@/lib/domain/equipment-status";
@@ -55,8 +55,8 @@ const REPAIR_STATUSES: readonly EquipmentStatus[] = ["needs_repair", "in_repair"
 const SUMMARY_STICKY_TOP = "top-14";
 /** Совпадает с rem-bump в globals.css (≥1024) — одна раскладка сводки, без двойного DOM. */
 const SUMMARY_DESKTOP_MQ = "(min-width: 1024px)";
-const qtyInputClass = `${controlClass} h-9 w-14 shrink-0 tabular-nums md:h-10 md:w-20`;
-const summaryCellClass = "px-1.5 py-2 align-middle md:px-3";
+const qtyInputClass = `${controlClass} h-9 w-full min-w-0 max-w-[5.5rem] shrink-0 tabular-nums md:h-10`;
+const summaryCellClass = "px-1.5 py-2 align-middle md:px-2.5 lg:px-3";
 const mobileQtyLabelClass = "text-[10px] font-medium tracking-wide text-ink/45 uppercase";
 
 function subscribeLg(onStoreChange: () => void): () => void {
@@ -142,7 +142,7 @@ export default function StockPage() {
   }, [query]);
 
   function assertEditable() {
-    assertEditable();
+    assertCan(session.role, "stock.write", db);
     if (writesBlocked) throw new LedgerOfflineWriteError();
   }
 
@@ -701,7 +701,7 @@ export default function StockPage() {
               const canMoveFamily = family.familyId !== "__uncategorized__" && canEdit;
               return (
                 <section key={family.familyId} className="overflow-hidden rounded-md border border-line bg-paper/70">
-                  <div className="flex items-start gap-2 border-b border-line bg-sand/80 px-2.5 py-2">
+                  <div className="flex items-start gap-2 border-b border-line bg-sand/80 px-3 py-2.5">
                     {canMoveFamily ? (
                       <span className="inline-flex shrink-0 flex-col gap-0.5 pt-0.5">
                         <button
@@ -757,7 +757,7 @@ export default function StockPage() {
                   </div>
 
                   {canMoveFamily ? (
-                    <div className="flex flex-wrap items-center gap-1 border-b border-line px-2.5 py-2">
+                    <div className="flex flex-wrap items-center gap-1 border-b border-line px-3 py-2">
                       {addingFamilyId === family.familyId ? (
                         <>
                           <input
@@ -814,14 +814,14 @@ export default function StockPage() {
                   ) : null}
 
                   {family.skus.length === 0 ? (
-                    <p className="px-2.5 py-3 text-xs text-ink/50">{t("eq.summaryNoVariants")}</p>
+                    <p className="px-3 py-3 text-xs text-ink/50">{t("eq.summaryNoVariants")}</p>
                   ) : (
                     <ul className="divide-y divide-line">
                       {family.skus.map((agg, skuIndex) => {
                         const draft = bucketDraftFor(agg);
                         const kitNest = kitBySku.get(agg.skuId);
                         return (
-                          <li key={agg.skuId} className="px-2.5 py-3">
+                          <li key={agg.skuId} className="px-3 py-3">
                             <div className="flex items-start gap-2">
                               {canEdit ? (
                                 <span className="inline-flex shrink-0 flex-col gap-0.5">
@@ -1103,31 +1103,32 @@ export default function StockPage() {
             })}
           </div>
           ) : (
-          /* Desktop ≥1024: sticky-таблица (совпадает с rem 18px) */
-          <div className="rounded-md border border-line bg-paper/60">
-            <table className="w-full table-fixed text-start text-sm">
+          /* Desktop ≥1024: sticky-таблица (совпадает с rem 18px).
+             overflow-x + min-w: имя не сжимается table-fixed до «Каби». */
+          <div className="overflow-x-auto rounded-md border border-line bg-paper/60">
+            <table className="w-full min-w-[68rem] table-fixed text-start text-sm">
               <colgroup>
+                <col className="w-[4.5rem]" />
+                <col className="w-[6.5rem]" />
+                <col className="w-[22rem]" />
                 <col className="w-[5.5rem]" />
-                <col className="w-[7rem]" />
-                <col />
-                <col className="w-[6.5rem]" />
-                <col className="w-[6.5rem]" />
-                <col className="w-[6.5rem]" />
-                <col className="w-[6.5rem]" />
-                <col className="w-[12rem]" />
+                <col className="w-[5.5rem]" />
+                <col className="w-[5.5rem]" />
+                <col className="w-[5.5rem]" />
+                <col className="w-[11rem]" />
               </colgroup>
               <thead
                 className={`sticky ${SUMMARY_STICKY_TOP} z-20 text-xs tracking-wide text-ink/50 uppercase shadow-[0_1px_0_0_var(--color-line,rgba(0,0,0,0.08))]`}
               >
                 <tr>
-                  <th className="bg-sand px-3 py-2.5 font-medium">{t("eq.summaryOrder")}</th>
-                  <th className="bg-sand px-3 py-2.5 font-medium">{t("stock.code")}</th>
-                  <th className="bg-sand px-3 py-2.5 font-medium">{t("stock.name")}</th>
-                  <th className="bg-sand px-3 py-2.5 font-medium">{t("eq.summaryTotal")}</th>
-                  <th className="bg-sand px-3 py-2.5 font-medium">{t("eq.summaryOnHand")}</th>
-                  <th className="bg-sand px-3 py-2.5 font-medium">{t("eq.summaryInUse")}</th>
-                  <th className="bg-sand px-3 py-2.5 font-medium">{t("eq.summaryInRepair")}</th>
-                  <th className="bg-sand px-3 py-2.5 font-medium">{t("eq.summaryDeployments")}</th>
+                  <th className="bg-sand px-2.5 py-2.5 font-medium lg:px-3">{t("eq.summaryOrder")}</th>
+                  <th className="bg-sand px-2.5 py-2.5 font-medium lg:px-3">{t("stock.code")}</th>
+                  <th className="bg-sand px-2.5 py-2.5 font-medium lg:px-3">{t("stock.name")}</th>
+                  <th className="bg-sand px-2.5 py-2.5 font-medium lg:px-3">{t("eq.summaryTotal")}</th>
+                  <th className="bg-sand px-2.5 py-2.5 font-medium lg:px-3">{t("eq.summaryOnHand")}</th>
+                  <th className="bg-sand px-2.5 py-2.5 font-medium lg:px-3">{t("eq.summaryInUse")}</th>
+                  <th className="bg-sand px-2.5 py-2.5 font-medium lg:px-3">{t("eq.summaryInRepair")}</th>
+                  <th className="bg-sand px-2.5 py-2.5 font-medium lg:px-3">{t("eq.summaryDeployments")}</th>
                 </tr>
               </thead>
               <tbody>
@@ -1164,30 +1165,27 @@ export default function StockPage() {
                         ) : null}
                       </td>
                       <td colSpan={2} className={`${summaryCellClass} font-medium`}>
-                        <div className="flex min-w-0 flex-col gap-1">
-                          {canMoveFamily ? (
-                            <input
-                              className={`${controlClass} h-10 w-full min-w-0 font-medium`}
-                              value={familyNameDrafts[family.familyId] ?? family.familyName}
-                              aria-label={t("eq.familyName")}
-                              onChange={(event) =>
-                                setFamilyNameDrafts((prev) => ({ ...prev, [family.familyId]: event.target.value }))
+                        {canMoveFamily ? (
+                          <input
+                            className={`${controlClass} h-10 w-full min-w-0 font-medium`}
+                            value={familyNameDrafts[family.familyId] ?? family.familyName}
+                            aria-label={t("eq.familyName")}
+                            onChange={(event) =>
+                              setFamilyNameDrafts((prev) => ({ ...prev, [family.familyId]: event.target.value }))
+                            }
+                            onBlur={(event) => void saveFamilyName(family.familyId, event.target.value, family.familyName)}
+                            onKeyDown={(event) => {
+                              if (event.key === "Enter") {
+                                event.preventDefault();
+                                (event.target as HTMLInputElement).blur();
                               }
-                              onBlur={(event) => void saveFamilyName(family.familyId, event.target.value, family.familyName)}
-                              onKeyDown={(event) => {
-                                if (event.key === "Enter") {
-                                  event.preventDefault();
-                                  (event.target as HTMLInputElement).blur();
-                                }
-                              }}
-                            />
-                          ) : (
-                            <span className="truncate">{family.familyName}</span>
-                          )}
-                          <span className="text-xs font-normal text-ink/50">
-                            {t("eq.summaryGroupTotal")}: {family.total}
+                            }}
+                          />
+                        ) : (
+                          <span className="block truncate" title={family.familyName}>
+                            {family.familyName}
                           </span>
-                        </div>
+                        )}
                       </td>
                       <td className={`${summaryCellClass} text-xs tabular-nums text-ink/60`}>{family.total}</td>
                       <td className={`${summaryCellClass} text-xs tabular-nums text-ink/60`}>{family.onHand}</td>
@@ -1299,22 +1297,33 @@ export default function StockPage() {
                             <td className={`${summaryCellClass} ps-4 font-mono text-xs tabular-nums`}>{agg.skuCode}</td>
                             <td className={`${summaryCellClass} overflow-visible`}>
                               {canEdit ? (
-                                <div className="flex min-w-0 flex-col gap-1">
-                                  <input
-                                    className={`${controlClass} h-10 w-full min-w-0`}
-                                    value={skuNameDrafts[agg.skuId] ?? agg.skuName}
-                                    aria-label={t("stock.name")}
-                                    onChange={(event) =>
-                                      setSkuNameDrafts((prev) => ({ ...prev, [agg.skuId]: event.target.value }))
-                                    }
-                                    onBlur={(event) => void saveSkuName(agg.skuId, event.target.value, agg.skuName)}
-                                    onKeyDown={(event) => {
-                                      if (event.key === "Enter") {
-                                        event.preventDefault();
-                                        (event.target as HTMLInputElement).blur();
+                                <div className="space-y-1">
+                                  <div className="flex min-w-0 items-center gap-2">
+                                    <input
+                                      className={`${controlClass} h-10 min-w-0 flex-1`}
+                                      value={skuNameDrafts[agg.skuId] ?? agg.skuName}
+                                      aria-label={t("stock.name")}
+                                      onChange={(event) =>
+                                        setSkuNameDrafts((prev) => ({ ...prev, [agg.skuId]: event.target.value }))
                                       }
-                                    }}
-                                  />
+                                      onBlur={(event) => void saveSkuName(agg.skuId, event.target.value, agg.skuName)}
+                                      onKeyDown={(event) => {
+                                        if (event.key === "Enter") {
+                                          event.preventDefault();
+                                          (event.target as HTMLInputElement).blur();
+                                        }
+                                      }}
+                                    />
+                                    {editingGroupSkuId !== agg.skuId ? (
+                                      <button
+                                        type="button"
+                                        className={buttonClass("ghost", "h-10 shrink-0 px-2 text-xs text-ink/60")}
+                                        onClick={() => setEditingGroupSkuId(agg.skuId)}
+                                      >
+                                        {t("eq.editGroup")}
+                                      </button>
+                                    ) : null}
+                                  </div>
                                   {editingGroupSkuId === agg.skuId ? (
                                     <div className="flex max-w-full flex-wrap items-center gap-2">
                                       <select
@@ -1342,24 +1351,18 @@ export default function StockPage() {
                                         {t("eq.repairCancel")}
                                       </button>
                                     </div>
-                                  ) : (
-                                    <button
-                                      type="button"
-                                      className={buttonClass("ghost", "h-8 w-fit px-2 text-xs text-ink/60")}
-                                      onClick={() => setEditingGroupSkuId(agg.skuId)}
-                                    >
-                                      {t("eq.editGroup")}
-                                    </button>
-                                  )}
+                                  ) : null}
                                 </div>
                               ) : (
-                                <span className="line-clamp-1">{agg.skuName}</span>
+                                <span className="block break-words leading-snug" title={agg.skuName}>
+                                  {agg.skuName}
+                                </span>
                               )}
                               {(() => {
                                 const pack = cabinetPackFromText(agg.total, `${agg.skuCode} ${agg.skuName}`);
                                 if (!pack) return null;
                                 return (
-                                  <p className="mt-1 text-[11px] tabular-nums text-ink/50" title={t("eq.cabinetPackHint")}>
+                                  <p className="mt-1 text-[11px] leading-4 tabular-nums text-ink/50" title={t("eq.cabinetPackHint")}>
                                     {t("eq.cabinetPack", {
                                       m2: pack.squareMeters,
                                       cubes: pack.cubes,
