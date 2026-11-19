@@ -102,14 +102,18 @@ function applyOpenedDb(
   };
 }
 
-/** Shared API недоступен и нет snapshot → обычный локальный IndexedDB (как Pages без ACCESS_API_BASE). */
-async function openLocalFallback(): Promise<ReadyWarehouse | { ready: false; error: string }> {
+/**
+ * Shared API недоступен и нет snapshot: открываем локальную копию только для просмотра.
+ * Запись блокируется (writesBlocked) — нельзя «успешно» сохранить только в IndexedDB,
+ * пока в бандле задан ACCESS_API_BASE / shared ledger.
+ */
+async function openSharedBrowseOnly(): Promise<ReadyWarehouse | { ready: false; error: string }> {
   const db = await openBrowserDb();
   return buildReady(db, {
-    shared: false,
+    shared: true,
     offline: true,
     snapshotSavedAt: null,
-    notice: "local-fallback",
+    notice: "offline",
   });
 }
 
@@ -153,9 +157,9 @@ export function WarehouseProvider({ children }: { children: ReactNode }) {
           }),
         );
       } catch {
-        // Нет сети и нет last-known → soft-disable shared, локальный режим.
+        // Нет сети и нет last-known → browse-only, запись в общий ledger запрещена.
         try {
-          const local = await openLocalFallback();
+          const local = await openSharedBrowseOnly();
           if (!cancelled) setState(local);
         } catch (error: unknown) {
           if (!cancelled) {
@@ -174,7 +178,7 @@ export function WarehouseProvider({ children }: { children: ReactNode }) {
     };
   }, []);
 
-  // Пока в бандле есть ACCESS_API_BASE — пробуем вернуться на shared, даже из local-fallback.
+  // Пока в бандле есть ACCESS_API_BASE — пробуем вернуться на shared из offline/browse-only.
   useEffect(() => {
     if (!sharedLedger) return;
     const timer = setInterval(() => {
@@ -184,7 +188,7 @@ export function WarehouseProvider({ children }: { children: ReactNode }) {
         if (!latest.ready) return;
 
         if (!probe.ok) {
-          if (!latest.shared) return; // уже local-fallback
+          if (!latest.shared) return;
           if (latest.offline && (latest.notice === "offline" || latest.notice === "offline-write")) return;
           setState((current) => {
             if (!current.ready || !current.shared) return current;
@@ -198,7 +202,7 @@ export function WarehouseProvider({ children }: { children: ReactNode }) {
           return;
         }
 
-        // Сеть жива: из local-fallback или stale/offline shared — подтянуть ledger.
+        // Сеть жива: из offline/browse-only или stale shared — подтянуть ledger.
         if (latest.shared && !latest.offline && probe.revision === knownRevision()) return;
 
         try {
@@ -289,30 +293,28 @@ export function WarehouseProvider({ children }: { children: ReactNode }) {
                   ? error
                   : new LedgerOfflineWriteError(error instanceof Error ? error.message : undefined);
               }
-              // Нет snapshot: текущая in-memory база → локальный IndexedDB (soft-disable shared).
-              await persistBrowserDb();
+              // Нет snapshot: не пишем «успех» в IndexedDB — shared mode fail-closed.
               setState((current) =>
                 current.ready
                   ? {
                       ...current,
-                      shared: false,
+                      shared: true,
                       offline: true,
-                      writesBlocked: false,
-                      snapshotSavedAt: null,
-                      notice: "local-fallback",
-                      revision: current.revision + 1,
-                      users: listUsers(current.db),
+                      writesBlocked: true,
+                      notice: "offline-write",
                     }
                   : current,
               );
-              return;
+              throw error instanceof LedgerOfflineWriteError
+                ? error
+                : new LedgerOfflineWriteError(error instanceof Error ? error.message : undefined);
             }
           } else {
             await persistBrowserDb();
           }
           setState((current) => {
             if (!current.ready) return current;
-            // Local-fallback: оставляем баннер и offline, запись в IndexedDB ок.
+            // Чистый локальный режим (без ACCESS_API_BASE): IndexedDB ок.
             if (!current.shared) {
               return {
                 ...current,
@@ -347,7 +349,7 @@ export function WarehouseProvider({ children }: { children: ReactNode }) {
             });
           })
           .catch(() => {
-            void openLocalFallback().then((local) => {
+            void openSharedBrowseOnly().then((local) => {
               if (local.ready) {
                 setState((current) => {
                   if (!current.ready) return local;

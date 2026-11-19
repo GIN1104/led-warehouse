@@ -25,10 +25,9 @@ type Props = {
 /** Создание комплекта под любой группой оборудования. Nested — в «Всё оборудование». */
 export function EquipmentKitsPanel({ db, allowed, revision, refresh, onFlash }: Props) {
   const { t, lang } = useI18n();
-  const tree = listKitTree(db);
+  const tree = useMemo(() => listKitTree(db), [db, revision]);
   const families = useMemo(() => listProductFamilies(db), [db, revision]);
   const [familyMode, setFamilyMode] = useState<"existing" | "new">("existing");
-  void revision;
 
   async function run(action: () => void, okKey: "kits.saved" | "kits.deleted") {
     try {

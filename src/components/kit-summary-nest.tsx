@@ -26,7 +26,8 @@ type Props = {
 /** Nested-подстроки комплекта под SKU в сводке «Всё оборудование». */
 export function KitSummaryNest({ db, subtype, allowed, refresh, onFlash }: Props) {
   const { t, lang } = useI18n();
-  const [open, setOpen] = useState(true);
+  /** Свернуто по умолчанию — меньше DOM и меньше лагов на сводке. */
+  const [open, setOpen] = useState(false);
   const [openUnits, setOpenUnits] = useState<Record<string, boolean>>({});
 
   async function run(action: () => void, ok: "kits.saved" | "kits.deleted" | "kits.itemAdded") {
@@ -68,7 +69,7 @@ export function KitSummaryNest({ db, subtype, allowed, refresh, onFlash }: Props
 
       {open
         ? subtype.units.map((unit) => {
-            const unitOpen = openUnits[unit.id] ?? true;
+            const unitOpen = openUnits[unit.id] ?? false;
             return (
               <Fragment key={unit.id}>
                 <tr className="border-t border-line/50 bg-paper/50">
