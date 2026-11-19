@@ -105,9 +105,11 @@ export default function OccupancyPage() {
               {rows.map((row) => (
                 <tr key={row.skuId} className="border-t border-line align-middle">
                   <td className="sticky start-0 z-10 bg-sand px-3 py-2">
-                    <div className="flex min-w-[9rem] flex-col gap-0.5">
+                    <div className="flex min-w-[11rem] max-w-[14rem] flex-col gap-0.5">
                       <span className="font-mono text-xs">{row.skuCode}</span>
-                      <span className="truncate text-xs text-ink/60">{row.skuName}</span>
+                      <span className="break-words text-xs leading-snug text-ink/60" title={row.skuName}>
+                        {row.skuName}
+                      </span>
                       {row.hasShortage ? <Badge tone="alert">{t("occupancy.legendShort")}</Badge> : null}
                     </div>
                   </td>

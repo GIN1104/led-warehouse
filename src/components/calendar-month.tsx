@@ -79,7 +79,7 @@ export function CalendarMonth({
                     style={item.color ? { backgroundColor: item.color } : undefined}
                     title={item.progress == null ? item.title : `${item.title} · ${item.progress}%`}
                   >
-                    <span className="block truncate">{item.title}</span>
+                    <span className="block line-clamp-2 break-words whitespace-normal">{item.title}</span>
                     {item.progress == null ? null : (
                       <span className="mb-0.5 block h-0.5 rounded bg-white/35">
                         <span className="block h-0.5 rounded bg-white" style={{ width: `${item.progress}%` }} />
