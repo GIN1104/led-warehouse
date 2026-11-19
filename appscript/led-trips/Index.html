@@ -1,0 +1,620 @@
+<!DOCTYPE html>
+<html lang="ru">
+  <head>
+    <base target="_top" />
+    <meta charset="utf-8" />
+    <style>
+      :root {
+        --bg: #2b323c;
+        --panel: #3a434f;
+        --panel-2: #454f5c;
+        --text: #eef2f6;
+        --muted: #a7b0bc;
+        --teal: #3db5c8;
+        --teal-hover: #2fa0b2;
+        --screen: #7eb8e8;
+        --stage: #e8a0c0;
+        --card: #ffffff;
+        --danger: #e07070;
+        --radius: 14px;
+      }
+      * { box-sizing: border-box; }
+      html, body {
+        margin: 0; min-height: 100%;
+        font-family: "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+        background: var(--bg); color: var(--text);
+      }
+      .wrap { max-width: 920px; margin: 0 auto; padding: 18px 16px 40px; }
+      .top { display: flex; justify-content: space-between; gap: 12px; align-items: flex-start; }
+      h1 { margin: 0; font-size: 1.7rem; }
+      .sub { margin: 6px 0 16px; color: var(--muted); }
+      .lang { background: var(--panel); border: none; color: var(--text); border-radius: 999px; padding: 8px 14px; }
+      .nav { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 18px; }
+      .nav button {
+        border: none; border-radius: 999px; padding: 10px 14px; cursor: pointer;
+        background: var(--panel); color: var(--text); font-weight: 600;
+      }
+      .nav button.active { background: #5a90a8; }
+      .panel {
+        background: var(--panel); border-radius: 18px; padding: 18px 18px 22px;
+      }
+      .panel h2 { margin: 0 0 8px; }
+      .hint { color: var(--muted); font-size: 0.92rem; margin: 0 0 14px; }
+      .row { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 12px; }
+      label { display: block; font-size: 0.85rem; margin-bottom: 4px; color: var(--muted); }
+      input, select, textarea {
+        width: 100%; border: none; border-radius: 10px; padding: 10px 12px;
+        background: var(--panel-2); color: var(--text); font: inherit;
+      }
+      textarea { min-height: 72px; resize: vertical; }
+      .field { flex: 1 1 140px; }
+      .btn {
+        border: none; border-radius: 12px; padding: 12px 16px; font-weight: 700;
+        cursor: pointer; font-size: 0.95rem;
+      }
+      .btn-primary { background: var(--teal); color: #fff; }
+      .btn-primary:hover { background: var(--teal-hover); }
+      .btn-secondary { background: #2f3844; color: #fff; }
+      .btn:disabled { opacity: 0.55; cursor: not-allowed; }
+      .trip-list { display: grid; gap: 10px; margin-top: 14px; }
+      .trip-day { display: grid; grid-template-columns: 56px 1fr; gap: 10px; align-items: stretch; }
+      .dow { color: var(--muted); font-size: 0.85rem; padding-top: 10px; }
+      .trip-card {
+        border-radius: 12px; padding: 12px 14px; cursor: pointer; color: #123;
+        background: var(--screen);
+      }
+      .trip-card.stage { background: var(--stage); }
+      /* Peer: «обе категории — два цвета» */
+      .trip-card.both {
+        background: linear-gradient(90deg, var(--screen) 0 50%, var(--stage) 50% 100%);
+      }
+      .trip-card .badge { font-size: 0.72rem; letter-spacing: 0.04em; font-weight: 700; opacity: 0.85; }
+      .trip-card .title { font-weight: 700; margin: 4px 0; }
+      .trip-card .meta { font-size: 0.85rem; opacity: 0.85; }
+      .status { min-height: 1.2em; margin-top: 10px; font-size: 0.88rem; }
+      .status.ok { color: #8dffb0; }
+      .status.err { color: var(--danger); }
+      .overlay {
+        position: fixed; inset: 0; background: rgba(12, 16, 22, 0.72);
+        display: flex; align-items: flex-start; justify-content: center;
+        padding: 48px 12px 24px; z-index: 40; overflow: auto;
+      }
+      .overlay.hidden { display: none; }
+      .close-top {
+        position: absolute; top: 12px; right: 16px;
+        background: #3a4656; color: #fff; border: none; border-radius: 8px;
+        padding: 8px 14px; cursor: pointer;
+      }
+      .modal {
+        width: min(560px, 100%); background: var(--card); color: #1c2430;
+        border-radius: 14px; padding: 26px 26px 20px; position: relative;
+        box-shadow: 0 16px 48px rgba(0,0,0,.35);
+      }
+      .modal h1 { color: #1c2430; font-size: 1.45rem; margin: 0 0 8px; }
+      .modal .lead { color: #5c6b7a; margin: 0 0 18px; font-size: 0.95rem; }
+      .modal label { color: #1c2430; font-weight: 600; }
+      .modal textarea, .modal input[type=file] {
+        background: #fafbfc; color: #1c2430; border: 1px solid #d8dee6;
+      }
+      .modal .hint { color: #5c6b7a; }
+      .file-list { list-style: none; margin: 8px 0 0; padding: 0; }
+      .file-list li {
+        display: flex; justify-content: space-between; gap: 8px;
+        border: 1px solid #d8dee6; border-radius: 8px; padding: 8px 10px; margin-bottom: 6px;
+        font-size: 0.88rem;
+      }
+      .file-list button { border: none; background: transparent; color: #c0392b; cursor: pointer; }
+      .actions { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 10px; }
+      .detail {
+        background: #1f2833; border-radius: 16px; padding: 18px; margin-top: 12px;
+      }
+      .chips { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 8px; }
+      .chip { background: #2f8f6b; color: #fff; border-radius: 8px; padding: 4px 10px; font-size: 0.8rem; font-weight: 700; }
+      .hidden { display: none !important; }
+      table { width: 100%; border-collapse: collapse; font-size: 0.9rem; }
+      th, td { text-align: left; padding: 8px 6px; border-bottom: 1px solid #505a68; }
+    </style>
+  </head>
+  <body>
+    <div class="wrap">
+      <div class="top">
+        <div>
+          <h1>Выезды команды</h1>
+          <p class="sub">Создай выезд — каждый сотрудник получит личное сообщение в Telegram.</p>
+        </div>
+        <button type="button" class="lang" id="langBtn">RU · Русский</button>
+      </div>
+      <nav class="nav" id="nav">
+        <button type="button" data-tab="new">Новый выезд</button>
+        <button type="button" data-tab="log" class="active">Лог работ</button>
+        <button type="button" data-tab="hours">Часы работы</button>
+        <button type="button" data-tab="weekend">Заявки на выходные</button>
+        <button type="button" data-tab="message">Сообщение команде</button>
+        <button type="button" data-tab="settings">Настройки</button>
+      </nav>
+
+      <section class="panel tab" id="tab-new">
+        <h2>Новый выезд</h2>
+        <p class="hint">После сохранения сотрудники получат личное сообщение (Telegram stub, если бот не настроен).</p>
+        <div class="row">
+          <div class="field"><label>Дата</label><input id="newDate" type="date" /></div>
+          <div class="field"><label>Время</label><input id="newTime" type="time" value="11:00" /></div>
+          <div class="field">
+            <label>Категория</label>
+            <select id="newCategory"><option value="screen">Экран</option><option value="stage">Сцена</option><option value="both">Обе</option></select>
+          </div>
+        </div>
+        <div class="row">
+          <div class="field"><label>Место / название</label><input id="newPlace" placeholder="Matnas Neve yosef" /></div>
+          <div class="field">
+            <label>Схемы</label>
+            <select id="newSchemes"><option value="none">Не нужны</option><option value="ready">Готовы</option><option value="needed">Нужны</option></select>
+          </div>
+        </div>
+        <div class="field" style="margin-bottom:12px">
+          <label>Сотрудники (email через запятую)</label>
+          <input id="newAssignees" placeholder="crew@example.com" />
+        </div>
+        <button type="button" class="btn btn-primary" id="btnCreateTrip">Создать выезд</button>
+        <p class="status" id="newStatus"></p>
+      </section>
+
+      <section class="panel tab" id="tab-log">
+        <h2>Лог работ</h2>
+        <p class="hint">Выбери месяц и нажми на работу, чтобы посмотреть подробности или сохранить её в PDF.</p>
+        <div class="row">
+          <div class="field">
+            <label>Месяц</label>
+            <select id="logMonth"></select>
+          </div>
+          <div class="field"><label>Год</label><input id="logYear" type="number" min="2020" max="2100" /></div>
+          <div class="field">
+            <label>Поиск по сотруднику</label>
+            <select id="logPerson"><option value="">Все сотрудники · выбранный месяц</option></select>
+          </div>
+        </div>
+        <p class="hint">Экран — голубой · Сцена — розовый · обе категории — два цвета.</p>
+        <button type="button" class="btn btn-primary" id="btnMonthPdf">Сохранить месяц в PDF</button>
+        <div class="trip-list" id="tripList"></div>
+        <p class="status" id="logStatus"></p>
+      </section>
+
+      <section class="panel tab hidden" id="tab-hours">
+        <h2>Часы работы</h2>
+        <div class="row">
+          <div class="field"><label>Email</label><input id="hrsEmail" /></div>
+          <div class="field"><label>Дата</label><input id="hrsDate" type="date" /></div>
+          <div class="field"><label>Часы</label><input id="hrsValue" type="number" step="0.5" min="0" value="8" /></div>
+        </div>
+        <div class="field" style="margin-bottom:12px"><label>Заметка</label><input id="hrsNote" /></div>
+        <button type="button" class="btn btn-primary" id="btnAddHours">Добавить</button>
+        <table style="margin-top:14px"><thead><tr><th>Дата</th><th>Email</th><th>Часы</th><th>Заметка</th></tr></thead><tbody id="hrsBody"></tbody></table>
+        <p class="status" id="hrsStatus"></p>
+      </section>
+
+      <section class="panel tab hidden" id="tab-weekend">
+        <h2>Заявки на выходные</h2>
+        <div class="row">
+          <div class="field"><label>Email</label><input id="wkEmail" /></div>
+          <div class="field"><label>С</label><input id="wkFrom" type="date" /></div>
+          <div class="field"><label>По</label><input id="wkTo" type="date" /></div>
+        </div>
+        <div class="field" style="margin-bottom:12px"><label>Комментарий</label><input id="wkNote" /></div>
+        <button type="button" class="btn btn-primary" id="btnWeekend">Отправить заявку</button>
+        <table style="margin-top:14px"><thead><tr><th>Период</th><th>Email</th><th>Статус</th></tr></thead><tbody id="wkBody"></tbody></table>
+        <p class="status" id="wkStatus"></p>
+      </section>
+
+      <section class="panel tab hidden" id="tab-message">
+        <h2>Сообщение команде</h2>
+        <p class="hint">Broadcast в Telegram (stub без токена бота).</p>
+        <textarea id="msgText" placeholder="Текст сообщения…"></textarea>
+        <div style="margin-top:12px"><button type="button" class="btn btn-primary" id="btnMsg">Отправить</button></div>
+        <p class="status" id="msgStatus"></p>
+      </section>
+
+      <section class="panel tab hidden" id="tab-settings">
+        <h2>Настройки</h2>
+        <p class="hint">Секреты бота и webhook — только Script Properties (не в UI). Здесь — список людей и deep-link контракт.</p>
+        <table><thead><tr><th>Имя</th><th>Email</th><th>Роль</th></tr></thead><tbody id="peopleBody"></tbody></table>
+        <p class="hint" id="settingsMeta" style="margin-top:12px"></p>
+      </section>
+    </div>
+
+    <!-- Trip detail overlay -->
+    <div class="overlay hidden" id="detailOverlay">
+      <button type="button" class="close-top" id="detailClose">Закрыть</button>
+      <div class="detail" style="width:min(640px,100%)">
+        <div class="chips" id="detailChips"></div>
+        <h2 id="detailTitle" style="margin:0 0 6px"></h2>
+        <p class="hint" id="detailMeta"></p>
+        <div class="actions">
+          <button type="button" class="btn btn-primary" id="btnOpenFiles">Файлы и ссылки</button>
+          <button type="button" class="btn btn-secondary" id="detailBack">Назад к логу</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Files overlay (peer view=files) -->
+    <div class="overlay hidden" id="filesOverlay">
+      <button type="button" class="close-top" id="filesClose">Закрыть</button>
+      <div class="modal">
+        <h1>Файлы и ссылки к работе</h1>
+        <p class="lead">Добавь список и файлы любого формата. PNG и JPG появятся также в PDF. Бот пришлёт сотрудникам только новые файлы.</p>
+        <div class="field" style="margin-bottom:14px">
+          <label for="equipmentList">Список оборудования (если нужен отдельный текст)</label>
+          <textarea id="equipmentList" placeholder="Что взять на эту работу…"></textarea>
+        </div>
+        <div class="field" style="margin-bottom:14px">
+          <label for="fileInput">Файлы и схемы (до 10 на работу)</label>
+          <input id="fileInput" type="file" multiple />
+          <ul class="file-list" id="existingFiles"></ul>
+        </div>
+        <div class="field" style="margin-bottom:10px">
+          <label for="sheetLinks">Ссылки на Google Таблицы</label>
+          <textarea id="sheetLinks" placeholder="https://docs.google.com/spreadsheets/d/..."></textarea>
+          <p class="hint">Одна ссылка на строку, до 10. Новые и заменённые уходят сотрудникам; удаления — без уведомления.</p>
+        </div>
+        <p class="hint">Каждый файл до 8 МБ, новые вместе до 10 МБ.</p>
+        <div class="actions">
+          <button type="button" class="btn btn-primary" id="btnSaveFiles">Сохранить и отправить</button>
+          <button type="button" class="btn btn-secondary" id="filesBack">Назад</button>
+        </div>
+        <p class="status" id="filesStatus" style="color:#1e7a46"></p>
+        <p class="hint" style="margin-top:8px">trip=<span id="tripLabel"></span></p>
+      </div>
+    </div>
+
+    <script>
+      var INITIAL_TRIP = <?!= JSON.stringify(initialTripId) ?>;
+      var INITIAL_VIEW = <?!= JSON.stringify(initialView) ?>;
+      var state = {
+        tab: 'log',
+        month: new Date().getMonth() + 1,
+        year: new Date().getFullYear(),
+        trips: [],
+        people: [],
+        hours: [],
+        weekend: [],
+        trip: null,
+        files: [],
+        removeFileIds: [],
+        config: null
+      };
+
+      var MONTHS = ['январь','февраль','март','апрель','май','июнь','июль','август','сентябрь','октябрь','ноябрь','декабрь'];
+      var DOW = ['ВС','ПН','ВТ','СР','ЧТ','ПТ','СБ'];
+
+      function $(id) { return document.getElementById(id); }
+      function setStatus(el, text, kind) {
+        el.textContent = text || '';
+        el.className = 'status' + (kind ? ' ' + kind : '');
+      }
+      function run(fn) {
+        return new Promise(function (resolve, reject) {
+          google.script.run.withSuccessHandler(resolve).withFailureHandler(reject)[fn.name || fn]();
+        });
+      }
+      function api(name) {
+        var args = Array.prototype.slice.call(arguments, 1);
+        return new Promise(function (resolve, reject) {
+          var r = google.script.run.withSuccessHandler(resolve).withFailureHandler(reject);
+          r[name].apply(r, args);
+        });
+      }
+
+      function showTab(name) {
+        state.tab = name;
+        document.querySelectorAll('.tab').forEach(function (el) { el.classList.add('hidden'); });
+        $('tab-' + name).classList.remove('hidden');
+        document.querySelectorAll('#nav button').forEach(function (b) {
+          b.classList.toggle('active', b.getAttribute('data-tab') === name);
+        });
+        $('detailOverlay').classList.add('hidden');
+        if (name !== 'files') $('filesOverlay').classList.add('hidden');
+      }
+
+      function schemesLabel(s) {
+        if (s === 'ready') return 'СХЕМЫ ГОТОВЫ';
+        if (s === 'needed') return 'СХЕМЫ НУЖНЫ';
+        return 'СХЕМЫ НЕ НУЖНЫ';
+      }
+      function categoryLabel(c) {
+        if (c === 'stage') return 'СЦЕНА';
+        if (c === 'both') return 'ЭКРАН+СЦЕНА';
+        return 'ЭКРАН';
+      }
+
+      function renderTrips() {
+        var person = $('logPerson').value;
+        var list = state.trips.filter(function (t) {
+          if (!person) return true;
+          return String(t.assigneeEmails || '').indexOf(person) >= 0;
+        });
+        var html = '';
+        list.forEach(function (t) {
+          var d = new Date(t.date + 'T12:00:00');
+          var dow = isNaN(d.getTime()) ? '' : DOW[d.getDay()];
+          var day = t.date.slice(8) || '';
+          var cardCls = 'trip-card';
+          if (t.category === 'stage') cardCls += ' stage';
+          else if (t.category === 'both') cardCls += ' both';
+          html += '<div class="trip-day"><div class="dow">' + dow + ' ' + day + '</div>' +
+            '<div class="' + cardCls + '" data-id="' + t.id + '">' +
+            '<div class="badge">' + categoryLabel(t.category) + ' — ' + schemesLabel(t.schemes) + '</div>' +
+            '<div class="title">' + (t.title || t.place || 'Без названия') + '</div>' +
+            '<div class="meta">' + (t.time || '') + ' · место: ' + (t.place || '—') + '</div></div></div>';
+        });
+        $('tripList').innerHTML = html || '<p class="hint">Нет работ за выбранный период.</p>';
+        $('tripList').querySelectorAll('[data-id]').forEach(function (el) {
+          el.addEventListener('click', function () { openTrip(el.getAttribute('data-id')); });
+        });
+      }
+
+      function renderPeopleSelects() {
+        var opts = '<option value="">Все сотрудники · выбранный месяц</option>';
+        state.people.forEach(function (p) {
+          opts += '<option value="' + p.email + '">' + (p.name || p.email) + '</option>';
+        });
+        $('logPerson').innerHTML = opts;
+        var body = '';
+        state.people.forEach(function (p) {
+          body += '<tr><td>' + (p.name || '') + '</td><td>' + p.email + '</td><td>' + p.role + '</td></tr>';
+        });
+        $('peopleBody').innerHTML = body;
+      }
+
+      function renderHours() {
+        var body = '';
+        state.hours.forEach(function (h) {
+          body += '<tr><td>' + h.date + '</td><td>' + h.email + '</td><td>' + h.hours + '</td><td>' + (h.note || '') + '</td></tr>';
+        });
+        $('hrsBody').innerHTML = body || '<tr><td colspan="4">Пока пусто</td></tr>';
+      }
+
+      function renderWeekend() {
+        var body = '';
+        state.weekend.forEach(function (r) {
+          body += '<tr><td>' + r.dateFrom + ' → ' + r.dateTo + '</td><td>' + r.email + '</td><td>' + r.status + '</td></tr>';
+        });
+        $('wkBody').innerHTML = body || '<tr><td colspan="3">Заявок нет</td></tr>';
+      }
+
+      function openTrip(id) {
+        setStatus($('logStatus'), 'Загрузка…');
+        api('apiGetTrip', id).then(function (res) {
+          state.trip = res.trip;
+          state.files = res.files || [];
+          state.removeFileIds = [];
+          $('detailChips').innerHTML =
+            '<span class="chip">' + categoryLabel(res.trip.category) + '</span>' +
+            '<span class="chip">' + schemesLabel(res.trip.schemes) + '</span>';
+          $('detailTitle').textContent = res.trip.title || res.trip.place;
+          $('detailMeta').textContent = (res.trip.time || '') + ' · место: ' + (res.trip.place || '—');
+          $('detailOverlay').classList.remove('hidden');
+          setStatus($('logStatus'), '');
+          if (INITIAL_VIEW === 'files' || location.search.indexOf('view=files') >= 0) {
+            openFiles();
+          }
+        }).catch(function (e) {
+          setStatus($('logStatus'), e.message || String(e), 'err');
+        });
+      }
+
+      function openFiles() {
+        if (!state.trip) return;
+        $('tripLabel').textContent = state.trip.id;
+        $('equipmentList').value = state.trip.equipmentList || '';
+        $('sheetLinks').value = (state.trip.sheetLinks || []).join('\n');
+        state.removeFileIds = [];
+        renderFiles();
+        $('filesOverlay').classList.remove('hidden');
+      }
+
+      function renderFiles() {
+        var ul = $('existingFiles');
+        ul.innerHTML = '';
+        state.files.filter(function (f) { return state.removeFileIds.indexOf(f.id) < 0; }).forEach(function (f) {
+          var li = document.createElement('li');
+          var left = document.createElement('span');
+          if (f.url) {
+            var a = document.createElement('a'); a.href = f.url; a.target = '_blank'; a.textContent = f.name;
+            left.appendChild(a);
+          } else left.textContent = f.name;
+          var btn = document.createElement('button'); btn.type = 'button'; btn.textContent = 'Удалить';
+          btn.onclick = function () { state.removeFileIds.push(f.id); renderFiles(); };
+          li.appendChild(left); li.appendChild(btn); ul.appendChild(li);
+        });
+      }
+
+      function readFile(file) {
+        return new Promise(function (resolve, reject) {
+          var reader = new FileReader();
+          reader.onload = function () {
+            var s = String(reader.result || '');
+            var i = s.indexOf(',');
+            resolve({ name: file.name, mimeType: file.type || 'application/octet-stream', dataBase64: i >= 0 ? s.slice(i + 1) : s, size: file.size });
+          };
+          reader.onerror = reject;
+          reader.readAsDataURL(file);
+        });
+      }
+
+      function fillMonths() {
+        var sel = $('logMonth');
+        sel.innerHTML = MONTHS.map(function (m, i) {
+          return '<option value="' + (i + 1) + '">' + m + '</option>';
+        }).join('');
+        sel.value = String(state.month);
+        $('logYear').value = state.year;
+      }
+
+      function reloadLog() {
+        state.month = Number($('logMonth').value);
+        state.year = Number($('logYear').value);
+        setStatus($('logStatus'), 'Обновление…');
+        return api('apiListTrips', state.month, state.year).then(function (res) {
+          state.trips = res.trips || [];
+          renderTrips();
+          setStatus($('logStatus'), '');
+        }).catch(function (e) {
+          setStatus($('logStatus'), e.message || String(e), 'err');
+        });
+      }
+
+      function boot() {
+        fillMonths();
+        var today = new Date().toISOString().slice(0, 10);
+        $('newDate').value = today;
+        $('hrsDate').value = today;
+        $('wkFrom').value = today;
+        $('wkTo').value = today;
+
+        api('getAppBootstrap', INITIAL_TRIP, INITIAL_VIEW).then(function (boot) {
+          state.config = boot.config;
+          state.people = boot.people || [];
+          state.trips = boot.trips || [];
+          state.hours = boot.hours || [];
+          state.weekend = boot.weekend || [];
+          state.month = boot.month; state.year = boot.year;
+          $('logMonth').value = String(state.month);
+          $('logYear').value = state.year;
+          renderPeopleSelects();
+          renderTrips();
+          renderHours();
+          renderWeekend();
+          $('settingsMeta').textContent =
+            'Deep-link: tripId ↔ orderId. Warehouse base: ' +
+            ((boot.config && boot.config.warehouseBaseUrl) || '(не задан)') +
+            '. Telegram: ' + ((boot.config && boot.config.hasTelegram) ? 'настроен' : 'stub');
+
+          if (boot.trip) {
+            state.trip = boot.trip;
+            state.files = boot.files || [];
+            state.removeFileIds = [];
+            $('detailChips').innerHTML =
+              '<span class="chip">' + categoryLabel(boot.trip.category) + '</span>' +
+              '<span class="chip">' + schemesLabel(boot.trip.schemes) + '</span>';
+            $('detailTitle').textContent = boot.trip.title || boot.trip.place;
+            $('detailMeta').textContent = (boot.trip.time || '') + ' · место: ' + (boot.trip.place || '—');
+            $('detailOverlay').classList.remove('hidden');
+            if (boot.view === 'files' || INITIAL_VIEW === 'files') openFiles();
+          }
+        }).catch(function (e) {
+          setStatus($('logStatus'), e.message || String(e), 'err');
+        });
+      }
+
+      document.querySelectorAll('#nav button').forEach(function (b) {
+        b.addEventListener('click', function () { showTab(b.getAttribute('data-tab')); });
+      });
+      $('logMonth').addEventListener('change', reloadLog);
+      $('logYear').addEventListener('change', reloadLog);
+      $('logPerson').addEventListener('change', renderTrips);
+
+      $('btnCreateTrip').addEventListener('click', function () {
+        setStatus($('newStatus'), 'Создание…');
+        api('apiCreateTrip', {
+          date: $('newDate').value,
+          time: $('newTime').value,
+          place: $('newPlace').value,
+          title: $('newPlace').value,
+          category: $('newCategory').value,
+          schemes: $('newSchemes').value,
+          assigneeEmails: $('newAssignees').value
+        }).then(function () {
+          setStatus($('newStatus'), 'Создано · notify stub', 'ok');
+          showTab('log');
+          return reloadLog();
+        }).catch(function (e) { setStatus($('newStatus'), e.message || String(e), 'err'); });
+      });
+
+      $('btnMonthPdf').addEventListener('click', function () {
+        setStatus($('logStatus'), 'PDF…');
+        api('apiBuildMonthPdf', state.month, state.year).then(function (r) {
+          setStatus($('logStatus'), 'Stub PDF: ' + r.name + ' (' + r.count + ')', 'ok');
+          if (r.url) window.open(r.url, '_blank');
+        }).catch(function (e) { setStatus($('logStatus'), e.message || String(e), 'err'); });
+      });
+
+      $('btnAddHours').addEventListener('click', function () {
+        api('apiAddHours', {
+          email: $('hrsEmail').value || (state.people[0] && state.people[0].email) || '',
+          date: $('hrsDate').value,
+          hours: Number($('hrsValue').value),
+          note: $('hrsNote').value
+        }).then(function () {
+          return api('apiListHours', state.month, state.year);
+        }).then(function (res) {
+          state.hours = res.hours || [];
+          renderHours();
+          setStatus($('hrsStatus'), 'Сохранено', 'ok');
+        }).catch(function (e) { setStatus($('hrsStatus'), e.message || String(e), 'err'); });
+      });
+
+      $('btnWeekend').addEventListener('click', function () {
+        api('apiCreateWeekend', {
+          email: $('wkEmail').value || (state.people[0] && state.people[0].email) || '',
+          dateFrom: $('wkFrom').value,
+          dateTo: $('wkTo').value,
+          note: $('wkNote').value
+        }).then(function () { return api('apiListWeekend'); })
+          .then(function (res) {
+            state.weekend = res.weekend || [];
+            renderWeekend();
+            setStatus($('wkStatus'), 'Заявка создана', 'ok');
+          }).catch(function (e) { setStatus($('wkStatus'), e.message || String(e), 'err'); });
+      });
+
+      $('btnMsg').addEventListener('click', function () {
+        api('apiSendTeamMessage', $('msgText').value).then(function (r) {
+          setStatus($('msgStatus'), r.stub ? 'Отправлено (Telegram stub)' : 'Отправлено', 'ok');
+        }).catch(function (e) { setStatus($('msgStatus'), e.message || String(e), 'err'); });
+      });
+
+      $('btnOpenFiles').addEventListener('click', openFiles);
+      $('detailClose').addEventListener('click', function () { $('detailOverlay').classList.add('hidden'); });
+      $('detailBack').addEventListener('click', function () {
+        $('detailOverlay').classList.add('hidden');
+        showTab('log');
+      });
+      $('filesClose').addEventListener('click', function () { $('filesOverlay').classList.add('hidden'); });
+      $('filesBack').addEventListener('click', function () {
+        $('filesOverlay').classList.add('hidden');
+      });
+
+      $('btnSaveFiles').addEventListener('click', function () {
+        var input = $('fileInput');
+        var kept = state.files.filter(function (f) { return state.removeFileIds.indexOf(f.id) < 0; }).length;
+        var files = Array.prototype.slice.call(input.files || [], 0);
+        if (kept + files.length > 10) {
+          setStatus($('filesStatus'), 'Не больше 10 файлов', 'err');
+          return;
+        }
+        $('btnSaveFiles').disabled = true;
+        setStatus($('filesStatus'), 'Сохранение…');
+        Promise.all(files.map(readFile)).then(function (payloads) {
+          return api('saveAndSendTripFiles', state.trip.id, {
+            equipmentList: $('equipmentList').value,
+            sheetLinksText: $('sheetLinks').value,
+            newFiles: payloads,
+            removeFileIds: state.removeFileIds.slice(),
+            notifyStaff: true
+          });
+        }).then(function (res) {
+          state.files = res.bundle.files || [];
+          state.trip = res.trip || state.trip;
+          state.removeFileIds = [];
+          $('fileInput').value = '';
+          renderFiles();
+          setStatus($('filesStatus'), 'Сохранено · новых файлов: ' + (res.notifiedFileIds || []).length, 'ok');
+        }).catch(function (e) {
+          setStatus($('filesStatus'), e.message || String(e), 'err');
+        }).then(function () { $('btnSaveFiles').disabled = false; });
+      });
+
+      showTab('log');
+      boot();
+    </script>
+  </body>
+</html>

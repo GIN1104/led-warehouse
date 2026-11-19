@@ -1,0 +1,9 @@
+{
+  "scriptId": "PASTE_SCRIPT_ID_AFTER_clasp_create_OR_FROM_script.google.com",
+  "rootDir": ".",
+  "scriptExtensions": [".gs", ".js"],
+  "htmlExtensions": [".html"],
+  "jsonExtensions": [".json"],
+  "filePushOrder": [],
+  "skipSubdirectories": false
+}

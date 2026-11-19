@@ -210,12 +210,15 @@ export function saveOrderFiles(orderId: string, input: OrderFilesSaveInput): Ord
 }
 
 /**
- * Адаптер под будущий remote API.
- * Пока делегирует в mock; подмена — один раз в клиенте/сервере.
+ * Адаптер под будущий remote API / standalone GAS.
+ * Пока делегирует в mock — поведение /files не меняем.
+ * Deep-link на GAS: src/lib/trip-files-gas.ts (NEXT_PUBLIC_TRIP_FILES_GAS_EXEC_URL).
+ * Источники GAS: appscript/trip-files/
  */
 export const orderFilesApi = {
   async list(orderId: string): Promise<OrderFilesBundle> {
     // TODO(api): return fetchJson(`${apiBase}/v1/orders/${orderId}/files`)
+    // TODO(gas): опционально читать meta с WEBHOOK / shared sheet — не ломая mock
     return listOrderFiles(orderId);
   },
   async save(orderId: string, input: OrderFilesSaveInput): Promise<OrderFilesSaveResult> {
