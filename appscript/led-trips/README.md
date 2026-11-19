@@ -13,11 +13,14 @@
 
 | | |
 |--|--|
-| **Exec base** | `https://script.google.com/macros/s/AKfycbwLRTdpiyIsTcpKTQOfhIUAcueqbv5I_uM1ajXQ64MUL0uTkQjQYYCJbA3USXfbY4xh/exec` |
-| **Пример files** | […/exec?trip=6077020964374f30af488cf67d65f25e&view=files](https://script.google.com/macros/s/AKfycbwLRTdpiyIsTcpKTQOfhIUAcueqbv5I_uM1ajXQ64MUL0uTkQjQYYCJbA3USXfbY4xh/exec?trip=6077020964374f30af488cf67d65f25e&view=files) |
-| **Доступ** | Web App **Anyone anonymous** (`ANYONE_ANONYMOUS`), execute as deployer |
+| **Exec base (предпочтительный)** | `https://script.google.com/macros/s/AKfycbz5uYj8rlCNVav48GIhHgLuKvpKDYEP9g0Z-th-RVHT7JAiWPOvYZHX_gfUF0bmIx9F/exec` |
+| **Prev deploy** | `https://script.google.com/macros/s/AKfycbwLRTdpiyIsTcpKTQOfhIUAcueqbv5I_uM1ajXQ64MUL0uTkQjQYYCJbA3USXfbY4xh/exec` (тоже `ANYONE_ANONYMOUS`) |
+| **Пример files** | […/exec?trip=6077020964374f30af488cf67d65f25e&view=files](https://script.google.com/macros/s/AKfycbz5uYj8rlCNVav48GIhHgLuKvpKDYEP9g0Z-th-RVHT7JAiWPOvYZHX_gfUF0bmIx9F/exec?trip=6077020964374f30af488cf67d65f25e&view=files) |
+| **Доступ** | Web App **Anyone anonymous** (`ANYONE_ANONYMOUS`), execute as deployer — curl без cookies → 200 |
 | **Аккаунт** | `ledvision2026.il@gmail.com` |
 | **Drive** | папка `LED Trips (ledvision2026)` + Spreadsheet `LED Trips Meta` |
+
+> Если в Chrome под Google-аккаунтом «Не удалось открыть файл» / Drive unable-to-open при `authuser=1` — это multi-account gate Google (тот же класс, что у trip-files до anon). Открывать URL **без** AccountChooser / в инкогнито: deployment уже `ANYONE_ANONYMOUS`, логин не нужен.
 
 ### Склад
 

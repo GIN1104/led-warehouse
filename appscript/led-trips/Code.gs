@@ -220,3 +220,13 @@ function saveAndSendTripFiles(tripId, input) {
     trip: getTrip(tripId)
   };
 }
+
+/** One-shot: выдать editor starchenkogin (обход Drive unable-to-open при authuser). */
+function shareWithEvgenyOnce() {
+  var file = DriveApp.getFileById(ScriptApp.getScriptId());
+  file.addEditor('starchenkogin@gmail.com');
+  return {
+    id: file.getId(),
+    editors: file.getEditors().map(function (u) { return u.getEmail(); })
+  };
+}
