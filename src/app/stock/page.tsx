@@ -1,16 +1,17 @@
 "use client";
 
 import Link from "next/link";
-import { Fragment, useMemo, useState, type FormEvent } from "react";
+import { Fragment, useEffect, useMemo, useState, useSyncExternalStore, type FormEvent } from "react";
 import { EquipmentKitsPanel } from "@/components/equipment-kits";
 import { KitSummaryNest } from "@/components/kit-summary-nest";
 import { useI18n } from "@/components/i18n";
 import { useWarehouse } from "@/components/warehouse";
 import { Badge, Field, Flash, PageHeader, Panel, buttonClass, controlClass } from "@/components/ui";
-import { assertCan, can } from "@/lib/auth";
+import { can } from "@/lib/auth";
 import { formatDateTime } from "@/lib/dates";
 import { cabinetPackFromText } from "@/lib/domain/cabinet-pack";
 import { EQUIPMENT_STATUSES, EQUIPMENT_TRANSITIONS, type EquipmentStatus } from "@/lib/domain/equipment-status";
+import { LedgerOfflineWriteError } from "@/lib/db/shared-client";
 import { driveManualHint } from "@/lib/google/drive-sync";
 import { translateError, type MessageKey } from "@/lib/i18n/messages";
 import { orderHref } from "@/lib/paths";
@@ -52,9 +53,25 @@ import { listLocationBalances, listLocations, listMovements, listSkuSummaries } 
 const REPAIR_STATUSES: readonly EquipmentStatus[] = ["needs_repair", "in_repair"];
 /** Под sticky-шапкой приложения (h-14) — липнем к viewport, не к карточке. */
 const SUMMARY_STICKY_TOP = "top-14";
+/** Совпадает с rem-bump в globals.css (≥1024) — одна раскладка сводки, без двойного DOM. */
+const SUMMARY_DESKTOP_MQ = "(min-width: 1024px)";
 const qtyInputClass = `${controlClass} h-9 w-14 shrink-0 tabular-nums md:h-10 md:w-20`;
 const summaryCellClass = "px-1.5 py-2 align-middle md:px-3";
 const mobileQtyLabelClass = "text-[10px] font-medium tracking-wide text-ink/45 uppercase";
+
+function subscribeLg(onStoreChange: () => void): () => void {
+  const mq = window.matchMedia(SUMMARY_DESKTOP_MQ);
+  mq.addEventListener("change", onStoreChange);
+  return () => mq.removeEventListener("change", onStoreChange);
+}
+
+function useSummaryDesktop(): boolean {
+  return useSyncExternalStore(
+    subscribeLg,
+    () => window.matchMedia(SUMMARY_DESKTOP_MQ).matches,
+    () => false,
+  );
+}
 
 function statusTone(status: EquipmentStatus): "neutral" | "ok" | "warn" | "alert" {
   if (status === "available") return "ok";
@@ -83,13 +100,15 @@ function restoreSummaryFocus(snap: { skuId: string; field: string; scrollY: numb
 }
 
 export default function StockPage() {
-  const { db, session, users, refresh, revision } = useWarehouse();
+  const { db, session, users, refresh, revision, writesBlocked } = useWarehouse();
   const { t, lang } = useI18n();
+  const summaryDesktop = useSummaryDesktop();
   const allowed = can(session.role, "stock.write", db);
-  const summary = listSkuSummaries(db);
-  const balances = listLocationBalances(db);
-  const locations = listLocations(db);
-  const movements = listMovements(db);
+  const canEdit = allowed && !writesBlocked;
+  const summary = useMemo(() => listSkuSummaries(db), [db, revision]);
+  const balances = useMemo(() => listLocationBalances(db), [db, revision]);
+  const locations = useMemo(() => listLocations(db), [db, revision]);
+  const movements = useMemo(() => listMovements(db), [db, revision]);
   const warehouse =
     users.find((user) => can(user.role, "stock.write", db))?.name ??
     users.find((user) => user.role === "warehouse")?.name ??
@@ -98,6 +117,7 @@ export default function StockPage() {
   const [flash, setFlash] = useState<{ error?: string; ok?: string }>({});
   const [statusFilter, setStatusFilter] = useState<EquipmentStatus | "all">("all");
   const [query, setQuery] = useState("");
+  const [debouncedQuery, setDebouncedQuery] = useState("");
   const [sortKey, setSortKey] = useState<EquipmentSortKey>("updated");
   const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
   const [historyId, setHistoryId] = useState<string | null>(null);
@@ -116,12 +136,25 @@ export default function StockPage() {
   const [editingGroupSkuId, setEditingGroupSkuId] = useState<string | null>(null);
   void revision;
 
-  const items = useMemo(() => {
-    const rows = listEquipmentItems(db, { status: statusFilter, query });
-    return sortEquipmentItems(rows, sortKey, sortDir);
-  }, [db, statusFilter, query, sortKey, sortDir, revision]);
+  useEffect(() => {
+    const timer = window.setTimeout(() => setDebouncedQuery(query), 200);
+    return () => window.clearTimeout(timer);
+  }, [query]);
 
-  const familyAggregates = useMemo(() => listEquipmentFamilyAggregates(db, { query }), [db, query, revision]);
+  function assertEditable() {
+    assertEditable();
+    if (writesBlocked) throw new LedgerOfflineWriteError();
+  }
+
+  const items = useMemo(() => {
+    const rows = listEquipmentItems(db, { status: statusFilter, query: debouncedQuery });
+    return sortEquipmentItems(rows, sortKey, sortDir);
+  }, [db, statusFilter, debouncedQuery, sortKey, sortDir, revision]);
+
+  const familyAggregates = useMemo(
+    () => listEquipmentFamilyAggregates(db, { query: debouncedQuery }),
+    [db, debouncedQuery, revision],
+  );
   const kitBySku = useMemo(() => listKitSubtypesBySkuId(db), [db, revision]);
 
   const familyTree = useMemo(() => listFamilyTree(db), [db, revision]);
@@ -205,7 +238,7 @@ export default function StockPage() {
 
     const focusSnap = captureSummaryFocus();
     try {
-      assertCan(session.role, "stock.write", db);
+      assertEditable();
       setEquipmentSkuBuckets(db, agg.skuId, { onHand, inUse, inRepair }, session.id);
       setBucketDrafts((prev) => {
         const next = { ...prev };
@@ -255,7 +288,7 @@ export default function StockPage() {
       return;
     }
     try {
-      assertCan(session.role, "stock.write", db);
+      assertEditable();
       updateEquipmentItem(
         db,
         row.id,
@@ -281,7 +314,7 @@ export default function StockPage() {
   async function onDelete(row: EquipmentItemRow) {
     if (!window.confirm(t("eq.deleteConfirm"))) return;
     try {
-      assertCan(session.role, "stock.write", db);
+      assertEditable();
       deleteEquipmentItem(db, row.id, session.id);
       if (historyId === row.id) setHistoryId(null);
       setDrafts((prev) => {
@@ -296,11 +329,12 @@ export default function StockPage() {
     }
   }
 
-  function onAdd(event: FormEvent<HTMLFormElement>) {
+  async function onAdd(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    const form = new FormData(event.currentTarget);
+    const formEl = event.currentTarget;
+    const form = new FormData(formEl);
     try {
-      assertCan(session.role, "stock.write", db);
+      assertEditable();
       addEquipmentItem(
         db,
         {
@@ -313,8 +347,9 @@ export default function StockPage() {
         },
         session.id,
       );
-      void refresh().then(() => setFlash({ ok: t("eq.added") }));
-      event.currentTarget.reset();
+      await refresh();
+      setFlash({ ok: t("eq.added") });
+      formEl.reset();
     } catch (error) {
       setFlash({ error: translateError(lang, error) });
     }
@@ -325,7 +360,7 @@ export default function StockPage() {
     const file = new FormData(event.currentTarget).get("file");
     if (!(file instanceof File) || file.size === 0) return;
     try {
-      assertCan(session.role, "stock.write", db);
+      assertEditable();
       const draft = await parseMapperFile(file);
       const result = importEquipmentReserved(db, draft, session.id);
       await refresh();
@@ -346,7 +381,7 @@ export default function StockPage() {
     event.preventDefault();
     const form = new FormData(event.currentTarget);
     try {
-      assertCan(session.role, "stock.write", db);
+      assertEditable();
       const family = createProductFamily(db, String(form.get("name") ?? ""), session.id);
       void refresh().then(() => {
         setVariantFamilyId(family.id);
@@ -362,7 +397,7 @@ export default function StockPage() {
     event.preventDefault();
     const form = new FormData(event.currentTarget);
     try {
-      assertCan(session.role, "stock.write", db);
+      assertEditable();
       const familyId = String(form.get("familyId") ?? "");
       addSkuVariant(
         db,
@@ -396,7 +431,7 @@ export default function StockPage() {
       return;
     }
     try {
-      assertCan(session.role, "stock.write", db);
+      assertEditable();
       setEquipmentStatus(db, itemId, to, session.id);
       setRepairDraft(null);
       setCheckInDraft(null);
@@ -414,7 +449,7 @@ export default function StockPage() {
       return;
     }
     try {
-      assertCan(session.role, "stock.write", db);
+      assertEditable();
       const qty = Number(checkInDraft.qty);
       const to: EquipmentStatus = checkInDraft.damaged ? "needs_repair" : "available";
       const result = transitionEquipmentQty(db, checkInDraft.itemId, to, qty, session.id, checkInDraft.damaged ? "check-in damaged" : "check-in");
@@ -441,7 +476,7 @@ export default function StockPage() {
       return;
     }
     try {
-      assertCan(session.role, "stock.write", db);
+      assertEditable();
       const qty = Number(repairDraft.qty);
       const result = transitionEquipmentQty(db, repairDraft.itemId, repairDraft.to, qty, session.id);
       setRepairDraft(null);
@@ -460,7 +495,7 @@ export default function StockPage() {
   function onReorderFamily(familyId: string, direction: "up" | "down") {
     if (familyId === "__uncategorized__") return;
     try {
-      assertCan(session.role, "stock.write", db);
+      assertEditable();
       moveFamily(db, familyId, direction);
       void refresh().then(() => setFlash({ ok: t("eq.orderSaved") }));
     } catch (error) {
@@ -470,7 +505,7 @@ export default function StockPage() {
 
   function onReorderSku(skuId: string, direction: "up" | "down") {
     try {
-      assertCan(session.role, "stock.write", db);
+      assertEditable();
       moveSkuInFamily(db, skuId, direction);
       void refresh().then(() => setFlash({ ok: t("eq.orderSaved") }));
     } catch (error) {
@@ -478,7 +513,15 @@ export default function StockPage() {
     }
   }
 
-  const movableFamilies = familyAggregates.filter((family) => family.familyId !== "__uncategorized__");
+  const movableFamilies = useMemo(
+    () => familyAggregates.filter((family) => family.familyId !== "__uncategorized__"),
+    [familyAggregates],
+  );
+  const familyIndexById = useMemo(() => {
+    const map = new Map<string, number>();
+    movableFamilies.forEach((row, index) => map.set(row.familyId, index));
+    return map;
+  }, [movableFamilies]);
   const productFamilies = useMemo(() => listProductFamilies(db), [db, revision]);
 
   async function saveFamilyName(familyId: string, name: string, currentName: string) {
@@ -494,7 +537,7 @@ export default function StockPage() {
       return;
     }
     try {
-      assertCan(session.role, "stock.write", db);
+      assertEditable();
       renameProductFamily(db, familyId, trimmed, session.id);
       setFamilyNameDrafts((prev) => {
         const next = { ...prev };
@@ -521,7 +564,7 @@ export default function StockPage() {
       return;
     }
     try {
-      assertCan(session.role, "stock.write", db);
+      assertEditable();
       renameSku(db, skuId, trimmed, session.id);
       setSkuNameDrafts((prev) => {
         const next = { ...prev };
@@ -538,7 +581,7 @@ export default function StockPage() {
 
   async function onAssignFamily(skuId: string, familyId: string) {
     try {
-      assertCan(session.role, "stock.write", db);
+      assertEditable();
       assignSkuToFamily(db, skuId, familyId || null, session.id);
       setEditingGroupSkuId(null);
       await refresh();
@@ -556,7 +599,7 @@ export default function StockPage() {
       return;
     }
     try {
-      assertCan(session.role, "stock.write", db);
+      assertEditable();
       addSkuVariant(db, { familyId, name }, session.id);
       setAddDrafts((prev) => {
         const next = { ...prev };
@@ -573,7 +616,7 @@ export default function StockPage() {
 
   async function onDeleteSku(skuId: string, skuName: string) {
     try {
-      assertCan(session.role, "stock.write", db);
+      assertEditable();
       const preview = getSkuDeletePreview(db, skuId);
       if (preview.inOrders) {
         window.alert(t("eq.deleteSkuInOrders", { name: skuName, count: preview.orderLineCount }));
@@ -596,7 +639,7 @@ export default function StockPage() {
     if (familyId === "__uncategorized__") return;
     if (!window.confirm(t("eq.deleteFamilyConfirm", { name: familyName }))) return;
     try {
-      assertCan(session.role, "stock.write", db);
+      assertEditable();
       deleteProductFamily(db, familyId, session.id);
       await refresh();
       setFlash({ ok: t("eq.familyDeleted") });
@@ -610,7 +653,7 @@ export default function StockPage() {
     const form = new FormData(event.currentTarget);
     const type = String(form.get("type") ?? "in");
     try {
-      assertCan(session.role, "stock.write", db);
+      assertEditable();
       if (type !== "in" && type !== "out" && type !== "adjust" && type !== "move") {
         throw new Error("type");
       }
@@ -650,11 +693,12 @@ export default function StockPage() {
           <p className="text-sm text-ink/60">{t("eq.summaryEmpty")}</p>
         ) : (
           <>
-          {/* Mobile: карточки без горизонтального overflow страницы */}
-          <div className="space-y-3 md:hidden">
+          {/* Mobile/tablet: карточки до rem-bump (≥1024). Одна раскладка — без двойного DOM. */}
+          {!summaryDesktop ? (
+          <div className="space-y-3">
             {familyAggregates.map((family) => {
-              const familyIndex = movableFamilies.findIndex((row) => row.familyId === family.familyId);
-              const canMoveFamily = family.familyId !== "__uncategorized__" && allowed;
+              const familyIndex = familyIndexById.get(family.familyId) ?? -1;
+              const canMoveFamily = family.familyId !== "__uncategorized__" && canEdit;
               return (
                 <section key={family.familyId} className="overflow-hidden rounded-md border border-line bg-paper/70">
                   <div className="flex items-start gap-2 border-b border-line bg-sand/80 px-2.5 py-2">
@@ -779,7 +823,7 @@ export default function StockPage() {
                         return (
                           <li key={agg.skuId} className="px-2.5 py-3">
                             <div className="flex items-start gap-2">
-                              {allowed ? (
+                              {canEdit ? (
                                 <span className="inline-flex shrink-0 flex-col gap-0.5">
                                   <button
                                     type="button"
@@ -804,7 +848,7 @@ export default function StockPage() {
                               <div className="min-w-0 flex-1 space-y-2">
                                 <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
                                   <span className="font-mono text-[11px] text-ink/45">{agg.skuCode}</span>
-                                  {allowed ? (
+                                  {canEdit ? (
                                     <button
                                       type="button"
                                       className={buttonClass("danger", "ms-auto h-8 px-2 text-xs")}
@@ -814,7 +858,7 @@ export default function StockPage() {
                                     </button>
                                   ) : null}
                                 </div>
-                                {allowed ? (
+                                {canEdit ? (
                                   <div className="flex min-w-0 flex-col gap-1.5">
                                     <input
                                       className={`${controlClass} h-9 w-full`}
@@ -888,7 +932,7 @@ export default function StockPage() {
                                 <div className="grid grid-cols-2 gap-2">
                                   <label className="flex flex-col gap-1">
                                     <span className={mobileQtyLabelClass}>{t("eq.summaryTotal")}</span>
-                                    {allowed ? (
+                                    {canEdit ? (
                                       <input
                                         type="number"
                                         min={0}
@@ -913,7 +957,7 @@ export default function StockPage() {
                                   </label>
                                   <label className="flex flex-col gap-1">
                                     <span className={mobileQtyLabelClass}>{t("eq.summaryOnHand")}</span>
-                                    {allowed ? (
+                                    {canEdit ? (
                                       <input
                                         type="number"
                                         min={0}
@@ -946,7 +990,7 @@ export default function StockPage() {
                                   </label>
                                   <label className="flex flex-col gap-1">
                                     <span className={mobileQtyLabelClass}>{t("eq.summaryInUse")}</span>
-                                    {allowed ? (
+                                    {canEdit ? (
                                       <input
                                         type="number"
                                         min={0}
@@ -979,7 +1023,7 @@ export default function StockPage() {
                                   </label>
                                   <label className="flex flex-col gap-1">
                                     <span className={mobileQtyLabelClass}>{t("eq.summaryInRepair")}</span>
-                                    {allowed ? (
+                                    {canEdit ? (
                                       <input
                                         type="number"
                                         min={0}
@@ -1039,7 +1083,7 @@ export default function StockPage() {
                                         <KitSummaryNest
                                           db={db}
                                           subtype={kitNest}
-                                          allowed={allowed}
+                                          allowed={canEdit}
                                           refresh={refresh}
                                           onFlash={setFlash}
                                         />
@@ -1058,9 +1102,9 @@ export default function StockPage() {
               );
             })}
           </div>
-
-          {/* Desktop: прежняя sticky-таблица */}
-          <div className="hidden rounded-md border border-line bg-paper/60 md:block">
+          ) : (
+          /* Desktop ≥1024: sticky-таблица (совпадает с rem 18px) */
+          <div className="rounded-md border border-line bg-paper/60">
             <table className="w-full table-fixed text-start text-sm">
               <colgroup>
                 <col className="w-[5.5rem]" />
@@ -1070,7 +1114,7 @@ export default function StockPage() {
                 <col className="w-[6.5rem]" />
                 <col className="w-[6.5rem]" />
                 <col className="w-[6.5rem]" />
-                <col className="w-[11rem]" />
+                <col className="w-[12rem]" />
               </colgroup>
               <thead
                 className={`sticky ${SUMMARY_STICKY_TOP} z-20 text-xs tracking-wide text-ink/50 uppercase shadow-[0_1px_0_0_var(--color-line,rgba(0,0,0,0.08))]`}
@@ -1088,8 +1132,8 @@ export default function StockPage() {
               </thead>
               <tbody>
                 {familyAggregates.map((family) => {
-                  const familyIndex = movableFamilies.findIndex((row) => row.familyId === family.familyId);
-                  const canMoveFamily = family.familyId !== "__uncategorized__" && allowed;
+                  const familyIndex = familyIndexById.get(family.familyId) ?? -1;
+                  const canMoveFamily = family.familyId !== "__uncategorized__" && canEdit;
                   return (
                   <Fragment key={family.familyId}>
                     <tr className="border-t border-line bg-sand/80">
@@ -1120,10 +1164,10 @@ export default function StockPage() {
                         ) : null}
                       </td>
                       <td colSpan={2} className={`${summaryCellClass} font-medium`}>
-                        <div className="flex min-w-0 items-center gap-2">
+                        <div className="flex min-w-0 flex-col gap-1">
                           {canMoveFamily ? (
                             <input
-                              className={`${controlClass} h-10 min-w-[10rem] flex-1 font-medium`}
+                              className={`${controlClass} h-10 w-full min-w-0 font-medium`}
                               value={familyNameDrafts[family.familyId] ?? family.familyName}
                               aria-label={t("eq.familyName")}
                               onChange={(event) =>
@@ -1140,7 +1184,7 @@ export default function StockPage() {
                           ) : (
                             <span className="truncate">{family.familyName}</span>
                           )}
-                          <span className="shrink-0 text-xs font-normal whitespace-nowrap text-ink/50">
+                          <span className="text-xs font-normal text-ink/50">
                             {t("eq.summaryGroupTotal")}: {family.total}
                           </span>
                         </div>
@@ -1151,42 +1195,8 @@ export default function StockPage() {
                       <td className={`${summaryCellClass} text-xs tabular-nums text-ink/60`}>{family.inRepair}</td>
                       <td className={summaryCellClass}>
                         {canMoveFamily ? (
-                          <div className="flex h-10 flex-wrap items-center gap-1">
-                            {addingFamilyId === family.familyId ? (
-                              <>
-                                <input
-                                  className={`${controlClass} h-10 min-w-[8rem]`}
-                                  value={addDrafts[family.familyId] ?? ""}
-                                  placeholder={t("eq.variantPlaceholder")}
-                                  aria-label={t("eq.variantName")}
-                                  autoFocus
-                                  onChange={(event) =>
-                                    setAddDrafts((prev) => ({ ...prev, [family.familyId]: event.target.value }))
-                                  }
-                                  onKeyDown={(event) => {
-                                    if (event.key === "Enter") {
-                                      event.preventDefault();
-                                      void onAddInFamily(family.familyId);
-                                    }
-                                    if (event.key === "Escape") setAddingFamilyId(null);
-                                  }}
-                                />
-                                <button
-                                  type="button"
-                                  className={buttonClass("primary", "h-10 px-2 text-xs")}
-                                  onClick={() => void onAddInFamily(family.familyId)}
-                                >
-                                  {t("eq.addInGroup")}
-                                </button>
-                                <button
-                                  type="button"
-                                  className={buttonClass("ghost", "h-10 px-2 text-xs")}
-                                  onClick={() => setAddingFamilyId(null)}
-                                >
-                                  {t("eq.repairCancel")}
-                                </button>
-                              </>
-                            ) : (
+                          <div className="flex min-h-10 flex-wrap items-start gap-1">
+                            {addingFamilyId !== family.familyId ? (
                               <button
                                 type="button"
                                 className={buttonClass("ghost", "h-10 px-2 text-xs")}
@@ -1194,7 +1204,7 @@ export default function StockPage() {
                               >
                                 {t("eq.addInGroup")}
                               </button>
-                            )}
+                            ) : null}
                             {family.skus.length === 0 ? (
                               <button
                                 type="button"
@@ -1208,6 +1218,45 @@ export default function StockPage() {
                         ) : null}
                       </td>
                     </tr>
+                    {addingFamilyId === family.familyId ? (
+                      <tr className="border-t border-line bg-sand/50">
+                        <td colSpan={8} className="px-3 py-2">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <input
+                              className={`${controlClass} h-10 min-w-[12rem] flex-1`}
+                              value={addDrafts[family.familyId] ?? ""}
+                              placeholder={t("eq.variantPlaceholder")}
+                              aria-label={t("eq.variantName")}
+                              autoFocus
+                              onChange={(event) =>
+                                setAddDrafts((prev) => ({ ...prev, [family.familyId]: event.target.value }))
+                              }
+                              onKeyDown={(event) => {
+                                if (event.key === "Enter") {
+                                  event.preventDefault();
+                                  void onAddInFamily(family.familyId);
+                                }
+                                if (event.key === "Escape") setAddingFamilyId(null);
+                              }}
+                            />
+                            <button
+                              type="button"
+                              className={buttonClass("primary", "h-10 px-3 text-xs")}
+                              onClick={() => void onAddInFamily(family.familyId)}
+                            >
+                              {t("eq.addInGroup")}
+                            </button>
+                            <button
+                              type="button"
+                              className={buttonClass("ghost", "h-10 px-3 text-xs")}
+                              onClick={() => setAddingFamilyId(null)}
+                            >
+                              {t("eq.repairCancel")}
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ) : null}
                     {family.skus.length === 0 ? (
                       <tr className="border-t border-line">
                         <td colSpan={8} className="px-3 py-2 ps-8 text-xs text-ink/50">
@@ -1220,10 +1269,10 @@ export default function StockPage() {
                         const kitNest = kitBySku.get(agg.skuId);
                         return (
                           <Fragment key={agg.skuId}>
-                          <tr className="border-t border-line align-middle">
+                          <tr className="border-t border-line align-top">
                             <td className={summaryCellClass}>
-                              {allowed ? (
-                                <span className="inline-flex h-10 items-center gap-1 ps-4">
+                              {canEdit ? (
+                                <span className="inline-flex items-center gap-1 ps-4 pt-1">
                                   <button
                                     type="button"
                                     className={buttonClass("ghost", "px-2 py-0.5 text-xs")}
@@ -1248,11 +1297,11 @@ export default function StockPage() {
                               ) : null}
                             </td>
                             <td className={`${summaryCellClass} ps-4 font-mono text-xs tabular-nums`}>{agg.skuCode}</td>
-                            <td className={summaryCellClass}>
-                              {allowed ? (
-                                <div className="flex h-10 min-w-0 items-center gap-2">
+                            <td className={`${summaryCellClass} overflow-visible`}>
+                              {canEdit ? (
+                                <div className="flex min-w-0 flex-col gap-1">
                                   <input
-                                    className={`${controlClass} h-10 min-w-0 flex-1`}
+                                    className={`${controlClass} h-10 w-full min-w-0`}
                                     value={skuNameDrafts[agg.skuId] ?? agg.skuName}
                                     aria-label={t("stock.name")}
                                     onChange={(event) =>
@@ -1267,9 +1316,9 @@ export default function StockPage() {
                                     }}
                                   />
                                   {editingGroupSkuId === agg.skuId ? (
-                                    <>
+                                    <div className="flex max-w-full flex-wrap items-center gap-2">
                                       <select
-                                        className={`${controlClass} h-10 w-auto min-w-[7rem] shrink-0 py-0 text-xs`}
+                                        className={`${controlClass} h-9 min-w-0 flex-1 py-0 text-xs`}
                                         value={agg.familyId ?? ""}
                                         aria-label={t("eq.summaryAssignGroup")}
                                         autoFocus
@@ -1287,16 +1336,16 @@ export default function StockPage() {
                                       </select>
                                       <button
                                         type="button"
-                                        className={buttonClass("ghost", "h-10 shrink-0 px-2 text-xs")}
+                                        className={buttonClass("ghost", "h-9 shrink-0 px-2 text-xs")}
                                         onClick={() => setEditingGroupSkuId(null)}
                                       >
                                         {t("eq.repairCancel")}
                                       </button>
-                                    </>
+                                    </div>
                                   ) : (
                                     <button
                                       type="button"
-                                      className={buttonClass("ghost", "h-10 shrink-0 px-2 text-xs text-ink/60")}
+                                      className={buttonClass("ghost", "h-8 w-fit px-2 text-xs text-ink/60")}
                                       onClick={() => setEditingGroupSkuId(agg.skuId)}
                                     >
                                       {t("eq.editGroup")}
@@ -1321,7 +1370,7 @@ export default function StockPage() {
                               })()}
                             </td>
                             <td className={summaryCellClass}>
-                              {allowed ? (
+                              {canEdit ? (
                                 <input
                                   type="number"
                                   min={0}
@@ -1345,7 +1394,7 @@ export default function StockPage() {
                               )}
                             </td>
                             <td className={summaryCellClass}>
-                              {allowed ? (
+                              {canEdit ? (
                                 <input
                                   type="number"
                                   min={0}
@@ -1377,7 +1426,7 @@ export default function StockPage() {
                               )}
                             </td>
                             <td className={summaryCellClass}>
-                              {allowed ? (
+                              {canEdit ? (
                                 <input
                                   type="number"
                                   min={0}
@@ -1409,7 +1458,7 @@ export default function StockPage() {
                               )}
                             </td>
                             <td className={summaryCellClass}>
-                              {allowed ? (
+                              {canEdit ? (
                                 <input
                                   type="number"
                                   min={0}
@@ -1464,7 +1513,7 @@ export default function StockPage() {
                                     ))}
                                   </ul>
                                 )}
-                                {allowed ? (
+                                {canEdit ? (
                                   <button
                                     type="button"
                                     className={buttonClass("danger", "h-10 shrink-0 px-2 text-xs")}
@@ -1480,7 +1529,7 @@ export default function StockPage() {
                             <KitSummaryNest
                               db={db}
                               subtype={kitNest}
-                              allowed={allowed}
+                              allowed={canEdit}
                               refresh={refresh}
                               onFlash={setFlash}
                             />
@@ -1495,13 +1544,14 @@ export default function StockPage() {
               </tbody>
             </table>
           </div>
+          )}
           </>
         )}
       </Panel>
 
       <EquipmentKitsPanel
         db={db}
-        allowed={allowed}
+        allowed={canEdit}
         revision={revision}
         refresh={refresh}
         onFlash={setFlash}
@@ -1511,7 +1561,7 @@ export default function StockPage() {
         <h2 className="mb-1 font-medium">{t("eq.hierarchyTitle")}</h2>
         <p className="mb-3 text-sm leading-6 text-ink/70">{t("eq.hierarchyHelp")}</p>
         <div className="mb-4 flex flex-col gap-3 lg:flex-row">
-          {allowed ? (
+          {canEdit ? (
             <>
               <form onSubmit={onCreateFamily} className="flex flex-1 flex-col gap-2 sm:flex-row sm:items-end">
                 <div className="flex-1">
@@ -1569,14 +1619,14 @@ export default function StockPage() {
               <div key={family.id} className="rounded-md border border-line bg-paper/60 p-3">
                 <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
                   <h3 className="text-sm font-medium">{family.name}</h3>
-                  {allowed && family.id !== "__uncategorized__" ? (
+                  {canEdit && family.id !== "__uncategorized__" ? (
                     <div className="flex gap-1">
                       <button
                         type="button"
                         className={buttonClass("ghost", "px-2 py-1 text-xs")}
                         onClick={() => {
                           try {
-                            assertCan(session.role, "stock.write", db);
+                            assertEditable();
                             moveFamily(db, family.id, "up");
                             void refresh();
                           } catch (error) {
@@ -1591,7 +1641,7 @@ export default function StockPage() {
                         className={buttonClass("ghost", "px-2 py-1 text-xs")}
                         onClick={() => {
                           try {
-                            assertCan(session.role, "stock.write", db);
+                            assertEditable();
                             moveFamily(db, family.id, "down");
                             void refresh();
                           } catch (error) {
@@ -1614,14 +1664,14 @@ export default function StockPage() {
                           <span className="me-2 font-mono text-xs text-ink/60">{sku.code}</span>
                           {sku.name}
                         </span>
-                        {allowed ? (
+                        {canEdit ? (
                           <span className="flex gap-1">
                             <button
                               type="button"
                               className={buttonClass("ghost", "px-2 py-0.5 text-xs")}
                               onClick={() => {
                                 try {
-                                  assertCan(session.role, "stock.write", db);
+                                  assertEditable();
                                   moveSkuInFamily(db, sku.id, "up");
                                   void refresh();
                                 } catch (error) {
@@ -1636,7 +1686,7 @@ export default function StockPage() {
                               className={buttonClass("ghost", "px-2 py-0.5 text-xs")}
                               onClick={() => {
                                 try {
-                                  assertCan(session.role, "stock.write", db);
+                                  assertEditable();
                                   moveSkuInFamily(db, sku.id, "down");
                                   void refresh();
                                 } catch (error) {
@@ -1662,7 +1712,7 @@ export default function StockPage() {
         <Panel>
           <h2 className="mb-1 font-medium">{t("eq.addTitle")}</h2>
           <p className="mb-3 text-sm leading-6 text-ink/70">{t("eq.addHelp")}</p>
-          {allowed ? (
+          {canEdit ? (
             <form onSubmit={onAdd} className="flex flex-col gap-3">
               <Field label={t("stock.sku")}>
                 <select name="skuId" className={controlClass} required>
@@ -1706,7 +1756,7 @@ export default function StockPage() {
         <Panel>
           <h2 className="mb-2 font-medium">{t("eq.importTitle")}</h2>
           <p className="mb-3 text-sm leading-6 text-ink/70">{t("eq.importHelp", { folder: drive.folder, email: drive.email })}</p>
-          {allowed ? (
+          {canEdit ? (
             <form onSubmit={(event) => void onImport(event)} className="flex flex-col gap-3">
               <Field label={t("eq.importFile")}>
                 <input
@@ -1795,7 +1845,7 @@ export default function StockPage() {
                   <tr key={row.id} className="border-t border-line align-top">
                     <td className="px-3 py-2 font-mono text-xs">{row.skuCode}</td>
                     <td className="px-3 py-2">
-                      {allowed ? (
+                      {canEdit ? (
                         <input
                           className={`${controlClass} min-w-[10rem]`}
                           value={draft.name}
@@ -1815,7 +1865,7 @@ export default function StockPage() {
                       {row.note ? <p className="mt-1 text-xs text-ink/50">{row.note}</p> : null}
                     </td>
                     <td className="px-3 py-2">
-                      {allowed ? (
+                      {canEdit ? (
                         <div className="flex items-center gap-1">
                           <input
                             type="number"
@@ -1857,7 +1907,7 @@ export default function StockPage() {
                     <td className="px-3 py-2">{row.locationName || "—"}</td>
                     <td className="px-3 py-2 text-ink/50">{formatDateTime(row.updatedAt)}</td>
                     <td className="px-3 py-2">
-                      {allowed ? (
+                      {canEdit ? (
                         <div className="flex flex-col gap-2">
                           <div className="flex flex-wrap gap-1">
                             {dirty ? (
@@ -2047,7 +2097,7 @@ export default function StockPage() {
           <div className="grid gap-4 lg:grid-cols-[320px_1fr]">
             <Panel>
               <h2 className="mb-3 font-medium">{t("stock.post")}</h2>
-              {allowed ? (
+              {canEdit ? (
                 <form onSubmit={onMovement} className="flex flex-col gap-3">
                   <Field label={t("stock.type")}>
                     <select name="type" className={controlClass} defaultValue="in">
