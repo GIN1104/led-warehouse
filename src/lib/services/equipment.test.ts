@@ -248,6 +248,16 @@ describe("оборудование: статусы и импорт", () => {
     );
   });
 
+  it("сводка принимает крупный qty (392 кубика) без переполнения стека", () => {
+    const db = setup();
+    const updated = setEquipmentSkuBuckets(db, "CAB-P25", { onHand: 392, inUse: 0, inRepair: 0 }, "wh");
+    expect(updated.total).toBe(392);
+    expect(updated.onHand).toBe(392);
+    const again = setEquipmentSkuBuckets(db, "CAB-P25", { onHand: 300, inUse: 80, inRepair: 12 }, "wh");
+    expect(again.total).toBe(392);
+    expect(again.onHand + again.inUse + again.inRepair).toBe(392);
+  });
+
   it("группирует сводку: группа → подгруппы", () => {
     const db = setup();
     const family = createProductFamily(db, "Телевизор", "wh");
