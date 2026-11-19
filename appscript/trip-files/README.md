@@ -13,18 +13,21 @@
 
 | | |
 |--|--|
-| **Exec base** | `https://script.google.com/macros/s/AKfycbxJpOOtsCZgRIHjesbWZtrOxkm4ctibx6L65TNHEmTT-dAlXQ6X5MecKyr1p6RU96Nm/exec` |
-| **Пример** | […/exec?trip=test-deploy-1&view=files](https://script.google.com/macros/s/AKfycbxJpOOtsCZgRIHjesbWZtrOxkm4ctibx6L65TNHEmTT-dAlXQ6X5MecKyr1p6RU96Nm/exec?trip=test-deploy-1&view=files) |
-| **Редактор** | `https://script.google.com/home/projects/<scriptId>/edit` (scriptId в локальном `.clasp.json`, не в git) |
+| **Exec base (актуальный)** | `https://script.google.com/macros/s/AKfycbzM6OTwuBKCJ3sLHVJdVHIiQH2lf2EYHGtilE4KxWmNAo6K-ZQe4xejW_RvqoPEdoLE/exec` |
+| **Пример** | […/exec?trip=share-test&view=files](https://script.google.com/macros/s/AKfycbzM6OTwuBKCJ3sLHVJdVHIiQH2lf2EYHGtilE4KxWmNAo6K-ZQe4xejW_RvqoPEdoLE/exec?trip=share-test&view=files) |
+| **Доступ** | Web App **Anyone anonymous** (`ANYONE_ANONYMOUS`), execute as deployer — без логина у открывающего |
+| **Редактор** | scriptId в локальном `.clasp.json` (не в git) |
 | **Аккаунт** | `ledvision2026.il@gmail.com` |
-| **Drive** | папка `LED Trip Files (ledvision2026)` создаётся при первом `getTripFilesBundle` / `setupTripFilesStorage` |
+| **Drive** | папка `LED Trip Files (ledvision2026)` при первом запросе / `setupTripFilesStorage` |
+
+> Ранее был URL `…/AKfycbxJpOOtsCZ…/exec` с доступом только `ANYONE` (нужен Google login + OAuth непроверенного приложения) — из‑за этого у других аккаунтов «Не удалось открыть файл…». Старый deployment тоже переведён на `ANYONE_ANONYMOUS`; предпочтительно новый URL выше.
 
 ### Склад: `NEXT_PUBLIC_TRIP_FILES_GAS_EXEC_URL`
 
 В Pages Variables / `.env.local` (без query, без секретов в чат):
 
 ```bash
-NEXT_PUBLIC_TRIP_FILES_GAS_EXEC_URL=https://script.google.com/macros/s/AKfycbxJpOOtsCZgRIHjesbWZtrOxkm4ctibx6L65TNHEmTT-dAlXQ6X5MecKyr1p6RU96Nm/exec
+NEXT_PUBLIC_TRIP_FILES_GAS_EXEC_URL=https://script.google.com/macros/s/AKfycbzM6OTwuBKCJ3sLHVJdVHIiQH2lf2EYHGtilE4KxWmNAo6K-ZQe4xejW_RvqoPEdoLE/exec
 ```
 
 Хелпер `tripFilesGasHref(orderId)` → `{exec}?trip={orderId}&view=files`.  
