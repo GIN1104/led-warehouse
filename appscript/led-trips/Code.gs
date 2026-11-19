@@ -221,12 +221,36 @@ function saveAndSendTripFiles(tripId, input) {
   };
 }
 
-/** One-shot: выдать editor starchenkogin (обход Drive unable-to-open при authuser). */
-function shareWithEvgenyOnce() {
+/**
+ * LED-73: выдать starchenkogin@gmail.com editor на скрипт + Drive root + Meta sheet.
+ * Owner остаётся ledvision2026.il@gmail.com.
+ */
+function shareWithStarchenkoOnce() {
+  var email = 'starchenkogin@gmail.com';
   var file = DriveApp.getFileById(ScriptApp.getScriptId());
-  file.addEditor('starchenkogin@gmail.com');
-  return {
-    id: file.getId(),
-    editors: file.getEditors().map(function (u) { return u.getEmail(); })
-  };
+  file.addEditor(email);
+  ensureStorageReady_();
+  var c = getConfig();
+  var shared = { scriptId: file.getId(), folderId: '', sheetId: '' };
+  if (c.driveRootFolderId) {
+    DriveApp.getFolderById(c.driveRootFolderId).addEditor(email);
+    shared.folderId = c.driveRootFolderId;
+  }
+  if (c.metaSpreadsheetId) {
+    DriveApp.getFileById(c.metaSpreadsheetId).addEditor(email);
+    shared.sheetId = c.metaSpreadsheetId;
+  }
+  var p = getProps_();
+  // LED-73: всегда держим starchenkogin в ADMIN_EMAILS (не только при пустом prop)
+  p.setProperty(PROP.ADMIN_EMAILS, DEFAULT_ADMINS);
+  shared.adminEmails = getConfig().adminEmails;
+  shared.editors = file.getEditors().map(function (u) {
+    return u.getEmail();
+  });
+  return shared;
+}
+
+/** @deprecated alias */
+function shareWithEvgenyOnce() {
+  return shareWithStarchenkoOnce();
 }

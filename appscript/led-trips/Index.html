@@ -4,296 +4,614 @@
     <base target="_top" />
     <meta charset="utf-8" />
     <style>
+      /* Светлая по умолчанию; тёмная — отдельная палитра (не инверсия) */
       :root {
-        --bg: #2b323c;
-        --panel: #3a434f;
-        --panel-2: #454f5c;
-        --text: #eef2f6;
-        --muted: #a7b0bc;
-        --teal: #3db5c8;
-        --teal-hover: #2fa0b2;
-        --screen: #7eb8e8;
-        --stage: #e8a0c0;
+        --bg: #eef2f6;
+        --bg-accent: #e4ebf2;
+        --panel: #ffffff;
+        --panel-2: #f3f6f9;
+        --text: #15202b;
+        --muted: #5a6b7d;
+        --teal: #1f8f9e;
+        --teal-hover: #187987;
+        --nav-active: #2f6f84;
+        --screen: #9ecceb;
+        --stage: #efb7cc;
         --card: #ffffff;
-        --danger: #e07070;
+        --danger: #c0392b;
+        --ok: #1b7a44;
+        --border: #cfd8e3;
+        --overlay: rgba(18, 28, 40, 0.48);
+        --detail-bg: #e7eef4;
+        --btn-secondary: #e6edf3;
+        --btn-secondary-text: #15202b;
+        --close-bg: #445062;
+        --chip-bg: #ffffff;
+        --shadow: 0 1px 2px rgba(21, 32, 43, 0.06);
         --radius: 14px;
+        --ctrl-min: 7.5rem;
+        --font: "Segoe UI", "Helvetica Neue", Arial, "Noto Sans Hebrew", "Arial Hebrew", sans-serif;
+      }
+      html[data-theme="dark"] {
+        --bg: #0b1220;
+        --bg-accent: #111a2b;
+        --panel: #162033;
+        --panel-2: #1c2a40;
+        --text: #e8eef8;
+        --muted: #9aabc4;
+        --teal: #3ec7d6;
+        --teal-hover: #2fb3c2;
+        --nav-active: #248ea0;
+        --screen: #2a6f9e;
+        --stage: #9a4f72;
+        --card: #162033;
+        --danger: #ff8a8a;
+        --ok: #6dffb0;
+        --border: #2a3b55;
+        --overlay: rgba(4, 8, 16, 0.78);
+        --detail-bg: #101a2c;
+        --btn-secondary: #24344f;
+        --btn-secondary-text: #e8eef8;
+        --close-bg: #2a3b55;
+        --chip-bg: #1c2a40;
+        --shadow: 0 8px 28px rgba(0, 0, 0, 0.45);
       }
       * { box-sizing: border-box; }
       html, body {
         margin: 0; min-height: 100%;
-        font-family: "Segoe UI", "Helvetica Neue", Arial, sans-serif;
-        background: var(--bg); color: var(--text);
+        font-family: var(--font);
+        background:
+          radial-gradient(1200px 500px at 10% -10%, var(--bg-accent), transparent 55%),
+          var(--bg);
+        color: var(--text);
       }
-      .wrap { max-width: 920px; margin: 0 auto; padding: 18px 16px 40px; }
-      .top { display: flex; justify-content: space-between; gap: 12px; align-items: flex-start; }
-      h1 { margin: 0; font-size: 1.7rem; }
-      .sub { margin: 6px 0 16px; color: var(--muted); }
-      .lang { background: var(--panel); border: none; color: var(--text); border-radius: 999px; padding: 8px 14px; }
+      .wrap { max-width: 960px; margin: 0 auto; padding: 18px 16px 40px; }
+      .top { display: flex; justify-content: space-between; gap: 16px; align-items: flex-start; }
+      .top-actions {
+        display: flex; flex-wrap: wrap; gap: 10px; align-items: flex-end;
+        justify-content: flex-end; flex: 0 1 auto; max-width: 100%;
+      }
+      .ctrl {
+        display: flex; flex-direction: column; gap: 4px; min-width: var(--ctrl-min);
+      }
+      .ctrl > span {
+        font-size: 0.72rem; font-weight: 700; letter-spacing: 0.04em;
+        text-transform: uppercase; color: var(--muted);
+      }
+      .ctrl select, .chip-btn {
+        min-width: var(--ctrl-min);
+        min-height: 42px;
+        background: var(--chip-bg);
+        border: 1px solid var(--border);
+        color: var(--text);
+        border-radius: 12px;
+        padding: 8px 12px;
+        cursor: pointer;
+        font: inherit;
+        font-weight: 600;
+        font-size: 0.92rem;
+        line-height: 1.25;
+        white-space: normal;
+        box-shadow: var(--shadow);
+      }
+      .ctrl select { appearance: auto; padding-inline-end: 28px; }
+      h1 { margin: 0; font-size: clamp(1.35rem, 2.4vw, 1.7rem); line-height: 1.25; }
+      .sub { margin: 6px 0 16px; color: var(--muted); max-width: 38rem; }
       .nav { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 18px; }
       .nav button {
-        border: none; border-radius: 999px; padding: 10px 14px; cursor: pointer;
-        background: var(--panel); color: var(--text); font-weight: 600;
+        border: 1px solid var(--border); border-radius: 999px;
+        padding: 10px 16px; min-height: 44px; min-width: 7rem;
+        cursor: pointer; background: var(--panel); color: var(--text);
+        font: inherit; font-weight: 600; font-size: 0.9rem; line-height: 1.25;
+        white-space: normal; text-align: center; box-shadow: var(--shadow);
       }
-      .nav button.active { background: #5a90a8; }
+      .nav button.active {
+        background: var(--nav-active); color: #fff; border-color: transparent;
+      }
       .panel {
         background: var(--panel); border-radius: 18px; padding: 18px 18px 22px;
+        border: 1px solid var(--border); box-shadow: var(--shadow);
       }
       .panel h2 { margin: 0 0 8px; }
       .hint { color: var(--muted); font-size: 0.92rem; margin: 0 0 14px; }
       .row { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 12px; }
       label { display: block; font-size: 0.85rem; margin-bottom: 4px; color: var(--muted); }
       input, select, textarea {
-        width: 100%; border: none; border-radius: 10px; padding: 10px 12px;
+        width: 100%; border: 1px solid var(--border); border-radius: 10px; padding: 10px 12px;
         background: var(--panel-2); color: var(--text); font: inherit;
       }
       textarea { min-height: 72px; resize: vertical; }
       .field { flex: 1 1 140px; }
       .btn {
-        border: none; border-radius: 12px; padding: 12px 16px; font-weight: 700;
-        cursor: pointer; font-size: 0.95rem;
+        border: none; border-radius: 12px;
+        padding: 12px 18px; min-height: 46px; min-width: 8.5rem;
+        font: inherit; font-weight: 700; font-size: 0.95rem; line-height: 1.25;
+        cursor: pointer; white-space: normal; text-align: center;
       }
-      .btn-primary { background: var(--teal); color: #fff; }
+      .btn-primary { background: var(--teal); color: #041016; }
+      html:not([data-theme="dark"]) .btn-primary { color: #fff; }
       .btn-primary:hover { background: var(--teal-hover); }
-      .btn-secondary { background: #2f3844; color: #fff; }
+      .btn-secondary { background: var(--btn-secondary); color: var(--btn-secondary-text); }
       .btn:disabled { opacity: 0.55; cursor: not-allowed; }
       .trip-list { display: grid; gap: 10px; margin-top: 14px; }
       .trip-day { display: grid; grid-template-columns: 56px 1fr; gap: 10px; align-items: stretch; }
       .dow { color: var(--muted); font-size: 0.85rem; padding-top: 10px; }
       .trip-card {
-        border-radius: 12px; padding: 12px 14px; cursor: pointer; color: #123;
-        background: var(--screen);
+        border-radius: 12px; padding: 12px 14px; cursor: pointer;
+        color: #102033; background: var(--screen);
+        border: 1px solid transparent;
       }
+      html[data-theme="dark"] .trip-card { color: #f3f7ff; border-color: rgba(255,255,255,0.08); }
       .trip-card.stage { background: var(--stage); }
-      /* Peer: «обе категории — два цвета» */
       .trip-card.both {
         background: linear-gradient(90deg, var(--screen) 0 50%, var(--stage) 50% 100%);
       }
-      .trip-card .badge { font-size: 0.72rem; letter-spacing: 0.04em; font-weight: 700; opacity: 0.85; }
-      .trip-card .title { font-weight: 700; margin: 4px 0; }
-      .trip-card .meta { font-size: 0.85rem; opacity: 0.85; }
+      .trip-card .badge { font-size: 0.72rem; letter-spacing: 0.04em; font-weight: 700; opacity: 0.9; }
+      .trip-card .title { font-weight: 700; margin: 4px 0; line-height: 1.3; }
+      .trip-card .meta { font-size: 0.85rem; opacity: 0.9; }
       .status { min-height: 1.2em; margin-top: 10px; font-size: 0.88rem; }
-      .status.ok { color: #8dffb0; }
+      .status.ok { color: var(--ok); }
       .status.err { color: var(--danger); }
       .overlay {
-        position: fixed; inset: 0; background: rgba(12, 16, 22, 0.72);
+        position: fixed; inset: 0; background: var(--overlay);
         display: flex; align-items: flex-start; justify-content: center;
         padding: 48px 12px 24px; z-index: 40; overflow: auto;
       }
       .overlay.hidden { display: none; }
       .close-top {
         position: absolute; top: 12px; right: 16px;
-        background: #3a4656; color: #fff; border: none; border-radius: 8px;
-        padding: 8px 14px; cursor: pointer;
+        background: var(--close-bg); color: #fff; border: none; border-radius: 8px;
+        padding: 8px 14px; min-height: 40px; cursor: pointer; font: inherit; font-weight: 600;
+        white-space: normal;
       }
       .modal {
-        width: min(560px, 100%); background: var(--card); color: #1c2430;
+        width: min(560px, 100%); background: var(--card); color: var(--text);
         border-radius: 14px; padding: 26px 26px 20px; position: relative;
-        box-shadow: 0 16px 48px rgba(0,0,0,.35);
+        border: 1px solid var(--border); box-shadow: var(--shadow);
       }
-      .modal h1 { color: #1c2430; font-size: 1.45rem; margin: 0 0 8px; }
-      .modal .lead { color: #5c6b7a; margin: 0 0 18px; font-size: 0.95rem; }
-      .modal label { color: #1c2430; font-weight: 600; }
+      .modal h1 { color: var(--text); font-size: 1.45rem; margin: 0 0 8px; }
+      .modal .lead { color: var(--muted); margin: 0 0 18px; font-size: 0.95rem; }
+      .modal label { color: var(--text); font-weight: 600; }
       .modal textarea, .modal input[type=file] {
-        background: #fafbfc; color: #1c2430; border: 1px solid #d8dee6;
+        background: var(--panel-2); color: var(--text); border: 1px solid var(--border);
       }
-      .modal .hint { color: #5c6b7a; }
+      .modal .hint { color: var(--muted); }
       .file-list { list-style: none; margin: 8px 0 0; padding: 0; }
       .file-list li {
-        display: flex; justify-content: space-between; gap: 8px;
-        border: 1px solid #d8dee6; border-radius: 8px; padding: 8px 10px; margin-bottom: 6px;
-        font-size: 0.88rem;
+        display: flex; justify-content: space-between; gap: 8px; align-items: center;
+        border: 1px solid var(--border); border-radius: 8px; padding: 8px 10px; margin-bottom: 6px;
+        font-size: 0.88rem; background: var(--panel-2);
       }
-      .file-list button { border: none; background: transparent; color: #c0392b; cursor: pointer; }
+      .file-list button { border: none; background: transparent; color: var(--danger); cursor: pointer; font: inherit; }
       .actions { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 10px; }
       .detail {
-        background: #1f2833; border-radius: 16px; padding: 18px; margin-top: 12px;
+        background: var(--detail-bg); border-radius: 16px; padding: 18px; margin-top: 12px;
+        color: var(--text); border: 1px solid var(--border);
       }
       .chips { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 8px; }
-      .chip { background: #2f8f6b; color: #fff; border-radius: 8px; padding: 4px 10px; font-size: 0.8rem; font-weight: 700; }
+      .chip {
+        background: #2f8f6b; color: #fff; border-radius: 8px;
+        padding: 6px 12px; font-size: 0.8rem; font-weight: 700;
+        white-space: normal; line-height: 1.25; max-width: 100%;
+      }
       .hidden { display: none !important; }
       table { width: 100%; border-collapse: collapse; font-size: 0.9rem; }
-      th, td { text-align: left; padding: 8px 6px; border-bottom: 1px solid #505a68; }
+      th, td { text-align: left; padding: 8px 6px; border-bottom: 1px solid var(--border); }
+
+      /* HE / RTL: больше места под глифы, без обрезки */
+      html[lang="he"] {
+        --ctrl-min: 9rem;
+        font-size: 15px;
+      }
+      html[lang="he"] .nav button,
+      html[lang="he"] .btn,
+      html[lang="he"] .chip-btn,
+      html[lang="he"] .ctrl select {
+        letter-spacing: 0;
+        padding-inline: 14px 16px;
+        word-break: keep-all;
+      }
+      html[lang="he"] .nav button { min-width: 8.25rem; max-width: 100%; }
+      html[dir="rtl"] body { direction: rtl; }
+      html[dir="rtl"] .top { flex-direction: row-reverse; }
+      html[dir="rtl"] .top-actions { flex-direction: row-reverse; justify-content: flex-start; }
+      html[dir="rtl"] .nav { flex-direction: row-reverse; }
+      html[dir="rtl"] .trip-day { grid-template-columns: 1fr 56px; }
+      html[dir="rtl"] .dow { text-align: left; }
+      html[dir="rtl"] th, html[dir="rtl"] td { text-align: right; }
+      html[dir="rtl"] .file-list li { flex-direction: row-reverse; }
+      html[dir="rtl"] .actions { flex-direction: row-reverse; }
+      html[dir="rtl"] .close-top { right: auto; left: 16px; }
+      html[dir="rtl"] .ctrl select { padding-inline: 28px 12px; }
+      @media (max-width: 640px) {
+        .top { flex-direction: column; }
+        .top-actions { width: 100%; justify-content: stretch; }
+        .ctrl { flex: 1 1 140px; }
+        .nav button { flex: 1 1 auto; min-width: calc(50% - 8px); }
+      }
     </style>
   </head>
   <body>
     <div class="wrap">
       <div class="top">
         <div>
-          <h1>Выезды команды</h1>
-          <p class="sub">Создай выезд — каждый сотрудник получит личное сообщение в Telegram.</p>
+          <h1 data-i18n="appTitle">Выезды команды</h1>
+          <p class="sub" data-i18n="appSub">Создай выезд — каждый сотрудник получит личное сообщение в Telegram.</p>
         </div>
-        <button type="button" class="lang" id="langBtn">RU · Русский</button>
+        <div class="top-actions">
+          <label class="ctrl" for="langSelect">
+            <span data-i18n="labelLang">Язык / Language</span>
+            <select id="langSelect" aria-label="Language">
+              <option value="ru">Русский</option>
+              <option value="en">English</option>
+              <option value="he">עברית</option>
+            </select>
+          </label>
+          <label class="ctrl">
+            <span data-i18n="themeTitle">Тема</span>
+            <button type="button" class="chip-btn" id="themeBtn" data-i18n="themeLight">Светлая</button>
+          </label>
+        </div>
       </div>
       <nav class="nav" id="nav">
-        <button type="button" data-tab="new">Новый выезд</button>
-        <button type="button" data-tab="log" class="active">Лог работ</button>
-        <button type="button" data-tab="hours">Часы работы</button>
-        <button type="button" data-tab="weekend">Заявки на выходные</button>
-        <button type="button" data-tab="message">Сообщение команде</button>
-        <button type="button" data-tab="settings">Настройки</button>
+        <button type="button" data-tab="new" data-i18n="tabNew">Новый выезд</button>
+        <button type="button" data-tab="log" class="active" data-i18n="tabLog">Лог работ</button>
+        <button type="button" data-tab="hours" data-i18n="tabHours">Часы работы</button>
+        <button type="button" data-tab="weekend" data-i18n="tabWeekend">Заявки на выходные</button>
+        <button type="button" data-tab="message" data-i18n="tabMessage">Сообщение команде</button>
+        <button type="button" data-tab="settings" data-i18n="tabSettings">Настройки</button>
       </nav>
 
       <section class="panel tab" id="tab-new">
-        <h2>Новый выезд</h2>
-        <p class="hint">После сохранения сотрудники получат личное сообщение (Telegram stub, если бот не настроен).</p>
+        <h2 data-i18n="tabNew">Новый выезд</h2>
+        <p class="hint" data-i18n="newHint">После сохранения сотрудники получат личное сообщение (Telegram stub, если бот не настроен).</p>
         <div class="row">
-          <div class="field"><label>Дата</label><input id="newDate" type="date" /></div>
-          <div class="field"><label>Время</label><input id="newTime" type="time" value="11:00" /></div>
+          <div class="field"><label data-i18n="labelDate">Дата</label><input id="newDate" type="date" /></div>
+          <div class="field"><label data-i18n="labelTime">Время</label><input id="newTime" type="time" value="11:00" /></div>
           <div class="field">
-            <label>Категория</label>
-            <select id="newCategory"><option value="screen">Экран</option><option value="stage">Сцена</option><option value="both">Обе</option></select>
+            <label data-i18n="labelCategory">Категория</label>
+            <select id="newCategory">
+              <option value="screen" data-i18n="catScreen">Экран</option>
+              <option value="stage" data-i18n="catStage">Сцена</option>
+              <option value="both" data-i18n="catBoth">Обе</option>
+            </select>
           </div>
         </div>
         <div class="row">
-          <div class="field"><label>Место / название</label><input id="newPlace" placeholder="Matnas Neve yosef" /></div>
+          <div class="field"><label data-i18n="labelPlace">Место / название</label><input id="newPlace" placeholder="Matnas Neve yosef" /></div>
           <div class="field">
-            <label>Схемы</label>
-            <select id="newSchemes"><option value="none">Не нужны</option><option value="ready">Готовы</option><option value="needed">Нужны</option></select>
+            <label data-i18n="labelSchemes">Схемы</label>
+            <select id="newSchemes">
+              <option value="none" data-i18n="schNone">Не нужны</option>
+              <option value="ready" data-i18n="schReady">Готовы</option>
+              <option value="needed" data-i18n="schNeeded">Нужны</option>
+            </select>
           </div>
         </div>
         <div class="field" style="margin-bottom:12px">
-          <label>Сотрудники (email через запятую)</label>
+          <label data-i18n="labelAssignees">Сотрудники (email через запятую)</label>
           <input id="newAssignees" placeholder="crew@example.com" />
         </div>
-        <button type="button" class="btn btn-primary" id="btnCreateTrip">Создать выезд</button>
+        <button type="button" class="btn btn-primary" id="btnCreateTrip" data-i18n="btnCreateTrip">Создать выезд</button>
         <p class="status" id="newStatus"></p>
       </section>
 
       <section class="panel tab" id="tab-log">
-        <h2>Лог работ</h2>
-        <p class="hint">Выбери месяц и нажми на работу, чтобы посмотреть подробности или сохранить её в PDF.</p>
+        <h2 data-i18n="tabLog">Лог работ</h2>
+        <p class="hint" data-i18n="logHint">Выбери месяц и нажми на работу, чтобы посмотреть подробности или сохранить её в PDF.</p>
         <div class="row">
           <div class="field">
-            <label>Месяц</label>
+            <label data-i18n="labelMonth">Месяц</label>
             <select id="logMonth"></select>
           </div>
-          <div class="field"><label>Год</label><input id="logYear" type="number" min="2020" max="2100" /></div>
+          <div class="field"><label data-i18n="labelYear">Год</label><input id="logYear" type="number" min="2020" max="2100" /></div>
           <div class="field">
-            <label>Поиск по сотруднику</label>
+            <label data-i18n="labelPerson">Поиск по сотруднику</label>
             <select id="logPerson"><option value="">Все сотрудники · выбранный месяц</option></select>
           </div>
         </div>
-        <p class="hint">Экран — голубой · Сцена — розовый · обе категории — два цвета.</p>
-        <button type="button" class="btn btn-primary" id="btnMonthPdf">Сохранить месяц в PDF</button>
+        <p class="hint" data-i18n="logColors">Экран — голубой · Сцена — розовый · обе категории — два цвета.</p>
+        <button type="button" class="btn btn-primary" id="btnMonthPdf" data-i18n="btnMonthPdf">Сохранить месяц в PDF</button>
         <div class="trip-list" id="tripList"></div>
         <p class="status" id="logStatus"></p>
       </section>
 
       <section class="panel tab hidden" id="tab-hours">
-        <h2>Часы работы</h2>
+        <h2 data-i18n="tabHours">Часы работы</h2>
         <div class="row">
           <div class="field"><label>Email</label><input id="hrsEmail" /></div>
-          <div class="field"><label>Дата</label><input id="hrsDate" type="date" /></div>
-          <div class="field"><label>Часы</label><input id="hrsValue" type="number" step="0.5" min="0" value="8" /></div>
+          <div class="field"><label data-i18n="labelDate">Дата</label><input id="hrsDate" type="date" /></div>
+          <div class="field"><label data-i18n="labelHours">Часы</label><input id="hrsValue" type="number" step="0.5" min="0" value="8" /></div>
         </div>
-        <div class="field" style="margin-bottom:12px"><label>Заметка</label><input id="hrsNote" /></div>
-        <button type="button" class="btn btn-primary" id="btnAddHours">Добавить</button>
-        <table style="margin-top:14px"><thead><tr><th>Дата</th><th>Email</th><th>Часы</th><th>Заметка</th></tr></thead><tbody id="hrsBody"></tbody></table>
+        <div class="field" style="margin-bottom:12px"><label data-i18n="labelNote">Заметка</label><input id="hrsNote" /></div>
+        <button type="button" class="btn btn-primary" id="btnAddHours" data-i18n="btnAdd">Добавить</button>
+        <table style="margin-top:14px"><thead><tr>
+          <th data-i18n="labelDate">Дата</th><th>Email</th><th data-i18n="labelHours">Часы</th><th data-i18n="labelNote">Заметка</th>
+        </tr></thead><tbody id="hrsBody"></tbody></table>
         <p class="status" id="hrsStatus"></p>
       </section>
 
       <section class="panel tab hidden" id="tab-weekend">
-        <h2>Заявки на выходные</h2>
+        <h2 data-i18n="tabWeekend">Заявки на выходные</h2>
         <div class="row">
           <div class="field"><label>Email</label><input id="wkEmail" /></div>
-          <div class="field"><label>С</label><input id="wkFrom" type="date" /></div>
-          <div class="field"><label>По</label><input id="wkTo" type="date" /></div>
+          <div class="field"><label data-i18n="labelFrom">С</label><input id="wkFrom" type="date" /></div>
+          <div class="field"><label data-i18n="labelTo">По</label><input id="wkTo" type="date" /></div>
         </div>
-        <div class="field" style="margin-bottom:12px"><label>Комментарий</label><input id="wkNote" /></div>
-        <button type="button" class="btn btn-primary" id="btnWeekend">Отправить заявку</button>
-        <table style="margin-top:14px"><thead><tr><th>Период</th><th>Email</th><th>Статус</th></tr></thead><tbody id="wkBody"></tbody></table>
+        <div class="field" style="margin-bottom:12px"><label data-i18n="labelComment">Комментарий</label><input id="wkNote" /></div>
+        <button type="button" class="btn btn-primary" id="btnWeekend" data-i18n="btnWeekend">Отправить заявку</button>
+        <table style="margin-top:14px"><thead><tr>
+          <th data-i18n="thPeriod">Период</th><th>Email</th><th data-i18n="thStatus">Статус</th>
+        </tr></thead><tbody id="wkBody"></tbody></table>
         <p class="status" id="wkStatus"></p>
       </section>
 
       <section class="panel tab hidden" id="tab-message">
-        <h2>Сообщение команде</h2>
-        <p class="hint">Broadcast в Telegram (stub без токена бота).</p>
-        <textarea id="msgText" placeholder="Текст сообщения…"></textarea>
-        <div style="margin-top:12px"><button type="button" class="btn btn-primary" id="btnMsg">Отправить</button></div>
+        <h2 data-i18n="tabMessage">Сообщение команде</h2>
+        <p class="hint" data-i18n="msgHint">Broadcast в Telegram (stub без токена бота).</p>
+        <textarea id="msgText" data-i18n-placeholder="msgPlaceholder" placeholder="Текст сообщения…"></textarea>
+        <div style="margin-top:12px"><button type="button" class="btn btn-primary" id="btnMsg" data-i18n="btnSend">Отправить</button></div>
         <p class="status" id="msgStatus"></p>
       </section>
 
       <section class="panel tab hidden" id="tab-settings">
-        <h2>Настройки</h2>
-        <p class="hint">Секреты бота и webhook — только Script Properties (не в UI). Здесь — список людей и deep-link контракт.</p>
-        <table><thead><tr><th>Имя</th><th>Email</th><th>Роль</th></tr></thead><tbody id="peopleBody"></tbody></table>
+        <h2 data-i18n="tabSettings">Настройки</h2>
+        <p class="hint" data-i18n="settingsHint">Секреты бота и webhook — только Script Properties (не в UI). Здесь — список людей и deep-link контракт.</p>
+        <table><thead><tr>
+          <th data-i18n="thName">Имя</th><th>Email</th><th data-i18n="thRole">Роль</th>
+        </tr></thead><tbody id="peopleBody"></tbody></table>
         <p class="hint" id="settingsMeta" style="margin-top:12px"></p>
       </section>
     </div>
 
-    <!-- Trip detail overlay -->
     <div class="overlay hidden" id="detailOverlay">
-      <button type="button" class="close-top" id="detailClose">Закрыть</button>
+      <button type="button" class="close-top" id="detailClose" data-i18n="btnClose">Закрыть</button>
       <div class="detail" style="width:min(640px,100%)">
         <div class="chips" id="detailChips"></div>
         <h2 id="detailTitle" style="margin:0 0 6px"></h2>
         <p class="hint" id="detailMeta"></p>
         <div class="actions">
-          <button type="button" class="btn btn-primary" id="btnOpenFiles">Файлы и ссылки</button>
-          <button type="button" class="btn btn-secondary" id="detailBack">Назад к логу</button>
+          <button type="button" class="btn btn-primary" id="btnOpenFiles" data-i18n="btnOpenFiles">Файлы и ссылки</button>
+          <button type="button" class="btn btn-secondary" id="detailBack" data-i18n="btnBackLog">Назад к логу</button>
         </div>
       </div>
     </div>
 
-    <!-- Files overlay (peer view=files) -->
     <div class="overlay hidden" id="filesOverlay">
-      <button type="button" class="close-top" id="filesClose">Закрыть</button>
+      <button type="button" class="close-top" id="filesClose" data-i18n="btnClose">Закрыть</button>
       <div class="modal">
-        <h1>Файлы и ссылки к работе</h1>
-        <p class="lead">Добавь список и файлы любого формата. PNG и JPG появятся также в PDF. Бот пришлёт сотрудникам только новые файлы.</p>
+        <h1 data-i18n="filesTitle">Файлы и ссылки к работе</h1>
+        <p class="lead" data-i18n="filesLead">Добавь список и файлы любого формата. PNG и JPG появятся также в PDF. Бот пришлёт сотрудникам только новые файлы.</p>
         <div class="field" style="margin-bottom:14px">
-          <label for="equipmentList">Список оборудования (если нужен отдельный текст)</label>
-          <textarea id="equipmentList" placeholder="Что взять на эту работу…"></textarea>
+          <label for="equipmentList" data-i18n="labelEquipment">Список оборудования (если нужен отдельный текст)</label>
+          <textarea id="equipmentList" data-i18n-placeholder="phEquipment" placeholder="Что взять на эту работу…"></textarea>
         </div>
         <div class="field" style="margin-bottom:14px">
-          <label for="fileInput">Файлы и схемы (до 10 на работу)</label>
+          <label for="fileInput" data-i18n="labelFiles">Файлы и схемы (до 10 на работу)</label>
           <input id="fileInput" type="file" multiple />
           <ul class="file-list" id="existingFiles"></ul>
         </div>
         <div class="field" style="margin-bottom:10px">
-          <label for="sheetLinks">Ссылки на Google Таблицы</label>
+          <label for="sheetLinks" data-i18n="labelSheets">Ссылки на Google Таблицы</label>
           <textarea id="sheetLinks" placeholder="https://docs.google.com/spreadsheets/d/..."></textarea>
-          <p class="hint">Одна ссылка на строку, до 10. Новые и заменённые уходят сотрудникам; удаления — без уведомления.</p>
+          <p class="hint" data-i18n="sheetsHint">Одна ссылка на строку, до 10. Новые и заменённые уходят сотрудникам; удаления — без уведомления.</p>
         </div>
-        <p class="hint">Каждый файл до 8 МБ, новые вместе до 10 МБ.</p>
+        <p class="hint" data-i18n="filesLimits">Каждый файл до 8 МБ, новые вместе до 10 МБ.</p>
         <div class="actions">
-          <button type="button" class="btn btn-primary" id="btnSaveFiles">Сохранить и отправить</button>
-          <button type="button" class="btn btn-secondary" id="filesBack">Назад</button>
+          <button type="button" class="btn btn-primary" id="btnSaveFiles" data-i18n="btnSaveSend">Сохранить и отправить</button>
+          <button type="button" class="btn btn-secondary" id="filesBack" data-i18n="btnBack">Назад</button>
         </div>
-        <p class="status" id="filesStatus" style="color:#1e7a46"></p>
+        <p class="status" id="filesStatus"></p>
         <p class="hint" style="margin-top:8px">trip=<span id="tripLabel"></span></p>
       </div>
     </div>
-
     <script>
       var INITIAL_TRIP = <?!= JSON.stringify(initialTripId) ?>;
       var INITIAL_VIEW = <?!= JSON.stringify(initialView) ?>;
       var state = {
-        tab: 'log',
+        tab: 'log', lang: 'ru',
         month: new Date().getMonth() + 1,
         year: new Date().getFullYear(),
-        trips: [],
-        people: [],
-        hours: [],
-        weekend: [],
-        trip: null,
-        files: [],
-        removeFileIds: [],
-        config: null
+        trips: [], people: [], hours: [], weekend: [],
+        trip: null, files: [], removeFileIds: [], config: null
+      };
+      var THEME_KEY = 'led-trips-theme';
+      var LANG_KEY = 'led-trips-lang';
+      var LANGS = ['ru', 'en', 'he'];
+
+      var I18N = {
+        ru: {
+          appTitle: 'Выезды команды',
+          appSub: 'Создай выезд — каждый сотрудник получит личное сообщение в Telegram.',
+          labelLang: 'Язык', themeLight: 'Светлая', themeDark: 'Тёмная', themeTitle: 'Тема',
+          tabNew: 'Новый выезд', tabLog: 'Лог работ', tabHours: 'Часы работы',
+          tabWeekend: 'Заявки на выходные', tabMessage: 'Сообщение команде', tabSettings: 'Настройки',
+          newHint: 'После сохранения сотрудники получат личное сообщение (Telegram stub, если бот не настроен).',
+          labelDate: 'Дата', labelTime: 'Время', labelCategory: 'Категория', labelPlace: 'Место / название',
+          labelSchemes: 'Схемы', labelAssignees: 'Сотрудники (email через запятую)',
+          catScreen: 'Экран', catStage: 'Сцена', catBoth: 'Обе',
+          schNone: 'Не нужны', schReady: 'Готовы', schNeeded: 'Нужны',
+          btnCreateTrip: 'Создать выезд',
+          logHint: 'Выбери месяц и нажми на работу, чтобы посмотреть подробности или сохранить её в PDF.',
+          labelMonth: 'Месяц', labelYear: 'Год', labelPerson: 'Поиск по сотруднику',
+          allPeople: 'Все сотрудники · выбранный месяц',
+          logColors: 'Экран — голубой · Сцена — розовый · обе категории — два цвета.',
+          btnMonthPdf: 'Сохранить месяц в PDF', noTrips: 'Нет работ за выбранный период.',
+          labelHours: 'Часы', labelNote: 'Заметка', btnAdd: 'Добавить', emptyHours: 'Пока пусто',
+          labelFrom: 'С', labelTo: 'По', labelComment: 'Комментарий', btnWeekend: 'Отправить заявку',
+          thPeriod: 'Период', thStatus: 'Статус', emptyWeekend: 'Заявок нет',
+          msgHint: 'Broadcast в Telegram (stub без токена бота).', msgPlaceholder: 'Текст сообщения…', btnSend: 'Отправить',
+          settingsHint: 'Секреты бота и webhook — только Script Properties (не в UI). Здесь — список людей и deep-link контракт.',
+          thName: 'Имя', thRole: 'Роль',
+          btnClose: 'Закрыть', btnOpenFiles: 'Файлы и ссылки', btnBackLog: 'Назад к логу',
+          filesTitle: 'Файлы и ссылки к работе',
+          filesLead: 'Добавь список и файлы любого формата. PNG и JPG появятся также в PDF. Бот пришлёт сотрудникам только новые файлы.',
+          labelEquipment: 'Список оборудования (если нужен отдельный текст)', phEquipment: 'Что взять на эту работу…',
+          labelFiles: 'Файлы и схемы (до 10 на работу)', labelSheets: 'Ссылки на Google Таблицы',
+          sheetsHint: 'Одна ссылка на строку, до 10. Новые и заменённые уходят сотрудникам; удаления — без уведомления.',
+          filesLimits: 'Каждый файл до 8 МБ, новые вместе до 10 МБ.',
+          btnSaveSend: 'Сохранить и отправить', btnBack: 'Назад', btnDelete: 'Удалить',
+          badgeScreen: 'ЭКРАН', badgeStage: 'СЦЕНА', badgeBoth: 'ЭКРАН+СЦЕНА',
+          schReadyBadge: 'СХЕМЫ ГОТОВЫ', schNeededBadge: 'СХЕМЫ НУЖНЫ', schNoneBadge: 'СХЕМЫ НЕ НУЖНЫ',
+          untitled: 'Без названия', placePrefix: 'место',
+          months: ['январь','февраль','март','апрель','май','июнь','июль','август','сентябрь','октябрь','ноябрь','декабрь'],
+          dow: ['ВС','ПН','ВТ','СР','ЧТ','ПТ','СБ'],
+          creating: 'Создание…', created: 'Создано · notify stub', loading: 'Загрузка…', updating: 'Обновление…',
+          saving: 'Сохранение…', saved: 'Сохранено', savedFiles: 'Сохранено · новых файлов: ',
+          weekendCreated: 'Заявка создана', sent: 'Отправлено', sentStub: 'Отправлено (Telegram stub)',
+          maxFiles: 'Не больше 10 файлов', pdfStub: 'Stub PDF: ',
+          settingsMeta: 'Deep-link: tripId ↔ orderId. Warehouse base: {base}. Telegram: {tg}',
+          tgOn: 'настроен', tgOff: 'stub', baseNone: '(не задан)'
+        },
+        en: {
+          appTitle: 'Team trips',
+          appSub: 'Create a trip — each teammate gets a personal Telegram message.',
+          labelLang: 'Language', themeLight: 'Light', themeDark: 'Dark', themeTitle: 'Theme',
+          tabNew: 'New trip', tabLog: 'Work log', tabHours: 'Work hours',
+          tabWeekend: 'Weekend requests', tabMessage: 'Team message', tabSettings: 'Settings',
+          newHint: 'After save, teammates get a personal message (Telegram stub if bot is not configured).',
+          labelDate: 'Date', labelTime: 'Time', labelCategory: 'Category', labelPlace: 'Place / title',
+          labelSchemes: 'Schemes', labelAssignees: 'Teammates (emails, comma-separated)',
+          catScreen: 'Screen', catStage: 'Stage', catBoth: 'Both',
+          schNone: 'Not needed', schReady: 'Ready', schNeeded: 'Needed',
+          btnCreateTrip: 'Create trip',
+          logHint: 'Pick a month and click a job to see details or save it as PDF.',
+          labelMonth: 'Month', labelYear: 'Year', labelPerson: 'Search by teammate',
+          allPeople: 'All teammates · selected month',
+          logColors: 'Screen — blue · Stage — pink · both — two colors.',
+          btnMonthPdf: 'Save month as PDF', noTrips: 'No jobs for this period.',
+          labelHours: 'Hours', labelNote: 'Note', btnAdd: 'Add', emptyHours: 'Empty so far',
+          labelFrom: 'From', labelTo: 'To', labelComment: 'Comment', btnWeekend: 'Submit request',
+          thPeriod: 'Period', thStatus: 'Status', emptyWeekend: 'No requests',
+          msgHint: 'Broadcast to Telegram (stub without bot token).', msgPlaceholder: 'Message text…', btnSend: 'Send',
+          settingsHint: 'Bot secrets and webhook live in Script Properties only. Here: people list and deep-link contract.',
+          thName: 'Name', thRole: 'Role',
+          btnClose: 'Close', btnOpenFiles: 'Files & links', btnBackLog: 'Back to log',
+          filesTitle: 'Files and links for the job',
+          filesLead: 'Add a list and files of any format. PNG and JPG also appear in the PDF. The bot sends only new files.',
+          labelEquipment: 'Equipment list (optional separate text)', phEquipment: 'What to bring…',
+          labelFiles: 'Files and schemes (up to 10 per job)', labelSheets: 'Google Sheets links',
+          sheetsHint: 'One link per line, up to 10. New/replaced links notify teammates; deletions are silent.',
+          filesLimits: 'Each file up to 8 MB; new files together up to 10 MB.',
+          btnSaveSend: 'Save and send', btnBack: 'Back', btnDelete: 'Delete',
+          badgeScreen: 'SCREEN', badgeStage: 'STAGE', badgeBoth: 'SCREEN+STAGE',
+          schReadyBadge: 'SCHEMES READY', schNeededBadge: 'SCHEMES NEEDED', schNoneBadge: 'SCHEMES NOT NEEDED',
+          untitled: 'Untitled', placePrefix: 'place',
+          months: ['January','February','March','April','May','June','July','August','September','October','November','December'],
+          dow: ['SU','MO','TU','WE','TH','FR','SA'],
+          creating: 'Creating…', created: 'Created · notify stub', loading: 'Loading…', updating: 'Updating…',
+          saving: 'Saving…', saved: 'Saved', savedFiles: 'Saved · new files: ',
+          weekendCreated: 'Request created', sent: 'Sent', sentStub: 'Sent (Telegram stub)',
+          maxFiles: 'No more than 10 files', pdfStub: 'Stub PDF: ',
+          settingsMeta: 'Deep-link: tripId ↔ orderId. Warehouse base: {base}. Telegram: {tg}',
+          tgOn: 'configured', tgOff: 'stub', baseNone: '(not set)'
+        },
+        he: {
+          appTitle: 'יציאות צוות',
+          appSub: 'צור יציאה — כל עובד יקבל הודעה אישית בטלגרם.',
+          labelLang: 'שפה', themeLight: 'בהיר', themeDark: 'כהה', themeTitle: 'ערכת נושא',
+          tabNew: 'יציאה חדשה', tabLog: 'יומן עבודות', tabHours: 'שעות עבודה',
+          tabWeekend: 'בקשות לסופ״ש', tabMessage: 'הודעה לצוות', tabSettings: 'הגדרות',
+          newHint: 'לאחר השמירה העובדים יקבלו הודעה אישית (Telegram stub אם אין בוט).',
+          labelDate: 'תאריך', labelTime: 'שעה', labelCategory: 'קטגוריה', labelPlace: 'מקום / שם',
+          labelSchemes: 'סכמות', labelAssignees: 'עובדים (אימיילים מופרדים בפסיק)',
+          catScreen: 'מסך', catStage: 'במה', catBoth: 'שניהם',
+          schNone: 'לא נדרש', schReady: 'מוכן', schNeeded: 'נדרש',
+          btnCreateTrip: 'צור יציאה',
+          logHint: 'בחר חודש ולחץ על עבודה לפרטים או לשמירה ב-PDF.',
+          labelMonth: 'חודש', labelYear: 'שנה', labelPerson: 'חיפוש לפי עובד',
+          allPeople: 'כל העובדים · חודש נבחר',
+          logColors: 'מסך — כחול · במה — ורוד · שניהם — שני צבעים.',
+          btnMonthPdf: 'שמור חודש כ-PDF', noTrips: 'אין עבודות לתקופה זו.',
+          labelHours: 'שעות', labelNote: 'הערה', btnAdd: 'הוסף', emptyHours: 'עדיין ריק',
+          labelFrom: 'מ-', labelTo: 'עד', labelComment: 'הערה', btnWeekend: 'שלח בקשה',
+          thPeriod: 'תקופה', thStatus: 'סטטוס', emptyWeekend: 'אין בקשות',
+          msgHint: 'שידור לטלגרם (stub בלי טוקן בוט).', msgPlaceholder: 'טקסט ההודעה…', btnSend: 'שלח',
+          settingsHint: 'סודות הבוט וה-webhook רק ב-Script Properties. כאן: אנשים וחוזה deep-link.',
+          thName: 'שם', thRole: 'תפקיד',
+          btnClose: 'סגור', btnOpenFiles: 'קבצים וקישורים', btnBackLog: 'חזרה ליומן',
+          filesTitle: 'קבצים וקישורים לעבודה',
+          filesLead: 'הוסף רשימה וקבצים בכל פורמט. PNG ו-JPG יופיעו גם ב-PDF. הבוט ישלח רק קבצים חדשים.',
+          labelEquipment: 'רשימת ציוד (טקסט נפרד אם צריך)', phEquipment: 'מה לקחת…',
+          labelFiles: 'קבצים וסכמות (עד 10 לעבודה)', labelSheets: 'קישורי Google Sheets',
+          sheetsHint: 'קישור אחד בשורה, עד 10. חדשים/מוחלפים נשלחים; מחיקות בלי התראה.',
+          filesLimits: 'כל קובץ עד 8MB; קבצים חדשים יחד עד 10MB.',
+          btnSaveSend: 'שמור ושלח', btnBack: 'חזרה', btnDelete: 'מחק',
+          badgeScreen: 'מסך', badgeStage: 'במה', badgeBoth: 'מסך+במה',
+          schReadyBadge: 'סכמות מוכנות', schNeededBadge: 'סכמות נדרשות', schNoneBadge: 'סכמות לא נדרשות',
+          untitled: 'ללא שם', placePrefix: 'מקום',
+          months: ['ינואר','פברואר','מרץ','אפריל','מאי','יוני','יולי','אוגוסט','ספטמבר','אוקטובר','נובמבר','דצמבר'],
+          dow: ['א׳','ב׳','ג׳','ד׳','ה׳','ו׳','ש׳'],
+          creating: 'יוצר…', created: 'נוצר · notify stub', loading: 'טוען…', updating: 'מעדכן…',
+          saving: 'שומר…', saved: 'נשמר', savedFiles: 'נשמר · קבצים חדשים: ',
+          weekendCreated: 'הבקשה נוצרה', sent: 'נשלח', sentStub: 'נשלח (Telegram stub)',
+          maxFiles: 'לא יותר מ-10 קבצים', pdfStub: 'Stub PDF: ',
+          settingsMeta: 'Deep-link: tripId ↔ orderId. Warehouse base: {base}. Telegram: {tg}',
+          tgOn: 'מוגדר', tgOff: 'stub', baseNone: '(לא הוגדר)'
+        }
       };
 
-      var MONTHS = ['январь','февраль','март','апрель','май','июнь','июль','август','сентябрь','октябрь','ноябрь','декабрь'];
-      var DOW = ['ВС','ПН','ВТ','СР','ЧТ','ПТ','СБ'];
-
       function $(id) { return document.getElementById(id); }
+      function t(key) {
+        var pack = I18N[state.lang] || I18N.ru;
+        return pack[key] != null ? pack[key] : (I18N.ru[key] != null ? I18N.ru[key] : key);
+      }
+      function months() { return t('months'); }
+      function dow() { return t('dow'); }
+
+      function applyTheme(theme) {
+        var mode = theme === 'dark' ? 'dark' : 'light';
+        document.documentElement.setAttribute('data-theme', mode);
+        try { localStorage.setItem(THEME_KEY, mode); } catch (e) {}
+        var btn = $('themeBtn');
+        if (btn) btn.textContent = mode === 'dark' ? t('themeDark') : t('themeLight');
+      }
+      function initTheme() {
+        var saved = '';
+        try { saved = localStorage.getItem(THEME_KEY) || ''; } catch (e) {}
+        applyTheme(saved === 'dark' ? 'dark' : 'light');
+      }
+
+      function applyLang(lang) {
+        if (LANGS.indexOf(lang) < 0) lang = 'ru';
+        state.lang = lang;
+        document.documentElement.lang = lang;
+        document.documentElement.dir = lang === 'he' ? 'rtl' : 'ltr';
+        try { localStorage.setItem(LANG_KEY, lang); } catch (e) {}
+        var sel = $('langSelect');
+        if (sel && sel.value !== lang) sel.value = lang;
+        document.querySelectorAll('[data-i18n]').forEach(function (el) {
+          var key = el.getAttribute('data-i18n');
+          if (key) el.textContent = t(key);
+        });
+        document.querySelectorAll('[data-i18n-placeholder]').forEach(function (el) {
+          var key = el.getAttribute('data-i18n-placeholder');
+          if (key) el.setAttribute('placeholder', t(key));
+        });
+        // options stay native names; keep select value
+        if (sel) sel.value = lang;
+        var themeBtn = $('themeBtn');
+        if (themeBtn) {
+          var mode = document.documentElement.getAttribute('data-theme') === 'dark' ? 'dark' : 'light';
+          themeBtn.textContent = mode === 'dark' ? t('themeDark') : t('themeLight');
+          themeBtn.title = t('themeTitle');
+        }
+        fillMonths();
+        renderPeopleSelects();
+        renderTrips();
+        renderHours();
+        renderWeekend();
+        if (state.config) updateSettingsMeta(state.config);
+      }
+      function initLang() {
+        var saved = '';
+        try { saved = localStorage.getItem(LANG_KEY) || ''; } catch (e) {}
+        applyLang(LANGS.indexOf(saved) >= 0 ? saved : 'ru');
+      }
+
       function setStatus(el, text, kind) {
         el.textContent = text || '';
         el.className = 'status' + (kind ? ' ' + kind : '');
-      }
-      function run(fn) {
-        return new Promise(function (resolve, reject) {
-          google.script.run.withSuccessHandler(resolve).withFailureHandler(reject)[fn.name || fn]();
-        });
       }
       function api(name) {
         var args = Array.prototype.slice.call(arguments, 1);
@@ -315,44 +633,45 @@
       }
 
       function schemesLabel(s) {
-        if (s === 'ready') return 'СХЕМЫ ГОТОВЫ';
-        if (s === 'needed') return 'СХЕМЫ НУЖНЫ';
-        return 'СХЕМЫ НЕ НУЖНЫ';
+        if (s === 'ready') return t('schReadyBadge');
+        if (s === 'needed') return t('schNeededBadge');
+        return t('schNoneBadge');
       }
       function categoryLabel(c) {
-        if (c === 'stage') return 'СЦЕНА';
-        if (c === 'both') return 'ЭКРАН+СЦЕНА';
-        return 'ЭКРАН';
+        if (c === 'stage') return t('badgeStage');
+        if (c === 'both') return t('badgeBoth');
+        return t('badgeScreen');
       }
 
       function renderTrips() {
         var person = $('logPerson').value;
-        var list = state.trips.filter(function (t) {
+        var list = state.trips.filter(function (trip) {
           if (!person) return true;
-          return String(t.assigneeEmails || '').indexOf(person) >= 0;
+          return String(trip.assigneeEmails || '').indexOf(person) >= 0;
         });
         var html = '';
-        list.forEach(function (t) {
-          var d = new Date(t.date + 'T12:00:00');
-          var dow = isNaN(d.getTime()) ? '' : DOW[d.getDay()];
-          var day = t.date.slice(8) || '';
+        var DOW = dow();
+        list.forEach(function (trip) {
+          var d = new Date(trip.date + 'T12:00:00');
+          var dayName = isNaN(d.getTime()) ? '' : DOW[d.getDay()];
+          var day = trip.date.slice(8) || '';
           var cardCls = 'trip-card';
-          if (t.category === 'stage') cardCls += ' stage';
-          else if (t.category === 'both') cardCls += ' both';
-          html += '<div class="trip-day"><div class="dow">' + dow + ' ' + day + '</div>' +
-            '<div class="' + cardCls + '" data-id="' + t.id + '">' +
-            '<div class="badge">' + categoryLabel(t.category) + ' — ' + schemesLabel(t.schemes) + '</div>' +
-            '<div class="title">' + (t.title || t.place || 'Без названия') + '</div>' +
-            '<div class="meta">' + (t.time || '') + ' · место: ' + (t.place || '—') + '</div></div></div>';
+          if (trip.category === 'stage') cardCls += ' stage';
+          else if (trip.category === 'both') cardCls += ' both';
+          html += '<div class="trip-day"><div class="dow">' + dayName + ' ' + day + '</div>' +
+            '<div class="' + cardCls + '" data-id="' + trip.id + '">' +
+            '<div class="badge">' + categoryLabel(trip.category) + ' — ' + schemesLabel(trip.schemes) + '</div>' +
+            '<div class="title">' + (trip.title || trip.place || t('untitled')) + '</div>' +
+            '<div class="meta">' + (trip.time || '') + ' · ' + t('placePrefix') + ': ' + (trip.place || '—') + '</div></div></div>';
         });
-        $('tripList').innerHTML = html || '<p class="hint">Нет работ за выбранный период.</p>';
+        $('tripList').innerHTML = html || '<p class="hint">' + t('noTrips') + '</p>';
         $('tripList').querySelectorAll('[data-id]').forEach(function (el) {
           el.addEventListener('click', function () { openTrip(el.getAttribute('data-id')); });
         });
       }
 
       function renderPeopleSelects() {
-        var opts = '<option value="">Все сотрудники · выбранный месяц</option>';
+        var opts = '<option value="">' + t('allPeople') + '</option>';
         state.people.forEach(function (p) {
           opts += '<option value="' + p.email + '">' + (p.name || p.email) + '</option>';
         });
@@ -369,7 +688,7 @@
         state.hours.forEach(function (h) {
           body += '<tr><td>' + h.date + '</td><td>' + h.email + '</td><td>' + h.hours + '</td><td>' + (h.note || '') + '</td></tr>';
         });
-        $('hrsBody').innerHTML = body || '<tr><td colspan="4">Пока пусто</td></tr>';
+        $('hrsBody').innerHTML = body || '<tr><td colspan="4">' + t('emptyHours') + '</td></tr>';
       }
 
       function renderWeekend() {
@@ -377,11 +696,11 @@
         state.weekend.forEach(function (r) {
           body += '<tr><td>' + r.dateFrom + ' → ' + r.dateTo + '</td><td>' + r.email + '</td><td>' + r.status + '</td></tr>';
         });
-        $('wkBody').innerHTML = body || '<tr><td colspan="3">Заявок нет</td></tr>';
+        $('wkBody').innerHTML = body || '<tr><td colspan="3">' + t('emptyWeekend') + '</td></tr>';
       }
 
       function openTrip(id) {
-        setStatus($('logStatus'), 'Загрузка…');
+        setStatus($('logStatus'), t('loading'));
         api('apiGetTrip', id).then(function (res) {
           state.trip = res.trip;
           state.files = res.files || [];
@@ -390,12 +709,10 @@
             '<span class="chip">' + categoryLabel(res.trip.category) + '</span>' +
             '<span class="chip">' + schemesLabel(res.trip.schemes) + '</span>';
           $('detailTitle').textContent = res.trip.title || res.trip.place;
-          $('detailMeta').textContent = (res.trip.time || '') + ' · место: ' + (res.trip.place || '—');
+          $('detailMeta').textContent = (res.trip.time || '') + ' · ' + t('placePrefix') + ': ' + (res.trip.place || '—');
           $('detailOverlay').classList.remove('hidden');
           setStatus($('logStatus'), '');
-          if (INITIAL_VIEW === 'files' || location.search.indexOf('view=files') >= 0) {
-            openFiles();
-          }
+          if (INITIAL_VIEW === 'files' || location.search.indexOf('view=files') >= 0) openFiles();
         }).catch(function (e) {
           setStatus($('logStatus'), e.message || String(e), 'err');
         });
@@ -421,7 +738,7 @@
             var a = document.createElement('a'); a.href = f.url; a.target = '_blank'; a.textContent = f.name;
             left.appendChild(a);
           } else left.textContent = f.name;
-          var btn = document.createElement('button'); btn.type = 'button'; btn.textContent = 'Удалить';
+          var btn = document.createElement('button'); btn.type = 'button'; btn.textContent = t('btnDelete');
           btn.onclick = function () { state.removeFileIds.push(f.id); renderFiles(); };
           li.appendChild(left); li.appendChild(btn); ul.appendChild(li);
         });
@@ -442,8 +759,9 @@
 
       function fillMonths() {
         var sel = $('logMonth');
-        sel.innerHTML = MONTHS.map(function (m, i) {
-          return '<option value="' + (i + 1) + '">' + m + '</option>';
+        var m = months();
+        sel.innerHTML = m.map(function (name, i) {
+          return '<option value="' + (i + 1) + '">' + name + '</option>';
         }).join('');
         sel.value = String(state.month);
         $('logYear').value = state.year;
@@ -452,7 +770,7 @@
       function reloadLog() {
         state.month = Number($('logMonth').value);
         state.year = Number($('logYear').value);
-        setStatus($('logStatus'), 'Обновление…');
+        setStatus($('logStatus'), t('updating'));
         return api('apiListTrips', state.month, state.year).then(function (res) {
           state.trips = res.trips || [];
           renderTrips();
@@ -460,6 +778,12 @@
         }).catch(function (e) {
           setStatus($('logStatus'), e.message || String(e), 'err');
         });
+      }
+
+      function updateSettingsMeta(config) {
+        var base = (config && config.warehouseBaseUrl) || t('baseNone');
+        var tg = (config && config.hasTelegram) ? t('tgOn') : t('tgOff');
+        $('settingsMeta').textContent = t('settingsMeta').replace('{base}', base).replace('{tg}', tg);
       }
 
       function boot() {
@@ -483,10 +807,7 @@
           renderTrips();
           renderHours();
           renderWeekend();
-          $('settingsMeta').textContent =
-            'Deep-link: tripId ↔ orderId. Warehouse base: ' +
-            ((boot.config && boot.config.warehouseBaseUrl) || '(не задан)') +
-            '. Telegram: ' + ((boot.config && boot.config.hasTelegram) ? 'настроен' : 'stub');
+          updateSettingsMeta(boot.config);
 
           if (boot.trip) {
             state.trip = boot.trip;
@@ -496,7 +817,7 @@
               '<span class="chip">' + categoryLabel(boot.trip.category) + '</span>' +
               '<span class="chip">' + schemesLabel(boot.trip.schemes) + '</span>';
             $('detailTitle').textContent = boot.trip.title || boot.trip.place;
-            $('detailMeta').textContent = (boot.trip.time || '') + ' · место: ' + (boot.trip.place || '—');
+            $('detailMeta').textContent = (boot.trip.time || '') + ' · ' + t('placePrefix') + ': ' + (boot.trip.place || '—');
             $('detailOverlay').classList.remove('hidden');
             if (boot.view === 'files' || INITIAL_VIEW === 'files') openFiles();
           }
@@ -508,22 +829,26 @@
       document.querySelectorAll('#nav button').forEach(function (b) {
         b.addEventListener('click', function () { showTab(b.getAttribute('data-tab')); });
       });
+      $('themeBtn').addEventListener('click', function () {
+        var cur = document.documentElement.getAttribute('data-theme') === 'dark' ? 'dark' : 'light';
+        applyTheme(cur === 'dark' ? 'light' : 'dark');
+      });
+      $('langSelect').addEventListener('change', function () {
+        applyLang($('langSelect').value);
+      });
       $('logMonth').addEventListener('change', reloadLog);
       $('logYear').addEventListener('change', reloadLog);
       $('logPerson').addEventListener('change', renderTrips);
 
       $('btnCreateTrip').addEventListener('click', function () {
-        setStatus($('newStatus'), 'Создание…');
+        setStatus($('newStatus'), t('creating'));
         api('apiCreateTrip', {
-          date: $('newDate').value,
-          time: $('newTime').value,
-          place: $('newPlace').value,
-          title: $('newPlace').value,
-          category: $('newCategory').value,
-          schemes: $('newSchemes').value,
+          date: $('newDate').value, time: $('newTime').value,
+          place: $('newPlace').value, title: $('newPlace').value,
+          category: $('newCategory').value, schemes: $('newSchemes').value,
           assigneeEmails: $('newAssignees').value
         }).then(function () {
-          setStatus($('newStatus'), 'Создано · notify stub', 'ok');
+          setStatus($('newStatus'), t('created'), 'ok');
           showTab('log');
           return reloadLog();
         }).catch(function (e) { setStatus($('newStatus'), e.message || String(e), 'err'); });
@@ -532,7 +857,7 @@
       $('btnMonthPdf').addEventListener('click', function () {
         setStatus($('logStatus'), 'PDF…');
         api('apiBuildMonthPdf', state.month, state.year).then(function (r) {
-          setStatus($('logStatus'), 'Stub PDF: ' + r.name + ' (' + r.count + ')', 'ok');
+          setStatus($('logStatus'), t('pdfStub') + r.name + ' (' + r.count + ')', 'ok');
           if (r.url) window.open(r.url, '_blank');
         }).catch(function (e) { setStatus($('logStatus'), e.message || String(e), 'err'); });
       });
@@ -540,35 +865,30 @@
       $('btnAddHours').addEventListener('click', function () {
         api('apiAddHours', {
           email: $('hrsEmail').value || (state.people[0] && state.people[0].email) || '',
-          date: $('hrsDate').value,
-          hours: Number($('hrsValue').value),
-          note: $('hrsNote').value
-        }).then(function () {
-          return api('apiListHours', state.month, state.year);
-        }).then(function (res) {
-          state.hours = res.hours || [];
-          renderHours();
-          setStatus($('hrsStatus'), 'Сохранено', 'ok');
-        }).catch(function (e) { setStatus($('hrsStatus'), e.message || String(e), 'err'); });
+          date: $('hrsDate').value, hours: Number($('hrsValue').value), note: $('hrsNote').value
+        }).then(function () { return api('apiListHours', state.month, state.year); })
+          .then(function (res) {
+            state.hours = res.hours || [];
+            renderHours();
+            setStatus($('hrsStatus'), t('saved'), 'ok');
+          }).catch(function (e) { setStatus($('hrsStatus'), e.message || String(e), 'err'); });
       });
 
       $('btnWeekend').addEventListener('click', function () {
         api('apiCreateWeekend', {
           email: $('wkEmail').value || (state.people[0] && state.people[0].email) || '',
-          dateFrom: $('wkFrom').value,
-          dateTo: $('wkTo').value,
-          note: $('wkNote').value
+          dateFrom: $('wkFrom').value, dateTo: $('wkTo').value, note: $('wkNote').value
         }).then(function () { return api('apiListWeekend'); })
           .then(function (res) {
             state.weekend = res.weekend || [];
             renderWeekend();
-            setStatus($('wkStatus'), 'Заявка создана', 'ok');
+            setStatus($('wkStatus'), t('weekendCreated'), 'ok');
           }).catch(function (e) { setStatus($('wkStatus'), e.message || String(e), 'err'); });
       });
 
       $('btnMsg').addEventListener('click', function () {
         api('apiSendTeamMessage', $('msgText').value).then(function (r) {
-          setStatus($('msgStatus'), r.stub ? 'Отправлено (Telegram stub)' : 'Отправлено', 'ok');
+          setStatus($('msgStatus'), r.stub ? t('sentStub') : t('sent'), 'ok');
         }).catch(function (e) { setStatus($('msgStatus'), e.message || String(e), 'err'); });
       });
 
@@ -579,20 +899,18 @@
         showTab('log');
       });
       $('filesClose').addEventListener('click', function () { $('filesOverlay').classList.add('hidden'); });
-      $('filesBack').addEventListener('click', function () {
-        $('filesOverlay').classList.add('hidden');
-      });
+      $('filesBack').addEventListener('click', function () { $('filesOverlay').classList.add('hidden'); });
 
       $('btnSaveFiles').addEventListener('click', function () {
         var input = $('fileInput');
         var kept = state.files.filter(function (f) { return state.removeFileIds.indexOf(f.id) < 0; }).length;
         var files = Array.prototype.slice.call(input.files || [], 0);
         if (kept + files.length > 10) {
-          setStatus($('filesStatus'), 'Не больше 10 файлов', 'err');
+          setStatus($('filesStatus'), t('maxFiles'), 'err');
           return;
         }
         $('btnSaveFiles').disabled = true;
-        setStatus($('filesStatus'), 'Сохранение…');
+        setStatus($('filesStatus'), t('saving'));
         Promise.all(files.map(readFile)).then(function (payloads) {
           return api('saveAndSendTripFiles', state.trip.id, {
             equipmentList: $('equipmentList').value,
@@ -607,12 +925,14 @@
           state.removeFileIds = [];
           $('fileInput').value = '';
           renderFiles();
-          setStatus($('filesStatus'), 'Сохранено · новых файлов: ' + (res.notifiedFileIds || []).length, 'ok');
+          setStatus($('filesStatus'), t('savedFiles') + (res.notifiedFileIds || []).length, 'ok');
         }).catch(function (e) {
           setStatus($('filesStatus'), e.message || String(e), 'err');
         }).then(function () { $('btnSaveFiles').disabled = false; });
       });
 
+      initTheme();
+      initLang();
       showTab('log');
       boot();
     </script>
