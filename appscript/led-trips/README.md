@@ -64,10 +64,11 @@ NEXT_PUBLIC_TRIP_FILES_GAS_EXEC_URL=…
 | `Index.html` | SPA shell: light/dark, RU/EN/HE + RTL |
 | `appsscript.json` | ANYONE_ANONYMOUS |
 
-### UI: тема и язык
+### UI: тема, язык, бренд
 
-- Тема: `localStorage['led-trips-theme']` — default **light**; отдельная тёмная палитра (не инверсия).
-- Язык: явный `<select>` RU / EN / HE (`localStorage['led-trips-lang']`); для HE `html[dir=rtl]` + увеличенные min-width/padding кнопок.
+- Тема: default **light**; dark = slate surfaces `#0a0e14` / `#141c27` + cyan accent (не инверсия).
+- Язык: явный `<select>` RU / EN / HE; HE — `dir=rtl` без double-flip, Heebo, padding под глифы.
+- Бренд: SVG LED-matrix mark + kicker рядом с заголовком.
 
 ---
 
