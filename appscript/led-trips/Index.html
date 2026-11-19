@@ -153,7 +153,15 @@
         display: flex;
         flex-direction: column;
         gap: 5px;
-        min-width: 8.5rem;
+        min-width: 9rem;
+      }
+      .ctrl#langSelect,
+      label.ctrl:has(#langSelect) {
+        min-width: 10rem;
+      }
+      label.ctrl:has(#langSelect) select {
+        border-color: var(--accent);
+        box-shadow: 0 0 0 1px var(--accent-soft), var(--shadow-sm);
       }
       .ctrl > span {
         font-size: 0.7rem;
@@ -234,10 +242,10 @@
         box-shadow: var(--shadow-sm);
       }
       html[lang="he"] .nav button {
-        min-height: 48px;
-        padding: 12px 20px;
-        font-size: 0.94rem;
-        line-height: 1.45;
+        min-height: 50px;
+        padding: 13px 22px;
+        font-size: 0.93rem;
+        line-height: 1.5;
         max-width: 100%;
       }
       .nav button.active {
