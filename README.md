@@ -25,6 +25,8 @@
 
 **Файлы заказа** (`/files/?orderId=`): список оборудования, вложения (до 10, 8 МБ / 10 МБ batch) и ссылки на Google Таблицы — зеркало peer `view=files`. Сейчас mock + точки `orderFilesApi` под ledger/HTTP; вход с карточки заказа «Файлы и ссылки».
 
+**Standalone Files (Apps Script):** исходники [`appscript/trip-files/`](appscript/trip-files/) — свой `/exec?trip=&view=files`, Drive + Spreadsheet meta, deploy clasp/вручную. Складской `/files` не ломаем; deep-link helper `tripFilesGasHref` / env `NEXT_PUBLIC_TRIP_FILES_GAS_EXEC_URL`.
+
 ## Решение по доставке
 
 **Старт: Progressive Web App (Next.js + TypeScript)** — единый веб-клиент для склада (планшеты/телефоны) и менеджеров (десктоп).
