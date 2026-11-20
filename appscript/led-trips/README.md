@@ -19,7 +19,7 @@
 | **Пример files** | […/exec?trip=6077020964374f30af488cf67d65f25e&view=files](https://script.google.com/macros/s/AKfycbyJqGNa5_Kqap4jn0kqi4JcOpbfKHbKWy_l6UHcomUDDJgMFd3g-QaF4kWC6BdQ6Pw7/exec?trip=6077020964374f30af488cf67d65f25e&view=files) |
 | **Доступ** | Web App **Anyone anonymous** (`ANYONE_ANONYMOUS`), **executeAs = USER_DEPLOYING** (= ledvision2026) |
 | **Редактор** | `starchenkogin@gmail.com` — `ADMIN_EMAILS` + Drive editor (`shareWithStarchenkoOnce`) |
-| **UI** | Светлая тема по умолчанию + тёмный toggle; i18n **RU / EN / HE** (RTL для HE) |
+| **UI** | **LEAP-2** redesign: full-bleed hero band, Space Grotesk, date-stack cards; light default + dark toggle; i18n **RU / EN / HE** (RTL для HE). Chip `UI · LEAP-2` + `?ui=leap2` cache-bust. Deploy `@50` on preferred exec. |
 | **Drive** | папка `LED Trips (ledvision2026)` + Spreadsheet `LED Trips Meta` — owner ledvision2026 |
 
 > Если в Chrome под Google-аккаунтом «Не удалось открыть файл» / Drive unable-to-open при `authuser=1` — это multi-account gate Google (тот же класс, что у trip-files до anon). Открывать URL **без** AccountChooser / в инкогнито: deployment уже `ANYONE_ANONYMOUS`, логин не нужен.
