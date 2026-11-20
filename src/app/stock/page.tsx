@@ -56,8 +56,33 @@ const SUMMARY_STICKY_TOP = "top-14";
 /** Совпадает с rem-bump в globals.css (≥1024) — одна раскладка сводки, без двойного DOM. */
 const SUMMARY_DESKTOP_MQ = "(min-width: 1024px)";
 const qtyInputClass = `${controlClass} h-9 w-full min-w-0 max-w-[5.5rem] shrink-0 tabular-nums md:h-10`;
-const summaryCellClass = "px-1.5 py-2 align-middle md:px-2.5 lg:px-3";
+const summaryCellClass = "px-1.5 py-2.5 align-middle md:px-2.5 lg:px-3";
+const summaryQtyCellClass = `${summaryCellClass} tabular-nums`;
 const mobileQtyLabelClass = "text-[10px] font-medium tracking-wide text-ink/45 uppercase";
+
+function CabinetPackLine({
+  total,
+  code,
+  name,
+  hint,
+  label,
+  className,
+}: {
+  total: number;
+  code: string;
+  name: string;
+  hint: string;
+  label: (vars: { m2: number; cubes: number; cases: number }) => string;
+  className?: string;
+}) {
+  const pack = cabinetPackFromText(total, `${code} ${name}`);
+  if (!pack) return null;
+  return (
+    <p className={className ?? "text-[11px] leading-4 tabular-nums text-ink/55"} title={hint}>
+      {label({ m2: pack.squareMeters, cubes: pack.cubes, cases: pack.cases })}
+    </p>
+  );
+}
 
 function subscribeLg(onStoreChange: () => void): () => void {
   const mq = window.matchMedia(SUMMARY_DESKTOP_MQ);
@@ -742,7 +767,7 @@ export default function StockPage() {
                           }}
                         />
                       ) : (
-                        <p className="truncate font-medium">{family.familyName}</p>
+                        <p className="break-words font-medium leading-snug">{family.familyName}</p>
                       )}
                       <p className="text-xs text-ink/50">
                         {t("eq.summaryGroupTotal")}: {family.total}
@@ -913,23 +938,10 @@ export default function StockPage() {
                                     )}
                                   </div>
                                 ) : (
-                                  <p className="font-medium">{agg.skuName}</p>
+                                  <p className="break-words font-medium leading-snug">{agg.skuName}</p>
                                 )}
-                                {(() => {
-                                  const pack = cabinetPackFromText(agg.total, `${agg.skuCode} ${agg.skuName}`);
-                                  if (!pack) return null;
-                                  return (
-                                    <p className="text-[11px] tabular-nums text-ink/50" title={t("eq.cabinetPackHint")}>
-                                      {t("eq.cabinetPack", {
-                                        m2: pack.squareMeters,
-                                        cubes: pack.cubes,
-                                        cases: pack.cases,
-                                      })}
-                                    </p>
-                                  );
-                                })()}
 
-                                <div className="grid grid-cols-2 gap-2">
+                                <div className="grid grid-cols-2 gap-2.5">
                                   <label className="flex flex-col gap-1">
                                     <span className={mobileQtyLabelClass}>{t("eq.summaryTotal")}</span>
                                     {canEdit ? (
@@ -952,7 +964,7 @@ export default function StockPage() {
                                         }}
                                       />
                                     ) : (
-                                      <span className="text-sm tabular-nums">{agg.total}</span>
+                                      <span className="min-h-9 text-sm tabular-nums leading-9">{agg.total}</span>
                                     )}
                                   </label>
                                   <label className="flex flex-col gap-1">
@@ -1055,6 +1067,14 @@ export default function StockPage() {
                                     )}
                                   </label>
                                 </div>
+                                <CabinetPackLine
+                                  total={Number(draft.total) || agg.total}
+                                  code={agg.skuCode}
+                                  name={agg.skuName}
+                                  hint={t("eq.cabinetPackHint")}
+                                  label={(vars) => t("eq.cabinetPack", vars)}
+                                  className="text-[11px] leading-tight tabular-nums text-ink/55"
+                                />
 
                                 {agg.deployments.length > 0 ? (
                                   <ul className="space-y-1 text-xs leading-5 text-ink/70">
@@ -1103,32 +1123,21 @@ export default function StockPage() {
             })}
           </div>
           ) : (
-          /* Desktop ≥1024: sticky-таблица (совпадает с rem 18px).
-             overflow-x + min-w: имя не сжимается table-fixed до «Каби». */
+          /* Desktop ≥1024: auto-layout, имя не в table-fixed; м²/куб/кейс под «Всего». */
           <div className="overflow-x-auto rounded-md border border-line bg-paper/60">
-            <table className="w-full min-w-[68rem] table-fixed text-start text-sm">
-              <colgroup>
-                <col className="w-[4.5rem]" />
-                <col className="w-[6.5rem]" />
-                <col className="w-[22rem]" />
-                <col className="w-[5.5rem]" />
-                <col className="w-[5.5rem]" />
-                <col className="w-[5.5rem]" />
-                <col className="w-[5.5rem]" />
-                <col className="w-[11rem]" />
-              </colgroup>
+            <table className="w-full min-w-[56rem] text-start text-sm">
               <thead
                 className={`sticky ${SUMMARY_STICKY_TOP} z-20 text-xs tracking-wide text-ink/50 uppercase shadow-[0_1px_0_0_var(--color-line,rgba(0,0,0,0.08))]`}
               >
                 <tr>
-                  <th className="bg-sand px-2.5 py-2.5 font-medium lg:px-3">{t("eq.summaryOrder")}</th>
-                  <th className="bg-sand px-2.5 py-2.5 font-medium lg:px-3">{t("stock.code")}</th>
-                  <th className="bg-sand px-2.5 py-2.5 font-medium lg:px-3">{t("stock.name")}</th>
-                  <th className="bg-sand px-2.5 py-2.5 font-medium lg:px-3">{t("eq.summaryTotal")}</th>
-                  <th className="bg-sand px-2.5 py-2.5 font-medium lg:px-3">{t("eq.summaryOnHand")}</th>
-                  <th className="bg-sand px-2.5 py-2.5 font-medium lg:px-3">{t("eq.summaryInUse")}</th>
-                  <th className="bg-sand px-2.5 py-2.5 font-medium lg:px-3">{t("eq.summaryInRepair")}</th>
-                  <th className="bg-sand px-2.5 py-2.5 font-medium lg:px-3">{t("eq.summaryDeployments")}</th>
+                  <th className="w-14 bg-sand px-2 py-2.5 font-medium lg:px-2.5">{t("eq.summaryOrder")}</th>
+                  <th className="w-24 bg-sand px-2 py-2.5 font-medium lg:px-2.5">{t("stock.code")}</th>
+                  <th className="min-w-[12rem] bg-sand px-2 py-2.5 font-medium lg:px-2.5">{t("stock.name")}</th>
+                  <th className="w-[7rem] bg-sand px-2 py-2.5 font-medium lg:px-2.5">{t("eq.summaryTotal")}</th>
+                  <th className="w-[5.5rem] bg-sand px-2 py-2.5 font-medium lg:px-2.5">{t("eq.summaryOnHand")}</th>
+                  <th className="w-[5.5rem] bg-sand px-2 py-2.5 font-medium lg:px-2.5">{t("eq.summaryInUse")}</th>
+                  <th className="w-[5.5rem] bg-sand px-2 py-2.5 font-medium lg:px-2.5">{t("eq.summaryInRepair")}</th>
+                  <th className="min-w-[8rem] bg-sand px-2 py-2.5 font-medium lg:px-2.5">{t("eq.summaryDeployments")}</th>
                 </tr>
               </thead>
               <tbody>
@@ -1165,55 +1174,61 @@ export default function StockPage() {
                         ) : null}
                       </td>
                       <td colSpan={2} className={`${summaryCellClass} font-medium`}>
-                        {canMoveFamily ? (
-                          <input
-                            className={`${controlClass} h-10 w-full min-w-0 font-medium`}
-                            value={familyNameDrafts[family.familyId] ?? family.familyName}
-                            aria-label={t("eq.familyName")}
-                            onChange={(event) =>
-                              setFamilyNameDrafts((prev) => ({ ...prev, [family.familyId]: event.target.value }))
-                            }
-                            onBlur={(event) => void saveFamilyName(family.familyId, event.target.value, family.familyName)}
-                            onKeyDown={(event) => {
-                              if (event.key === "Enter") {
-                                event.preventDefault();
-                                (event.target as HTMLInputElement).blur();
+                        <div className="flex min-w-0 flex-col gap-0.5">
+                          {canMoveFamily ? (
+                            <input
+                              className={`${controlClass} h-10 w-full min-w-0 font-medium`}
+                              value={familyNameDrafts[family.familyId] ?? family.familyName}
+                              aria-label={t("eq.familyName")}
+                              onChange={(event) =>
+                                setFamilyNameDrafts((prev) => ({ ...prev, [family.familyId]: event.target.value }))
                               }
-                            }}
-                          />
-                        ) : (
-                          <span className="block truncate" title={family.familyName}>
-                            {family.familyName}
+                              onBlur={(event) => void saveFamilyName(family.familyId, event.target.value, family.familyName)}
+                              onKeyDown={(event) => {
+                                if (event.key === "Enter") {
+                                  event.preventDefault();
+                                  (event.target as HTMLInputElement).blur();
+                                }
+                              }}
+                            />
+                          ) : (
+                            <span className="break-words leading-snug" title={family.familyName}>
+                              {family.familyName}
+                            </span>
+                          )}
+                          <span className="text-[11px] font-normal text-ink/45">
+                            {t("eq.summaryGroupTotal")}: {family.total}
                           </span>
-                        )}
+                          {canMoveFamily ? (
+                            <div className="mt-0.5 flex flex-wrap items-center gap-x-3 gap-y-1">
+                              {addingFamilyId !== family.familyId ? (
+                                <button
+                                  type="button"
+                                  className="text-start text-xs text-copper hover:underline"
+                                  onClick={() => setAddingFamilyId(family.familyId)}
+                                >
+                                  {t("eq.addInGroup")}
+                                </button>
+                              ) : null}
+                              {family.skus.length === 0 ? (
+                                <button
+                                  type="button"
+                                  className="text-start text-xs text-alert hover:underline"
+                                  onClick={() => void onDeleteEmptyFamily(family.familyId, family.familyName)}
+                                >
+                                  {t("eq.deleteFamily")}
+                                </button>
+                              ) : null}
+                            </div>
+                          ) : null}
+                        </div>
                       </td>
-                      <td className={`${summaryCellClass} text-xs tabular-nums text-ink/60`}>{family.total}</td>
-                      <td className={`${summaryCellClass} text-xs tabular-nums text-ink/60`}>{family.onHand}</td>
-                      <td className={`${summaryCellClass} text-xs tabular-nums text-ink/60`}>{family.inUse}</td>
-                      <td className={`${summaryCellClass} text-xs tabular-nums text-ink/60`}>{family.inRepair}</td>
+                      <td className={`${summaryQtyCellClass} text-sm font-medium text-ink/70`}>{family.total}</td>
+                      <td className={`${summaryQtyCellClass} text-sm text-ink/70`}>{family.onHand}</td>
+                      <td className={`${summaryQtyCellClass} text-sm text-ink/70`}>{family.inUse}</td>
+                      <td className={`${summaryQtyCellClass} text-sm text-ink/70`}>{family.inRepair}</td>
                       <td className={summaryCellClass}>
-                        {canMoveFamily ? (
-                          <div className="flex min-h-10 flex-wrap items-start gap-1">
-                            {addingFamilyId !== family.familyId ? (
-                              <button
-                                type="button"
-                                className={buttonClass("ghost", "h-10 px-2 text-xs")}
-                                onClick={() => setAddingFamilyId(family.familyId)}
-                              >
-                                {t("eq.addInGroup")}
-                              </button>
-                            ) : null}
-                            {family.skus.length === 0 ? (
-                              <button
-                                type="button"
-                                className={buttonClass("danger", "h-10 px-2 text-xs")}
-                                onClick={() => void onDeleteEmptyFamily(family.familyId, family.familyName)}
-                              >
-                                {t("eq.deleteFamily")}
-                              </button>
-                            ) : null}
-                          </div>
-                        ) : null}
+                        <span className="text-ink/35">—</span>
                       </td>
                     </tr>
                     {addingFamilyId === family.familyId ? (
@@ -1294,36 +1309,27 @@ export default function StockPage() {
                                 </span>
                               ) : null}
                             </td>
-                            <td className={`${summaryCellClass} ps-4 font-mono text-xs tabular-nums`}>{agg.skuCode}</td>
-                            <td className={`${summaryCellClass} overflow-visible`}>
+                            <td className={`${summaryCellClass} whitespace-nowrap ps-4 font-mono text-xs tabular-nums`}>
+                              {agg.skuCode}
+                            </td>
+                            <td className={`${summaryCellClass} max-w-[22rem]`}>
                               {canEdit ? (
                                 <div className="space-y-1">
-                                  <div className="flex min-w-0 items-center gap-2">
-                                    <input
-                                      className={`${controlClass} h-10 min-w-0 flex-1`}
-                                      value={skuNameDrafts[agg.skuId] ?? agg.skuName}
-                                      aria-label={t("stock.name")}
-                                      onChange={(event) =>
-                                        setSkuNameDrafts((prev) => ({ ...prev, [agg.skuId]: event.target.value }))
+                                  <input
+                                    className={`${controlClass} h-10 w-full min-w-0`}
+                                    value={skuNameDrafts[agg.skuId] ?? agg.skuName}
+                                    aria-label={t("stock.name")}
+                                    onChange={(event) =>
+                                      setSkuNameDrafts((prev) => ({ ...prev, [agg.skuId]: event.target.value }))
+                                    }
+                                    onBlur={(event) => void saveSkuName(agg.skuId, event.target.value, agg.skuName)}
+                                    onKeyDown={(event) => {
+                                      if (event.key === "Enter") {
+                                        event.preventDefault();
+                                        (event.target as HTMLInputElement).blur();
                                       }
-                                      onBlur={(event) => void saveSkuName(agg.skuId, event.target.value, agg.skuName)}
-                                      onKeyDown={(event) => {
-                                        if (event.key === "Enter") {
-                                          event.preventDefault();
-                                          (event.target as HTMLInputElement).blur();
-                                        }
-                                      }}
-                                    />
-                                    {editingGroupSkuId !== agg.skuId ? (
-                                      <button
-                                        type="button"
-                                        className={buttonClass("ghost", "h-10 shrink-0 px-2 text-xs text-ink/60")}
-                                        onClick={() => setEditingGroupSkuId(agg.skuId)}
-                                      >
-                                        {t("eq.editGroup")}
-                                      </button>
-                                    ) : null}
-                                  </div>
+                                    }}
+                                  />
                                   {editingGroupSkuId === agg.skuId ? (
                                     <div className="flex max-w-full flex-wrap items-center gap-2">
                                       <select
@@ -1351,52 +1357,66 @@ export default function StockPage() {
                                         {t("eq.repairCancel")}
                                       </button>
                                     </div>
-                                  ) : null}
+                                  ) : (
+                                    <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+                                      <button
+                                        type="button"
+                                        className="text-start text-xs text-copper hover:underline"
+                                        onClick={() => setEditingGroupSkuId(agg.skuId)}
+                                      >
+                                        {t("eq.editGroup")}
+                                      </button>
+                                      <button
+                                        type="button"
+                                        className="text-start text-xs text-alert hover:underline"
+                                        onClick={() => void onDeleteSku(agg.skuId, agg.skuName)}
+                                      >
+                                        {t("eq.delete")}
+                                      </button>
+                                    </div>
+                                  )}
                                 </div>
                               ) : (
                                 <span className="block break-words leading-snug" title={agg.skuName}>
                                   {agg.skuName}
                                 </span>
                               )}
-                              {(() => {
-                                const pack = cabinetPackFromText(agg.total, `${agg.skuCode} ${agg.skuName}`);
-                                if (!pack) return null;
-                                return (
-                                  <p className="mt-1 text-[11px] leading-4 tabular-nums text-ink/50" title={t("eq.cabinetPackHint")}>
-                                    {t("eq.cabinetPack", {
-                                      m2: pack.squareMeters,
-                                      cubes: pack.cubes,
-                                      cases: pack.cases,
-                                    })}
-                                  </p>
-                                );
-                              })()}
                             </td>
-                            <td className={summaryCellClass}>
-                              {canEdit ? (
-                                <input
-                                  type="number"
-                                  min={0}
-                                  step={1}
-                                  className={qtyInputClass}
-                                  data-sku-id={agg.skuId}
-                                  data-field="total"
-                                  value={draft.total}
-                                  aria-label={t("eq.summaryTotal")}
-                                  onChange={(event) => setBucketDraft(agg, { total: event.target.value })}
-                                  onBlur={(event) => void saveBuckets(agg, { total: event.target.value })}
-                                  onKeyDown={(event) => {
-                                    if (event.key === "Enter") {
-                                      event.preventDefault();
-                                      (event.target as HTMLInputElement).blur();
-                                    }
-                                  }}
+                            <td className={summaryQtyCellClass}>
+                              <div className="flex flex-col gap-1">
+                                {canEdit ? (
+                                  <input
+                                    type="number"
+                                    min={0}
+                                    step={1}
+                                    className={qtyInputClass}
+                                    data-sku-id={agg.skuId}
+                                    data-field="total"
+                                    value={draft.total}
+                                    aria-label={t("eq.summaryTotal")}
+                                    onChange={(event) => setBucketDraft(agg, { total: event.target.value })}
+                                    onBlur={(event) => void saveBuckets(agg, { total: event.target.value })}
+                                    onKeyDown={(event) => {
+                                      if (event.key === "Enter") {
+                                        event.preventDefault();
+                                        (event.target as HTMLInputElement).blur();
+                                      }
+                                    }}
+                                  />
+                                ) : (
+                                  <span className="font-medium">{agg.total}</span>
+                                )}
+                                <CabinetPackLine
+                                  total={Number(draft.total) || agg.total}
+                                  code={agg.skuCode}
+                                  name={agg.skuName}
+                                  hint={t("eq.cabinetPackHint")}
+                                  label={(vars) => t("eq.cabinetPack", vars)}
+                                  className="mt-0.5 text-[11px] leading-snug tabular-nums text-ink/55"
                                 />
-                              ) : (
-                                agg.total
-                              )}
+                              </div>
                             </td>
-                            <td className={summaryCellClass}>
+                            <td className={summaryQtyCellClass}>
                               {canEdit ? (
                                 <input
                                   type="number"
@@ -1428,7 +1448,7 @@ export default function StockPage() {
                                 <Badge tone="ok">{agg.onHand}</Badge>
                               )}
                             </td>
-                            <td className={summaryCellClass}>
+                            <td className={summaryQtyCellClass}>
                               {canEdit ? (
                                 <input
                                   type="number"
@@ -1460,7 +1480,7 @@ export default function StockPage() {
                                 <Badge tone={agg.inUse > 0 ? "warn" : "neutral"}>{agg.inUse}</Badge>
                               )}
                             </td>
-                            <td className={summaryCellClass}>
+                            <td className={summaryQtyCellClass}>
                               {canEdit ? (
                                 <input
                                   type="number"
@@ -1493,39 +1513,28 @@ export default function StockPage() {
                               )}
                             </td>
                             <td className={summaryCellClass}>
-                              <div className="flex min-h-10 items-center gap-2">
-                                {agg.deployments.length === 0 ? (
-                                  <span className="text-ink/40">—</span>
-                                ) : (
-                                  <ul className="min-w-0 flex-1 truncate text-xs leading-5">
-                                    {agg.deployments.map((dep, i) => (
-                                      <li key={dep.itemId} className={i === 0 ? "truncate" : "sr-only"}>
-                                        {dep.qty} {agg.unit}
-                                        {" · "}
-                                        {t(`eq.status.${dep.status}` as MessageKey)}
-                                        {" · "}
-                                        {dep.orderId ? (
-                                          <Link href={orderHref(dep.orderId)} className="text-copper hover:underline">
-                                            {dep.label || t("eq.openOrder")}
-                                          </Link>
-                                        ) : (
-                                          <span>{dep.label}</span>
-                                        )}
-                                        {agg.deployments.length > 1 ? ` +${agg.deployments.length - 1}` : ""}
-                                      </li>
-                                    ))}
-                                  </ul>
-                                )}
-                                {canEdit ? (
-                                  <button
-                                    type="button"
-                                    className={buttonClass("danger", "h-10 shrink-0 px-2 text-xs")}
-                                    onClick={() => void onDeleteSku(agg.skuId, agg.skuName)}
-                                  >
-                                    {t("eq.delete")}
-                                  </button>
-                                ) : null}
-                              </div>
+                              {agg.deployments.length === 0 ? (
+                                <span className="text-ink/40">—</span>
+                              ) : (
+                                <ul className="min-w-0 text-xs leading-5">
+                                  {agg.deployments.map((dep, i) => (
+                                    <li key={dep.itemId} className={i === 0 ? "break-words" : "sr-only"}>
+                                      {dep.qty} {agg.unit}
+                                      {" · "}
+                                      {t(`eq.status.${dep.status}` as MessageKey)}
+                                      {" · "}
+                                      {dep.orderId ? (
+                                        <Link href={orderHref(dep.orderId)} className="text-copper hover:underline">
+                                          {dep.label || t("eq.openOrder")}
+                                        </Link>
+                                      ) : (
+                                        <span>{dep.label}</span>
+                                      )}
+                                      {agg.deployments.length > 1 ? ` +${agg.deployments.length - 1}` : ""}
+                                    </li>
+                                  ))}
+                                </ul>
+                              )}
                             </td>
                           </tr>
                           {kitNest ? (

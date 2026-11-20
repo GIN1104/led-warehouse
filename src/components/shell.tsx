@@ -59,6 +59,7 @@ function RoleSwitch() {
         <button
           key={user.id}
           type="button"
+          title={`${user.name} · ${roleCaption(user.role, labels, t)}`}
           onClick={() => switchUser(user.id)}
           className={
             user.id === session.id
@@ -196,13 +197,17 @@ export function Shell({ children }: { children: ReactNode }) {
             )}
             <span className="sr-only">{open ? t("shell.hide") : t("shell.show")}</span>
           </button>
-          <p className="truncate font-semibold">LED Warehouse</p>
+          <p className="min-w-0 truncate font-semibold">LED Warehouse</p>
           <Link
             href="/me/"
-            className="ms-auto max-w-[45%] truncate text-xs text-ink/60 hover:text-copper sm:max-w-none"
+            title={[session.name, roleCaption(session.role, labels, t), auth?.email].filter(Boolean).join(" · ")}
+            className="ms-auto min-w-0 max-w-[58%] text-end text-xs text-ink/60 hover:text-copper sm:max-w-none"
           >
-            {session.name} · {roleCaption(session.role, labels, t)}
-            {auth ? ` · ${auth.email}` : ""}
+            <span className="block truncate">
+              {session.name}
+              <span className="text-ink/45"> · {roleCaption(session.role, labels, t)}</span>
+            </span>
+            {auth ? <span className="mt-0.5 hidden truncate sm:block">{auth.email}</span> : null}
           </Link>
         </header>
         <main className="min-w-0 flex-1 overflow-x-clip px-3 py-5 sm:px-4 md:px-8 md:py-8">
