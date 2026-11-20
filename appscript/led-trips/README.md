@@ -66,7 +66,7 @@ NEXT_PUBLIC_TRIP_FILES_GAS_EXEC_URL=…
 
 ### UI: тема, язык, бренд
 
-- Тема: default **light** (mist + teal ambient, glass panels); dark = deep navy `#070b12` + teal/violet glow; SVG LED **favicon**.
+- Тема: полный redesign light+dark; `html/body` + `::before` + `100dvh` заливают iframe (нет белой полосы в dark); SVG LED favicon.
 - Язык: явный `<select>` RU / EN / HE; HE — `dir=rtl` без double-flip, Heebo, padding под глифы.
 - Бренд: SVG LED-matrix mark + kicker рядом с заголовком.
 

@@ -13,7 +13,8 @@ function doGet(e) {
     .evaluate()
     .setTitle('Выезды · LED команда')
     .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL)
-    .addMetaTag('viewport', 'width=device-width, initial-scale=1');
+    .addMetaTag('viewport', 'width=device-width, initial-scale=1')
+    .addMetaTag('theme-color', '#060a11');
 }
 
 function include(filename) {
