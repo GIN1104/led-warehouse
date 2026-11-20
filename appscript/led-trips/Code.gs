@@ -9,12 +9,12 @@ function doGet(e) {
   var template = HtmlService.createTemplateFromFile('Index');
   template.initialTripId = String(params.trip || params.orderId || '').trim();
   template.initialView = String(params.view || '').trim().toLowerCase();
+  // theme-color задаём в Index.html (addMetaTag theme-color в HtmlService запрещён)
   return template
     .evaluate()
     .setTitle('Выезды · LED команда')
     .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL)
-    .addMetaTag('viewport', 'width=device-width, initial-scale=1')
-    .addMetaTag('theme-color', '#060a11');
+    .addMetaTag('viewport', 'width=device-width, initial-scale=1');
 }
 
 function include(filename) {
