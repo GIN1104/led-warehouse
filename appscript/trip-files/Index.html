@@ -1,0 +1,444 @@
+<!DOCTYPE html>
+<html lang="ru">
+  <head>
+    <base target="_top" />
+    <meta charset="utf-8" />
+    <style>
+      :root {
+        --bg: #1a2332;
+        --card: #ffffff;
+        --text: #1c2430;
+        --muted: #5c6b7a;
+        --border: #d8dee6;
+        --primary: #3db5c8;
+        --primary-hover: #2fa0b2;
+        --secondary: #3a4656;
+        --danger: #c0392b;
+        --radius: 10px;
+        --shadow: 0 12px 40px rgba(0, 0, 0, 0.35);
+      }
+      * {
+        box-sizing: border-box;
+      }
+      html,
+      body {
+        margin: 0;
+        min-height: 100%;
+        font-family: "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+        background: radial-gradient(1200px 600px at 50% -10%, #2a3a4f 0%, var(--bg) 55%);
+        color: var(--text);
+      }
+      .shell {
+        min-height: 100vh;
+        display: flex;
+        align-items: flex-start;
+        justify-content: center;
+        padding: 48px 16px 32px;
+        position: relative;
+      }
+      .close-top {
+        position: absolute;
+        top: 12px;
+        right: 16px;
+        appearance: none;
+        border: none;
+        background: var(--secondary);
+        color: #fff;
+        padding: 8px 16px;
+        border-radius: 8px;
+        font-size: 14px;
+        cursor: pointer;
+      }
+      .close-top:hover {
+        filter: brightness(1.08);
+      }
+      .card {
+        width: min(560px, 100%);
+        background: var(--card);
+        border-radius: 14px;
+        box-shadow: var(--shadow);
+        padding: 28px 28px 22px;
+      }
+      h1 {
+        margin: 0 0 8px;
+        font-size: 1.55rem;
+        font-weight: 700;
+        letter-spacing: -0.02em;
+      }
+      .lead {
+        margin: 0 0 22px;
+        color: var(--muted);
+        font-size: 0.95rem;
+        line-height: 1.45;
+      }
+      label {
+        display: block;
+        font-weight: 600;
+        font-size: 0.92rem;
+        margin: 0 0 8px;
+      }
+      .field {
+        margin-bottom: 18px;
+      }
+      textarea,
+      input[type="file"] {
+        width: 100%;
+        font: inherit;
+      }
+      textarea {
+        min-height: 88px;
+        resize: vertical;
+        border: 1px solid var(--border);
+        border-radius: var(--radius);
+        padding: 12px 14px;
+        background: #fafbfc;
+      }
+      textarea:focus {
+        outline: 2px solid rgba(61, 181, 200, 0.45);
+        border-color: var(--primary);
+      }
+      .hint {
+        margin: 8px 0 0;
+        color: var(--muted);
+        font-size: 0.82rem;
+        line-height: 1.4;
+      }
+      .limits {
+        margin: 4px 0 16px;
+        color: var(--muted);
+        font-size: 0.85rem;
+      }
+      .file-list {
+        list-style: none;
+        margin: 10px 0 0;
+        padding: 0;
+      }
+      .file-list li {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 8px;
+        padding: 8px 10px;
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        margin-bottom: 6px;
+        font-size: 0.88rem;
+      }
+      .file-list a {
+        color: #1a6f8a;
+        word-break: break-all;
+      }
+      .file-list button {
+        flex-shrink: 0;
+        border: none;
+        background: transparent;
+        color: var(--danger);
+        cursor: pointer;
+        font-size: 0.82rem;
+      }
+      .actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+        margin-top: 8px;
+      }
+      .btn {
+        appearance: none;
+        border: none;
+        border-radius: 10px;
+        padding: 12px 18px;
+        font-size: 0.95rem;
+        font-weight: 600;
+        cursor: pointer;
+      }
+      .btn:disabled {
+        opacity: 0.55;
+        cursor: not-allowed;
+      }
+      .btn-primary {
+        background: var(--primary);
+        color: #fff;
+        flex: 1 1 180px;
+      }
+      .btn-primary:hover:not(:disabled) {
+        background: var(--primary-hover);
+      }
+      .btn-secondary {
+        background: var(--secondary);
+        color: #fff;
+        flex: 0 1 120px;
+      }
+      .status {
+        min-height: 1.2em;
+        margin: 10px 0 0;
+        font-size: 0.88rem;
+      }
+      .status.error {
+        color: var(--danger);
+      }
+      .status.ok {
+        color: #1e7a46;
+      }
+      .meta-id {
+        margin-top: 14px;
+        font-size: 0.75rem;
+        color: #9aa6b2;
+        word-break: break-all;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="shell">
+      <button type="button" class="close-top" id="btnCloseTop">Закрыть</button>
+      <div class="card">
+        <h1>Файлы и ссылки к работе</h1>
+        <p class="lead">
+          Добавь список и файлы любого формата. PNG и JPG появятся также в PDF. Бот
+          пришлёт сотрудникам только новые файлы.
+        </p>
+
+        <div class="field">
+          <label for="equipmentList">Список оборудования (если нужен отдельный текст)</label>
+          <textarea
+            id="equipmentList"
+            placeholder="Что взять на эту работу…"
+          ></textarea>
+        </div>
+
+        <div class="field">
+          <label for="fileInput">Файлы и схемы (до 10 на работу)</label>
+          <input id="fileInput" type="file" multiple />
+          <ul class="file-list" id="existingFiles"></ul>
+        </div>
+
+        <div class="field">
+          <label for="sheetLinks">Ссылки на Google Таблицы</label>
+          <textarea
+            id="sheetLinks"
+            placeholder="https://docs.google.com/spreadsheets/d/..."
+          ></textarea>
+          <p class="hint">
+            Можно добавить, изменить или удалить строку. Одна ссылка на строку, до 10.
+            Доступ — через «Поделиться» в Google. Новые и заменённые ссылки уходят
+            сотрудникам; удаления — без уведомления.
+          </p>
+        </div>
+
+        <p class="limits">Каждый файл до 8 МБ, новые вместе до 10 МБ.</p>
+
+        <div class="actions">
+          <button type="button" class="btn btn-primary" id="btnSave">
+            Сохранить и отправить
+          </button>
+          <button type="button" class="btn btn-secondary" id="btnBack">Назад</button>
+        </div>
+        <p class="status" id="status" aria-live="polite"></p>
+        <p class="meta-id">trip=<span id="tripLabel"></span></p>
+      </div>
+    </div>
+
+    <script>
+      var TRIP_ID = <?!= JSON.stringify(tripId) ?>;
+      var state = {
+        files: [],
+        removeFileIds: [],
+        warehouseBackUrl: ''
+      };
+
+      var MAX_FILES = 10;
+      var MAX_EACH = 8 * 1024 * 1024;
+      var MAX_BATCH = 10 * 1024 * 1024;
+
+      function $(id) {
+        return document.getElementById(id);
+      }
+
+      function setStatus(text, kind) {
+        var el = $('status');
+        el.textContent = text || '';
+        el.className = 'status' + (kind ? ' ' + kind : '');
+      }
+
+      function formatSize(n) {
+        if (n < 1024) return n + ' B';
+        if (n < 1024 * 1024) return (n / 1024).toFixed(1) + ' KB';
+        return (n / (1024 * 1024)).toFixed(1) + ' MB';
+      }
+
+      function renderFiles() {
+        var ul = $('existingFiles');
+        ul.innerHTML = '';
+        var visible = state.files.filter(function (f) {
+          return state.removeFileIds.indexOf(f.id) < 0;
+        });
+        visible.forEach(function (f) {
+          var li = document.createElement('li');
+          var left = document.createElement('span');
+          if (f.url) {
+            var a = document.createElement('a');
+            a.href = f.url;
+            a.target = '_blank';
+            a.rel = 'noopener';
+            a.textContent = f.name + ' (' + formatSize(f.sizeBytes || 0) + ')';
+            left.appendChild(a);
+          } else {
+            left.textContent = f.name + ' (' + formatSize(f.sizeBytes || 0) + ')';
+          }
+          var btn = document.createElement('button');
+          btn.type = 'button';
+          btn.textContent = 'Удалить';
+          btn.addEventListener('click', function () {
+            state.removeFileIds.push(f.id);
+            renderFiles();
+          });
+          li.appendChild(left);
+          li.appendChild(btn);
+          ul.appendChild(li);
+        });
+      }
+
+      function goBack() {
+        if (state.warehouseBackUrl) {
+          window.top.location.href = state.warehouseBackUrl;
+          return;
+        }
+        if (window.history.length > 1) {
+          window.history.back();
+          return;
+        }
+        window.close();
+      }
+
+      function closeView() {
+        goBack();
+      }
+
+      function readFileAsPayload(file) {
+        return new Promise(function (resolve, reject) {
+          var reader = new FileReader();
+          reader.onload = function () {
+            var result = String(reader.result || '');
+            var comma = result.indexOf(',');
+            var b64 = comma >= 0 ? result.slice(comma + 1) : result;
+            resolve({
+              name: file.name,
+              mimeType: file.type || 'application/octet-stream',
+              dataBase64: b64,
+              size: file.size
+            });
+          };
+          reader.onerror = function () {
+            reject(new Error('Не удалось прочитать «' + file.name + '»'));
+          };
+          reader.readAsDataURL(file);
+        });
+      }
+
+      function validateClientFiles(fileList, existingCount) {
+        var files = Array.prototype.slice.call(fileList || [], 0);
+        if (existingCount + files.length > MAX_FILES) {
+          return 'Не больше ' + MAX_FILES + ' файлов на работу';
+        }
+        var batch = 0;
+        for (var i = 0; i < files.length; i++) {
+          if (files[i].size > MAX_EACH) {
+            return 'Файл «' + files[i].name + '» больше 8 МБ';
+          }
+          batch += files[i].size;
+        }
+        if (batch > MAX_BATCH) return 'Новые файлы вместе больше 10 МБ';
+        return null;
+      }
+
+      function loadBundle() {
+        setStatus('Загрузка…');
+        google.script.run
+          .withSuccessHandler(function (bundle) {
+            $('equipmentList').value = bundle.equipmentList || '';
+            $('sheetLinks').value = (bundle.sheetLinks || []).join('\n');
+            state.files = bundle.files || [];
+            state.removeFileIds = [];
+            state.warehouseBackUrl = bundle.warehouseBackUrl || '';
+            if (bundle.config && bundle.config.limits) {
+              MAX_FILES = bundle.config.limits.MAX_FILES || MAX_FILES;
+              MAX_EACH = bundle.config.limits.MAX_BYTES_EACH || MAX_EACH;
+              MAX_BATCH = bundle.config.limits.MAX_BYTES_BATCH || MAX_BATCH;
+            }
+            renderFiles();
+            setStatus('');
+          })
+          .withFailureHandler(function (err) {
+            setStatus(err && err.message ? err.message : String(err), 'error');
+          })
+          .getTripFilesBundle(TRIP_ID);
+      }
+
+      function onSave() {
+        var input = $('fileInput');
+        var keptCount = state.files.filter(function (f) {
+          return state.removeFileIds.indexOf(f.id) < 0;
+        }).length;
+        var err = validateClientFiles(input.files, keptCount);
+        if (err) {
+          setStatus(err, 'error');
+          return;
+        }
+
+        $('btnSave').disabled = true;
+        setStatus('Сохранение…');
+
+        var fileArr = Array.prototype.slice.call(input.files || [], 0);
+        Promise.all(fileArr.map(readFileAsPayload))
+          .then(function (payloads) {
+            return new Promise(function (resolve, reject) {
+              google.script.run
+                .withSuccessHandler(resolve)
+                .withFailureHandler(reject)
+                .saveAndSendTripFiles(TRIP_ID, {
+                  equipmentList: $('equipmentList').value,
+                  sheetLinksText: $('sheetLinks').value,
+                  newFiles: payloads,
+                  removeFileIds: state.removeFileIds.slice(),
+                  notifyStaff: true
+                });
+            });
+          })
+          .then(function (result) {
+            state.files = (result.bundle && result.bundle.files) || [];
+            state.removeFileIds = [];
+            state.warehouseBackUrl = result.warehouseBackUrl || state.warehouseBackUrl;
+            $('sheetLinks').value = ((result.bundle && result.bundle.sheetLinks) || []).join(
+              '\n'
+            );
+            $('fileInput').value = '';
+            renderFiles();
+            var parts = ['Сохранено'];
+            if (result.notifiedFileIds && result.notifiedFileIds.length) {
+              parts.push('новых файлов: ' + result.notifiedFileIds.length);
+            }
+            if (result.notifiedLinks && result.notifiedLinks.length) {
+              parts.push('новых ссылок: ' + result.notifiedLinks.length);
+            }
+            if (result.webhook && result.webhook.skipped) {
+              parts.push('(webhook не настроен)');
+            } else if (result.webhook && !result.webhook.ok) {
+              parts.push('webhook: ' + (result.webhook.error || 'ошибка'));
+            }
+            setStatus(parts.join(' · '), result.webhook && !result.webhook.ok ? 'error' : 'ok');
+          })
+          .catch(function (e) {
+            setStatus(e && e.message ? e.message : String(e), 'error');
+          })
+          .then(function () {
+            $('btnSave').disabled = false;
+          });
+      }
+
+      $('tripLabel').textContent = TRIP_ID;
+      $('btnSave').addEventListener('click', onSave);
+      $('btnBack').addEventListener('click', goBack);
+      $('btnCloseTop').addEventListener('click', closeView);
+      loadBundle();
+    </script>
+  </body>
+</html>

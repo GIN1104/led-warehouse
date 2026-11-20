@@ -1,0 +1,1188 @@
+<!DOCTYPE html>
+<html lang="ru">
+  <head>
+    <base target="_top" />
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%20viewBox%3D%220%200%2032%2032%22%3E%3Cdefs%3E%3ClinearGradient%20id%3D%22g%22%20x1%3D%223%22%20y1%3D%222%22%20x2%3D%2229%22%20y2%3D%2230%22%20gradientUnits%3D%22userSpaceOnUse%22%3E%3Cstop%20stop-color%3D%22%239af7ff%22/%3E%3Cstop%20offset%3D%22.42%22%20stop-color%3D%22%232fd0e0%22/%3E%3Cstop%20offset%3D%221%22%20stop-color%3D%22%230a6b78%22/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect%20width%3D%2232%22%20height%3D%2232%22%20rx%3D%229%22%20fill%3D%22url%28%23g%29%22/%3E%3Crect%20x%3D%227.5%22%20y%3D%227.5%22%20width%3D%2217%22%20height%3D%2212.5%22%20rx%3D%222.5%22%20fill%3D%22none%22%20stroke%3D%22%23fff%22%20stroke-width%3D%221.5%22/%3E%3Cg%20fill%3D%22%23fff%22%3E%3Ccircle%20cx%3D%2212%22%20cy%3D%2211.5%22%20r%3D%221.1%22/%3E%3Ccircle%20cx%3D%2216%22%20cy%3D%2211.5%22%20r%3D%221.1%22%20opacity%3D%22.85%22/%3E%3Ccircle%20cx%3D%2220%22%20cy%3D%2211.5%22%20r%3D%221.1%22%20opacity%3D%22.7%22/%3E%3Ccircle%20cx%3D%2212%22%20cy%3D%2215%22%20r%3D%221.1%22%20opacity%3D%22.75%22/%3E%3Ccircle%20cx%3D%2216%22%20cy%3D%2215%22%20r%3D%221.1%22/%3E%3Ccircle%20cx%3D%2220%22%20cy%3D%2215%22%20r%3D%221.1%22%20opacity%3D%22.85%22/%3E%3C/g%3E%3Cpath%20d%3D%22M12.5%2023.5h7M16%2019.8v3.7%22%20stroke%3D%22%23fff%22%20stroke-width%3D%221.5%22%20stroke-linecap%3D%22round%22/%3E%3C/svg%3E" />
+    <link rel="apple-touch-icon" href="data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%20viewBox%3D%220%200%2032%2032%22%3E%3Cdefs%3E%3ClinearGradient%20id%3D%22g%22%20x1%3D%223%22%20y1%3D%222%22%20x2%3D%2229%22%20y2%3D%2230%22%20gradientUnits%3D%22userSpaceOnUse%22%3E%3Cstop%20stop-color%3D%22%239af7ff%22/%3E%3Cstop%20offset%3D%22.42%22%20stop-color%3D%22%232fd0e0%22/%3E%3Cstop%20offset%3D%221%22%20stop-color%3D%22%230a6b78%22/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect%20width%3D%2232%22%20height%3D%2232%22%20rx%3D%229%22%20fill%3D%22url%28%23g%29%22/%3E%3Crect%20x%3D%227.5%22%20y%3D%227.5%22%20width%3D%2217%22%20height%3D%2212.5%22%20rx%3D%222.5%22%20fill%3D%22none%22%20stroke%3D%22%23fff%22%20stroke-width%3D%221.5%22/%3E%3Cg%20fill%3D%22%23fff%22%3E%3Ccircle%20cx%3D%2212%22%20cy%3D%2211.5%22%20r%3D%221.1%22/%3E%3Ccircle%20cx%3D%2216%22%20cy%3D%2211.5%22%20r%3D%221.1%22%20opacity%3D%22.85%22/%3E%3Ccircle%20cx%3D%2220%22%20cy%3D%2211.5%22%20r%3D%221.1%22%20opacity%3D%22.7%22/%3E%3Ccircle%20cx%3D%2212%22%20cy%3D%2215%22%20r%3D%221.1%22%20opacity%3D%22.75%22/%3E%3Ccircle%20cx%3D%2216%22%20cy%3D%2215%22%20r%3D%221.1%22/%3E%3Ccircle%20cx%3D%2220%22%20cy%3D%2215%22%20r%3D%221.1%22%20opacity%3D%22.85%22/%3E%3C/g%3E%3Cpath%20d%3D%22M12.5%2023.5h7M16%2019.8v3.7%22%20stroke%3D%22%23fff%22%20stroke-width%3D%221.5%22%20stroke-linecap%3D%22round%22/%3E%3C/svg%3E" />
+    <meta name="theme-color" content="#04070d" media="(prefers-color-scheme: dark)" />
+    <meta name="theme-color" content="#0b7584" media="(prefers-color-scheme: light)" />
+    <script>
+      (function () {
+        try {
+          var href = "data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%20viewBox%3D%220%200%2032%2032%22%3E%3Cdefs%3E%3ClinearGradient%20id%3D%22g%22%20x1%3D%223%22%20y1%3D%222%22%20x2%3D%2229%22%20y2%3D%2230%22%20gradientUnits%3D%22userSpaceOnUse%22%3E%3Cstop%20stop-color%3D%22%239af7ff%22/%3E%3Cstop%20offset%3D%22.42%22%20stop-color%3D%22%232fd0e0%22/%3E%3Cstop%20offset%3D%221%22%20stop-color%3D%22%230a6b78%22/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect%20width%3D%2232%22%20height%3D%2232%22%20rx%3D%229%22%20fill%3D%22url%28%23g%29%22/%3E%3Crect%20x%3D%227.5%22%20y%3D%227.5%22%20width%3D%2217%22%20height%3D%2212.5%22%20rx%3D%222.5%22%20fill%3D%22none%22%20stroke%3D%22%23fff%22%20stroke-width%3D%221.5%22/%3E%3Cg%20fill%3D%22%23fff%22%3E%3Ccircle%20cx%3D%2212%22%20cy%3D%2211.5%22%20r%3D%221.1%22/%3E%3Ccircle%20cx%3D%2216%22%20cy%3D%2211.5%22%20r%3D%221.1%22%20opacity%3D%22.85%22/%3E%3Ccircle%20cx%3D%2220%22%20cy%3D%2211.5%22%20r%3D%221.1%22%20opacity%3D%22.7%22/%3E%3Ccircle%20cx%3D%2212%22%20cy%3D%2215%22%20r%3D%221.1%22%20opacity%3D%22.75%22/%3E%3Ccircle%20cx%3D%2216%22%20cy%3D%2215%22%20r%3D%221.1%22/%3E%3Ccircle%20cx%3D%2220%22%20cy%3D%2215%22%20r%3D%221.1%22%20opacity%3D%22.85%22/%3E%3C/g%3E%3Cpath%20d%3D%22M12.5%2023.5h7M16%2019.8v3.7%22%20stroke%3D%22%23fff%22%20stroke-width%3D%221.5%22%20stroke-linecap%3D%22round%22/%3E%3C/svg%3E";
+          var l = document.createElement("link");
+          l.rel = "icon"; l.type = "image/svg+xml"; l.href = href;
+          document.head.appendChild(l);
+        } catch (e) {}
+      })();
+    </script>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Heebo:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet" />
+    <style>
+      /* LEAP-2 · 2026-11-20b — dramatic hero + new cards (hard-refresh leap) */
+      :root {
+        --bg: #d7e5ef;
+        --bg-deep: #bfd3e3;
+        --hero-a: #0b7584;
+        --hero-b: #163f5c;
+        --hero-text: #f3fbff;
+        --hero-muted: rgba(243, 251, 255, 0.82);
+        --surface: #f7fbfe;
+        --surface-2: #e8f1f8;
+        --surface-3: #d9e7f1;
+        --ink: #0b1722;
+        --muted: #4a6072;
+        --accent: #0c8a9a;
+        --accent-2: #e4577a;
+        --screen: #6fb6df;
+        --stage: #e89ab6;
+        --ok: #168544;
+        --danger: #c0392b;
+        --border: rgba(40, 70, 95, 0.14);
+        --shadow: 0 18px 50px rgba(20, 50, 80, 0.14);
+        --radius: 22px;
+        --font: "IBM Plex Sans", "Segoe UI", sans-serif;
+        --display: "Space Grotesk", "IBM Plex Sans", sans-serif;
+        --font-he: "Heebo", "Noto Sans Hebrew", "Arial Hebrew", sans-serif;
+        --ease: cubic-bezier(0.2, 0.9, 0.2, 1);
+        color-scheme: light;
+      }
+      html[data-theme="dark"] {
+        --bg: #04070d;
+        --bg-deep: #02040a;
+        --hero-a: #041820;
+        --hero-b: #0a2a38;
+        --hero-text: #e8fbff;
+        --hero-muted: rgba(200, 240, 250, 0.72);
+        --surface: #101925;
+        --surface-2: #162233;
+        --surface-3: #1c2b40;
+        --ink: #eef6fb;
+        --muted: #93a7ba;
+        --accent: #4de4f3;
+        --accent-2: #ff7aa2;
+        --screen: #1f6f9e;
+        --stage: #9a4568;
+        --ok: #3fdf96;
+        --danger: #ff8f86;
+        --border: rgba(140, 190, 220, 0.16);
+        --shadow: 0 24px 60px rgba(0, 0, 0, 0.55);
+        color-scheme: dark;
+      }
+      *, *::before, *::after { box-sizing: border-box; }
+      html {
+        height: 100%;
+        min-height: 100vh;
+        min-height: 100dvh;
+        background: var(--bg) !important;
+        -webkit-text-size-adjust: 100%;
+      }
+      body {
+        margin: 0;
+        min-height: 100vh;
+        min-height: 100dvh;
+        font-family: var(--font);
+        color: var(--ink);
+        background: var(--bg) !important;
+        line-height: 1.45;
+      }
+      body::before {
+        content: "";
+        position: fixed; inset: 0; z-index: -2; pointer-events: none;
+        background:
+          radial-gradient(900px 500px at 100% 0%, color-mix(in srgb, var(--accent) 18%, transparent), transparent 60%),
+          radial-gradient(800px 480px at 0% 100%, color-mix(in srgb, var(--accent-2) 12%, transparent), transparent 55%),
+          linear-gradient(180deg, var(--bg) 0%, var(--bg-deep) 100%);
+      }
+      html[lang="he"], html[lang="he"] body { font-family: var(--font-he); letter-spacing: 0; }
+      @media (prefers-reduced-motion: reduce) {
+        *, *::before, *::after { animation: none !important; transition: none !important; }
+      }
+      @keyframes rise { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: none; } }
+      @keyframes shimmer {
+        0% { background-position: 0% 50%; }
+        100% { background-position: 100% 50%; }
+      }
+
+      .hero {
+        position: relative;
+        overflow: hidden;
+        color: var(--hero-text);
+        background: linear-gradient(125deg, var(--hero-a) 0%, var(--hero-b) 55%, #0b2c3d 100%);
+        box-shadow: 0 20px 50px rgba(10, 40, 60, 0.25);
+      }
+      html[data-theme="dark"] .hero {
+        background:
+          radial-gradient(700px 280px at 15% 20%, rgba(77, 228, 243, 0.22), transparent 60%),
+          radial-gradient(600px 260px at 90% 80%, rgba(255, 122, 162, 0.16), transparent 55%),
+          linear-gradient(145deg, #031018 0%, #072636 45%, #0a1a2a 100%);
+        box-shadow: 0 24px 60px rgba(0, 0, 0, 0.55);
+      }
+      .hero::after {
+        content: "";
+        position: absolute; inset: 0;
+        background-image:
+          linear-gradient(rgba(255,255,255,0.05) 1px, transparent 1px),
+          linear-gradient(90deg, rgba(255,255,255,0.05) 1px, transparent 1px);
+        background-size: 48px 48px;
+        mask-image: linear-gradient(180deg, rgba(0,0,0,0.55), transparent 85%);
+        pointer-events: none;
+        opacity: 0.35;
+      }
+      .hero-inner {
+        position: relative; z-index: 1;
+        max-width: 1080px; margin: 0 auto;
+        padding: 28px 20px 34px;
+        display: grid; gap: 22px;
+      }
+      .hero-top {
+        display: flex; justify-content: space-between; gap: 16px; align-items: flex-start;
+      }
+      .brand-lockup { display: flex; gap: 14px; align-items: center; min-width: 0; }
+      .brand-mark {
+        width: 52px; height: 52px; border-radius: 16px; overflow: hidden; flex: 0 0 auto;
+        box-shadow: 0 10px 30px rgba(0,0,0,0.25), inset 0 1px 0 rgba(255,255,255,0.35);
+      }
+      .brand-mark svg { display: block; width: 100%; height: 100%; }
+      .brand-kicker {
+        margin: 0 0 4px;
+        font-size: 0.72rem; font-weight: 700;
+        letter-spacing: 0.14em; text-transform: uppercase;
+        color: var(--hero-muted);
+      }
+      html[lang="he"] .brand-kicker { letter-spacing: 0.02em; text-transform: none; font-size: 0.78rem; }
+      .build-chip {
+        display: inline-flex; align-items: center; gap: 6px;
+        margin-top: 8px; padding: 4px 10px; border-radius: 999px;
+        font-size: 0.68rem; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase;
+        color: var(--hero-text);
+        background: rgba(255,255,255,0.14);
+        border: 1px solid rgba(255,255,255,0.22);
+      }
+      .hero-title {
+        margin: 0;
+        font-family: var(--display);
+        font-size: clamp(2rem, 5vw, 3.15rem);
+        font-weight: 700; letter-spacing: -0.035em; line-height: 1.05;
+        max-width: 14ch;
+      }
+      html[lang="he"] .hero-title {
+        font-family: var(--font-he); letter-spacing: 0; line-height: 1.2; max-width: 16ch;
+      }
+      .hero-sub {
+        margin: 12px 0 0; max-width: 36rem;
+        font-size: 1.05rem; line-height: 1.55; color: var(--hero-muted);
+      }
+      .hero-actions { display: flex; flex-wrap: wrap; gap: 10px; align-items: flex-end; }
+      .ctrl { display: flex; flex-direction: column; gap: 5px; min-width: 9.5rem; }
+      .ctrl > span {
+        font-size: 0.68rem; font-weight: 700; letter-spacing: 0.08em;
+        text-transform: uppercase; color: var(--hero-muted);
+      }
+      html[lang="he"] .ctrl > span { letter-spacing: 0; text-transform: none; }
+      .ctrl select, .chip-btn {
+        height: 44px; min-width: 9.5rem; padding: 0 12px;
+        border-radius: 12px; border: 1px solid rgba(255,255,255,0.28);
+        background: rgba(255,255,255,0.12);
+        color: var(--hero-text);
+        font: inherit; font-weight: 600; cursor: pointer;
+        backdrop-filter: blur(8px);
+      }
+      .ctrl select option { color: #0b1722; }
+      label.ctrl:has(#langSelect) select {
+        border-color: rgba(255,255,255,0.55);
+        box-shadow: 0 0 0 1px rgba(255,255,255,0.15);
+      }
+
+      .shell {
+        max-width: 1080px; margin: -18px auto 0;
+        padding: 0 16px 56px; position: relative; z-index: 2;
+      }
+      .nav {
+        display: flex; flex-wrap: wrap; gap: 4px 6px;
+        margin: 0 0 18px; padding: 10px 12px;
+        border-radius: 18px;
+        background: var(--surface);
+        border: 1px solid var(--border);
+        box-shadow: var(--shadow);
+      }
+      .nav button {
+        appearance: none; border: 0; background: transparent;
+        color: var(--muted); font: inherit; font-weight: 650;
+        font-family: var(--display); font-size: 0.92rem;
+        padding: 12px 14px 10px; border-radius: 12px; cursor: pointer;
+        position: relative;
+        transition: color 0.2s var(--ease), background 0.2s var(--ease);
+      }
+      html[lang="he"] .nav button { font-family: var(--font-he); font-size: 0.95rem; padding: 12px 16px; }
+      .nav button:hover { color: var(--ink); background: var(--surface-2); }
+      .nav button.active { color: var(--ink); background: var(--surface-2); }
+      .nav button.active::after {
+        content: "";
+        position: absolute; left: 14px; right: 14px; bottom: 6px;
+        height: 3px; border-radius: 999px;
+        background: linear-gradient(90deg, var(--accent), var(--accent-2));
+      }
+
+      .panel {
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: var(--radius);
+        padding: 26px 22px 28px;
+        box-shadow: var(--shadow);
+        animation: rise 0.45s var(--ease) both;
+      }
+      html[data-theme="dark"] .panel {
+        background: linear-gradient(180deg, #141f2e 0%, var(--surface) 40%);
+      }
+      .panel h2 {
+        margin: 0 0 8px;
+        font-family: var(--display);
+        font-size: clamp(1.35rem, 2.4vw, 1.7rem);
+        letter-spacing: -0.02em; font-weight: 700;
+      }
+      html[lang="he"] .panel h2 { font-family: var(--font-he); letter-spacing: 0; }
+      .hint { color: var(--muted); margin: 0 0 16px; font-size: 0.95rem; }
+      .row { display: flex; flex-wrap: wrap; gap: 12px; margin-bottom: 12px; }
+      .field { flex: 1 1 150px; min-width: 0; }
+      label { display: block; margin-bottom: 6px; color: var(--muted); font-size: 0.82rem; font-weight: 600; }
+      input, select, textarea {
+        width: 100%; border: 1px solid var(--border); border-radius: 12px;
+        padding: 11px 12px; min-height: 44px;
+        background: var(--surface-2); color: var(--ink); font: inherit;
+      }
+      input:focus, select:focus, textarea:focus, .ctrl select:focus, .chip-btn:focus-visible, .nav button:focus-visible, .btn:focus-visible {
+        outline: 2px solid var(--accent); outline-offset: 2px;
+      }
+      textarea { min-height: 88px; resize: vertical; }
+
+      .btn {
+        display: inline-flex; align-items: center; justify-content: center;
+        min-height: 48px; min-width: 9rem; padding: 12px 20px;
+        border: 0; border-radius: 14px; cursor: pointer;
+        font: inherit; font-weight: 750; font-family: var(--display);
+        transition: transform 0.18s var(--ease), filter 0.18s var(--ease);
+      }
+      html[lang="he"] .btn { font-family: var(--font-he); min-width: 10rem; }
+      .btn:hover { transform: translateY(-2px); }
+      .btn-primary {
+        color: #041018;
+        background: linear-gradient(120deg, var(--accent), #7af0ff 40%, var(--accent-2));
+        background-size: 180% 100%;
+        animation: shimmer 6s linear infinite;
+        box-shadow: 0 12px 28px color-mix(in srgb, var(--accent) 30%, transparent);
+      }
+      html:not([data-theme="dark"]) .btn-primary { color: #fff; }
+      .btn-secondary { background: var(--surface-3); color: var(--ink); border: 1px solid var(--border); }
+      .btn:disabled { opacity: 0.55; cursor: not-allowed; transform: none; }
+
+      .trip-list { display: grid; gap: 14px; margin-top: 18px; }
+      .trip-day {
+        display: grid;
+        grid-template-columns: 4.5rem minmax(0, 1fr);
+        gap: 14px; align-items: stretch;
+        animation: rise 0.4s var(--ease) both;
+      }
+      .dow {
+        display: flex; flex-direction: column; align-items: flex-end; justify-content: center;
+        text-align: end; gap: 2px;
+      }
+      .dow .dnum {
+        font-family: var(--display);
+        font-size: 1.85rem; font-weight: 700; letter-spacing: -0.04em; line-height: 1;
+        color: var(--ink);
+      }
+      .dow .dname {
+        font-size: 0.72rem; font-weight: 700; letter-spacing: 0.08em;
+        text-transform: uppercase; color: var(--muted);
+      }
+      html[lang="he"] .dow .dname { letter-spacing: 0; text-transform: none; font-family: var(--font-he); }
+      .trip-card {
+        position: relative;
+        border-radius: 18px;
+        padding: 16px 18px 18px;
+        background: var(--surface-2);
+        border: 1px solid var(--border);
+        color: var(--ink);
+        cursor: pointer;
+        overflow: hidden;
+        box-shadow: 0 10px 24px rgba(20, 40, 60, 0.08);
+        transition: transform 0.2s var(--ease), box-shadow 0.2s var(--ease);
+      }
+      .trip-card::after {
+        content: "";
+        position: absolute; left: 0; right: 0; bottom: 0; height: 5px;
+        background: var(--screen);
+      }
+      .trip-card.stage::after { background: var(--stage); }
+      .trip-card.both::after {
+        background: linear-gradient(90deg, var(--screen) 0 50%, var(--stage) 50% 100%);
+      }
+      html[dir="rtl"] .trip-card.both::after {
+        background: linear-gradient(270deg, var(--screen) 0 50%, var(--stage) 50% 100%);
+      }
+      .trip-card:hover {
+        transform: translateY(-3px) scale(1.01);
+        box-shadow: 0 18px 36px rgba(20, 40, 60, 0.16);
+      }
+      html[data-theme="dark"] .trip-card {
+        background: #152233;
+        box-shadow: 0 14px 30px rgba(0,0,0,0.35);
+      }
+      .trip-card .badge {
+        display: inline-block;
+        font-size: 0.68rem; font-weight: 800; letter-spacing: 0.06em;
+        text-transform: uppercase;
+        padding: 4px 10px; border-radius: 999px;
+        background: color-mix(in srgb, var(--accent) 16%, transparent);
+        color: var(--accent);
+      }
+      html[lang="he"] .trip-card .badge { letter-spacing: 0; text-transform: none; font-size: 0.75rem; }
+      .trip-card .title {
+        margin: 10px 0 4px;
+        font-family: var(--display);
+        font-size: 1.2rem; font-weight: 700; letter-spacing: -0.02em;
+      }
+      html[lang="he"] .trip-card .title { font-family: var(--font-he); letter-spacing: 0; }
+      .trip-card .meta { color: var(--muted); font-size: 0.9rem; }
+
+      .status { min-height: 1.2em; margin-top: 10px; font-size: 0.88rem; }
+      .status.ok { color: var(--ok); }
+      .status.err { color: var(--danger); }
+      .overlay {
+        position: fixed; inset: 0; background: rgba(6,12,20,0.62);
+        display: flex; align-items: flex-start; justify-content: center;
+        padding: 48px 12px; z-index: 40; overflow: auto;
+      }
+      .overlay.hidden, .hidden, .tab.hidden { display: none !important; }
+      .close-top {
+        position: absolute; top: 12px; inset-inline-end: 16px;
+        background: var(--surface-3); color: var(--ink);
+        border: 1px solid var(--border); border-radius: 10px;
+        padding: 8px 14px; cursor: pointer; font: inherit; font-weight: 600;
+      }
+      .modal {
+        width: min(560px, 100%); background: var(--surface); color: var(--ink);
+        border-radius: 20px; padding: 26px; position: relative;
+        border: 1px solid var(--border); box-shadow: var(--shadow);
+      }
+      .modal h1 { margin: 0 0 8px; font-family: var(--display); font-size: 1.4rem; }
+      .modal .lead, .modal .hint { color: var(--muted); }
+      .modal label { color: var(--ink); }
+      .file-list { list-style: none; margin: 8px 0 0; padding: 0; }
+      .file-list li {
+        display: flex; justify-content: space-between; gap: 8px; align-items: center;
+        border: 1px solid var(--border); border-radius: 10px; padding: 8px 10px; margin-bottom: 6px;
+        background: var(--surface-2); font-size: 0.88rem;
+      }
+      .file-list button { border: 0; background: transparent; color: var(--danger); cursor: pointer; font: inherit; }
+      .actions { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 10px; }
+      .detail {
+        background: var(--surface-2); border-radius: 16px; padding: 18px; margin-top: 12px;
+        border: 1px solid var(--border);
+      }
+      .chips { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 8px; }
+      .chip {
+        background: color-mix(in srgb, var(--accent) 16%, transparent);
+        color: var(--accent); border-radius: 999px; padding: 6px 12px;
+        font-size: 0.78rem; font-weight: 700;
+      }
+      table { width: 100%; border-collapse: collapse; font-size: 0.9rem; }
+      th, td { text-align: start; padding: 8px 6px; border-bottom: 1px solid var(--border); vertical-align: top; }
+      html[dir="rtl"] .close-top { inset-inline-end: auto; inset-inline-start: 16px; }
+      html[dir="rtl"] .dow { align-items: flex-start; text-align: start; }
+
+      @media (max-width: 720px) {
+        .hero-top { flex-direction: column; }
+        .hero-actions { width: 100%; }
+        .ctrl { flex: 1 1 calc(50% - 10px); }
+        .ctrl select, .chip-btn { width: 100%; }
+        .nav button { flex: 1 1 calc(50% - 8px); }
+        html[lang="he"] .nav button { flex: 1 1 100%; }
+        .trip-day { grid-template-columns: 3.6rem minmax(0,1fr); }
+        .dow .dnum { font-size: 1.45rem; }
+      }
+    </style>
+  </head>
+  <body data-ui="leap2">
+    <header class="hero">
+      <div class="hero-inner">
+        <div class="hero-top">
+          <div class="brand-lockup">
+            <div class="brand-mark" aria-hidden="true" title="LED">
+              <svg viewBox="0 0 40 40" xmlns="http://www.w3.org/2000/svg" role="img">
+                <defs>
+                  <linearGradient id="ledg" x1="4" y1="2" x2="36" y2="38" gradientUnits="userSpaceOnUse">
+                    <stop stop-color="#9af7ff"/>
+                    <stop offset="0.4" stop-color="#2fd0e0"/>
+                    <stop offset="1" stop-color="#0a6b78"/>
+                  </linearGradient>
+                  <linearGradient id="ledglow" x1="20" y1="8" x2="20" y2="32" gradientUnits="userSpaceOnUse">
+                    <stop stop-color="#fff" stop-opacity="0.35"/>
+                    <stop offset="1" stop-color="#fff" stop-opacity="0"/>
+                  </linearGradient>
+                </defs>
+                <rect width="40" height="40" rx="12" fill="url(#ledg)"/>
+                <rect x="1.2" y="1.2" width="37.6" height="37.6" rx="10.8" fill="none" stroke="#fff" stroke-opacity="0.22" stroke-width="1.2"/>
+                <!-- LED matrix panel -->
+                <rect x="10" y="10" width="20" height="15" rx="3" fill="url(#ledglow)" stroke="#fff" stroke-width="1.5"/>
+                <g fill="#fff">
+                  <circle cx="15" cy="14.5" r="1.25"/><circle cx="20" cy="14.5" r="1.25" opacity=".85"/><circle cx="25" cy="14.5" r="1.25" opacity=".7"/>
+                  <circle cx="15" cy="18.5" r="1.25" opacity=".75"/><circle cx="20" cy="18.5" r="1.25"/><circle cx="25" cy="18.5" r="1.25" opacity=".85"/>
+                  <circle cx="15" cy="22.5" r="1.25" opacity=".55"/><circle cx="20" cy="22.5" r="1.25" opacity=".7"/><circle cx="25" cy="22.5" r="1.25" opacity=".55"/>
+                </g>
+                <path d="M16 29.5h8" stroke="#fff" stroke-width="1.6" stroke-linecap="round" opacity=".9"/>
+                <path d="M20 25.2v4.3" stroke="#fff" stroke-width="1.6" stroke-linecap="round" opacity=".9"/>
+              </svg>
+            </div>
+            <div>
+              <p class="brand-kicker" data-i18n="brandKicker">LED команда</p>
+              <span class="build-chip" id="uiBuildChip">UI · LEAP-2</span>
+            </div>
+          </div>
+          <div class="hero-actions">
+            <label class="ctrl" for="langSelect">
+              <span data-i18n="labelLang">Язык / Language</span>
+              <select id="langSelect" aria-label="Language">
+                <option value="ru">Русский</option>
+                <option value="en">English</option>
+                <option value="he">עברית</option>
+              </select>
+            </label>
+            <label class="ctrl">
+              <span data-i18n="themeTitle">Тема</span>
+              <button type="button" class="chip-btn" id="themeBtn" data-i18n="themeLight">Светлая</button>
+            </label>
+          </div>
+        </div>
+        <div>
+          <h1 class="hero-title" data-i18n="appTitle">Выезды · LED команда</h1>
+          <p class="hero-sub" data-i18n="appSub">Создай выезд — каждый сотрудник получит личное сообщение в Telegram.</p>
+        </div>
+      </div>
+    </header>
+    <div class="shell">
+      <nav class="nav" id="nav">
+        <button type="button" data-tab="new" data-i18n="tabNew">Новый выезд</button>
+        <button type="button" data-tab="log" class="active" data-i18n="tabLog">Лог работ</button>
+        <button type="button" data-tab="hours" data-i18n="tabHours">Часы работы</button>
+        <button type="button" data-tab="weekend" data-i18n="tabWeekend">Заявки на выходные</button>
+        <button type="button" data-tab="message" data-i18n="tabMessage">Сообщение команде</button>
+        <button type="button" data-tab="settings" data-i18n="tabSettings">Настройки</button>
+      </nav>
+
+      <section class="panel tab hidden" id="tab-new">
+        <h2 data-i18n="tabNew">Новый выезд</h2>
+        <p class="hint" data-i18n="newHint">После сохранения сотрудники получат личное сообщение (Telegram stub, если бот не настроен).</p>
+        <div class="row">
+          <div class="field"><label data-i18n="labelDate">Дата</label><input id="newDate" type="date" /></div>
+          <div class="field"><label data-i18n="labelTime">Время</label><input id="newTime" type="time" value="11:00" /></div>
+          <div class="field">
+            <label data-i18n="labelCategory">Категория</label>
+            <select id="newCategory">
+              <option value="screen" data-i18n="catScreen">Экран</option>
+              <option value="stage" data-i18n="catStage">Сцена</option>
+              <option value="both" data-i18n="catBoth">Обе</option>
+            </select>
+          </div>
+        </div>
+        <div class="row">
+          <div class="field"><label data-i18n="labelPlace">Место / название</label><input id="newPlace" placeholder="Matnas Neve yosef" /></div>
+          <div class="field">
+            <label data-i18n="labelSchemes">Схемы</label>
+            <select id="newSchemes">
+              <option value="none" data-i18n="schNone">Не нужны</option>
+              <option value="ready" data-i18n="schReady">Готовы</option>
+              <option value="needed" data-i18n="schNeeded">Нужны</option>
+            </select>
+          </div>
+        </div>
+        <div class="field" style="margin-bottom:12px">
+          <label data-i18n="labelAssignees">Сотрудники (email через запятую)</label>
+          <input id="newAssignees" placeholder="crew@example.com" />
+        </div>
+        <button type="button" class="btn btn-primary" id="btnCreateTrip" data-i18n="btnCreateTrip">Создать выезд</button>
+        <p class="status" id="newStatus"></p>
+      </section>
+
+      <section class="panel tab" id="tab-log">
+        <h2 data-i18n="tabLog">Лог работ</h2>
+        <p class="hint" data-i18n="logHint">Выбери месяц и нажми на работу, чтобы посмотреть подробности или сохранить её в PDF.</p>
+        <div class="row">
+          <div class="field">
+            <label data-i18n="labelMonth">Месяц</label>
+            <select id="logMonth"></select>
+          </div>
+          <div class="field"><label data-i18n="labelYear">Год</label><input id="logYear" type="number" min="2020" max="2100" /></div>
+          <div class="field">
+            <label data-i18n="labelPerson">Поиск по сотруднику</label>
+            <select id="logPerson"><option value="">Все сотрудники · выбранный месяц</option></select>
+          </div>
+        </div>
+        <p class="hint" data-i18n="logColors">Экран — голубой · Сцена — розовый · обе категории — два цвета.</p>
+        <button type="button" class="btn btn-primary" id="btnMonthPdf" data-i18n="btnMonthPdf">Сохранить месяц в PDF</button>
+        <div class="trip-list" id="tripList"></div>
+        <p class="status" id="logStatus"></p>
+      </section>
+
+      <section class="panel tab hidden" id="tab-hours">
+        <h2 data-i18n="tabHours">Часы работы</h2>
+        <div class="row">
+          <div class="field"><label>Email</label><input id="hrsEmail" /></div>
+          <div class="field"><label data-i18n="labelDate">Дата</label><input id="hrsDate" type="date" /></div>
+          <div class="field"><label data-i18n="labelHours">Часы</label><input id="hrsValue" type="number" step="0.5" min="0" value="8" /></div>
+        </div>
+        <div class="field" style="margin-bottom:12px"><label data-i18n="labelNote">Заметка</label><input id="hrsNote" /></div>
+        <button type="button" class="btn btn-primary" id="btnAddHours" data-i18n="btnAdd">Добавить</button>
+        <table style="margin-top:14px"><thead><tr>
+          <th data-i18n="labelDate">Дата</th><th>Email</th><th data-i18n="labelHours">Часы</th><th data-i18n="labelNote">Заметка</th>
+        </tr></thead><tbody id="hrsBody"></tbody></table>
+        <p class="status" id="hrsStatus"></p>
+      </section>
+
+      <section class="panel tab hidden" id="tab-weekend">
+        <h2 data-i18n="tabWeekend">Заявки на выходные</h2>
+        <div class="row">
+          <div class="field"><label>Email</label><input id="wkEmail" /></div>
+          <div class="field"><label data-i18n="labelFrom">С</label><input id="wkFrom" type="date" /></div>
+          <div class="field"><label data-i18n="labelTo">По</label><input id="wkTo" type="date" /></div>
+        </div>
+        <div class="field" style="margin-bottom:12px"><label data-i18n="labelComment">Комментарий</label><input id="wkNote" /></div>
+        <button type="button" class="btn btn-primary" id="btnWeekend" data-i18n="btnWeekend">Отправить заявку</button>
+        <table style="margin-top:14px"><thead><tr>
+          <th data-i18n="thPeriod">Период</th><th>Email</th><th data-i18n="thStatus">Статус</th>
+        </tr></thead><tbody id="wkBody"></tbody></table>
+        <p class="status" id="wkStatus"></p>
+      </section>
+
+      <section class="panel tab hidden" id="tab-message">
+        <h2 data-i18n="tabMessage">Сообщение команде</h2>
+        <p class="hint" data-i18n="msgHint">Broadcast в Telegram (stub без токена бота).</p>
+        <textarea id="msgText" data-i18n-placeholder="msgPlaceholder" placeholder="Текст сообщения…"></textarea>
+        <div style="margin-top:12px"><button type="button" class="btn btn-primary" id="btnMsg" data-i18n="btnSend">Отправить</button></div>
+        <p class="status" id="msgStatus"></p>
+      </section>
+
+      <section class="panel tab hidden" id="tab-settings">
+        <h2 data-i18n="tabSettings">Настройки</h2>
+        <p class="hint" data-i18n="settingsHint">Секреты бота и webhook — только Script Properties (не в UI). Здесь — список людей и deep-link контракт.</p>
+        <table><thead><tr>
+          <th data-i18n="thName">Имя</th><th>Email</th><th data-i18n="thRole">Роль</th>
+        </tr></thead><tbody id="peopleBody"></tbody></table>
+        <p class="hint" id="settingsMeta" style="margin-top:12px"></p>
+      </section>
+    </div><!-- /.shell -->
+
+    <div class="overlay hidden" id="detailOverlay">
+      <button type="button" class="close-top" id="detailClose" data-i18n="btnClose">Закрыть</button>
+      <div class="detail" style="width:min(640px,100%)">
+        <div class="chips" id="detailChips"></div>
+        <h2 id="detailTitle" style="margin:0 0 6px"></h2>
+        <p class="hint" id="detailMeta"></p>
+        <div class="actions">
+          <button type="button" class="btn btn-primary" id="btnOpenFiles" data-i18n="btnOpenFiles">Файлы и ссылки</button>
+          <button type="button" class="btn btn-secondary" id="detailBack" data-i18n="btnBackLog">Назад к логу</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="overlay hidden" id="filesOverlay">
+      <button type="button" class="close-top" id="filesClose" data-i18n="btnClose">Закрыть</button>
+      <div class="modal">
+        <h1 data-i18n="filesTitle">Файлы и ссылки к работе</h1>
+        <p class="lead" data-i18n="filesLead">Добавь список и файлы любого формата. PNG и JPG появятся также в PDF. Бот пришлёт сотрудникам только новые файлы.</p>
+        <div class="field" style="margin-bottom:14px">
+          <label for="equipmentList" data-i18n="labelEquipment">Список оборудования (если нужен отдельный текст)</label>
+          <textarea id="equipmentList" data-i18n-placeholder="phEquipment" placeholder="Что взять на эту работу…"></textarea>
+        </div>
+        <div class="field" style="margin-bottom:14px">
+          <label for="fileInput" data-i18n="labelFiles">Файлы и схемы (до 10 на работу)</label>
+          <input id="fileInput" type="file" multiple />
+          <ul class="file-list" id="existingFiles"></ul>
+        </div>
+        <div class="field" style="margin-bottom:10px">
+          <label for="sheetLinks" data-i18n="labelSheets">Ссылки на Google Таблицы</label>
+          <textarea id="sheetLinks" placeholder="https://docs.google.com/spreadsheets/d/..."></textarea>
+          <p class="hint" data-i18n="sheetsHint">Одна ссылка на строку, до 10. Новые и заменённые уходят сотрудникам; удаления — без уведомления.</p>
+        </div>
+        <p class="hint" data-i18n="filesLimits">Каждый файл до 8 МБ, новые вместе до 10 МБ.</p>
+        <div class="actions">
+          <button type="button" class="btn btn-primary" id="btnSaveFiles" data-i18n="btnSaveSend">Сохранить и отправить</button>
+          <button type="button" class="btn btn-secondary" id="filesBack" data-i18n="btnBack">Назад</button>
+        </div>
+        <p class="status" id="filesStatus"></p>
+        <p class="hint" style="margin-top:8px">trip=<span id="tripLabel"></span></p>
+      </div>
+    </div>
+    <script>
+      var INITIAL_TRIP = <?!= JSON.stringify(initialTripId) ?>;
+      var INITIAL_VIEW = <?!= JSON.stringify(initialView) ?>;
+      var state = {
+        tab: 'log', lang: 'ru',
+        month: new Date().getMonth() + 1,
+        year: new Date().getFullYear(),
+        trips: [], people: [], hours: [], weekend: [],
+        trip: null, files: [], removeFileIds: [], config: null
+      };
+      var THEME_KEY = 'led-trips-theme';
+      var LANG_KEY = 'led-trips-lang';
+      var LANGS = ['ru', 'en', 'he'];
+
+      var I18N = {
+        ru: {
+          brandKicker: 'LED команда',
+          appTitle: 'Выезды · LED команда',
+          appSub: 'Создай выезд — каждый сотрудник получит личное сообщение в Telegram.',
+          labelLang: 'Язык', themeLight: 'Светлая', themeDark: 'Тёмная', themeTitle: 'Тема',
+          tabNew: 'Новый выезд', tabLog: 'Лог работ', tabHours: 'Часы работы',
+          tabWeekend: 'Заявки на выходные', tabMessage: 'Сообщение команде', tabSettings: 'Настройки',
+          newHint: 'После сохранения сотрудники получат личное сообщение (Telegram stub, если бот не настроен).',
+          labelDate: 'Дата', labelTime: 'Время', labelCategory: 'Категория', labelPlace: 'Место / название',
+          labelSchemes: 'Схемы', labelAssignees: 'Сотрудники (email через запятую)',
+          catScreen: 'Экран', catStage: 'Сцена', catBoth: 'Обе',
+          schNone: 'Не нужны', schReady: 'Готовы', schNeeded: 'Нужны',
+          btnCreateTrip: 'Создать выезд',
+          logHint: 'Выбери месяц и нажми на работу, чтобы посмотреть подробности или сохранить её в PDF.',
+          labelMonth: 'Месяц', labelYear: 'Год', labelPerson: 'Поиск по сотруднику',
+          allPeople: 'Все сотрудники · выбранный месяц',
+          logColors: 'Экран — голубой · Сцена — розовый · обе категории — два цвета.',
+          btnMonthPdf: 'Сохранить месяц в PDF', noTrips: 'Нет работ за выбранный период.',
+          labelHours: 'Часы', labelNote: 'Заметка', btnAdd: 'Добавить', emptyHours: 'Пока пусто',
+          labelFrom: 'С', labelTo: 'По', labelComment: 'Комментарий', btnWeekend: 'Отправить заявку',
+          thPeriod: 'Период', thStatus: 'Статус', emptyWeekend: 'Заявок нет',
+          msgHint: 'Broadcast в Telegram (stub без токена бота).', msgPlaceholder: 'Текст сообщения…', btnSend: 'Отправить',
+          settingsHint: 'Секреты бота и webhook — только Script Properties (не в UI). Здесь — список людей и deep-link контракт.',
+          thName: 'Имя', thRole: 'Роль',
+          btnClose: 'Закрыть', btnOpenFiles: 'Файлы и ссылки', btnBackLog: 'Назад к логу',
+          filesTitle: 'Файлы и ссылки к работе',
+          filesLead: 'Добавь список и файлы любого формата. PNG и JPG появятся также в PDF. Бот пришлёт сотрудникам только новые файлы.',
+          labelEquipment: 'Список оборудования (если нужен отдельный текст)', phEquipment: 'Что взять на эту работу…',
+          labelFiles: 'Файлы и схемы (до 10 на работу)', labelSheets: 'Ссылки на Google Таблицы',
+          sheetsHint: 'Одна ссылка на строку, до 10. Новые и заменённые уходят сотрудникам; удаления — без уведомления.',
+          filesLimits: 'Каждый файл до 8 МБ, новые вместе до 10 МБ.',
+          btnSaveSend: 'Сохранить и отправить', btnBack: 'Назад', btnDelete: 'Удалить',
+          badgeScreen: 'ЭКРАН', badgeStage: 'СЦЕНА', badgeBoth: 'ЭКРАН+СЦЕНА',
+          schReadyBadge: 'СХЕМЫ ГОТОВЫ', schNeededBadge: 'СХЕМЫ НУЖНЫ', schNoneBadge: 'СХЕМЫ НЕ НУЖНЫ',
+          untitled: 'Без названия', placePrefix: 'место',
+          months: ['январь','февраль','март','апрель','май','июнь','июль','август','сентябрь','октябрь','ноябрь','декабрь'],
+          dow: ['ВС','ПН','ВТ','СР','ЧТ','ПТ','СБ'],
+          creating: 'Создание…', created: 'Создано · notify stub', loading: 'Загрузка…', updating: 'Обновление…',
+          saving: 'Сохранение…', saved: 'Сохранено', savedFiles: 'Сохранено · новых файлов: ',
+          weekendCreated: 'Заявка создана', sent: 'Отправлено', sentStub: 'Отправлено (Telegram stub)',
+          maxFiles: 'Не больше 10 файлов', pdfStub: 'Stub PDF: ',
+          settingsMeta: 'Deep-link: tripId ↔ orderId. Warehouse base: {base}. Telegram: {tg}',
+          tgOn: 'настроен', tgOff: 'stub', baseNone: '(не задан)'
+        },
+        en: {
+          brandKicker: 'LED team',
+          appTitle: 'Trips · LED team',
+          appSub: 'Create a trip — each teammate gets a personal Telegram message.',
+          labelLang: 'Language', themeLight: 'Light', themeDark: 'Dark', themeTitle: 'Theme',
+          tabNew: 'New trip', tabLog: 'Work log', tabHours: 'Work hours',
+          tabWeekend: 'Weekend requests', tabMessage: 'Team message', tabSettings: 'Settings',
+          newHint: 'After save, teammates get a personal message (Telegram stub if bot is not configured).',
+          labelDate: 'Date', labelTime: 'Time', labelCategory: 'Category', labelPlace: 'Place / title',
+          labelSchemes: 'Schemes', labelAssignees: 'Teammates (emails, comma-separated)',
+          catScreen: 'Screen', catStage: 'Stage', catBoth: 'Both',
+          schNone: 'Not needed', schReady: 'Ready', schNeeded: 'Needed',
+          btnCreateTrip: 'Create trip',
+          logHint: 'Pick a month and click a job to see details or save it as PDF.',
+          labelMonth: 'Month', labelYear: 'Year', labelPerson: 'Search by teammate',
+          allPeople: 'All teammates · selected month',
+          logColors: 'Screen — blue · Stage — pink · both — two colors.',
+          btnMonthPdf: 'Save month as PDF', noTrips: 'No jobs for this period.',
+          labelHours: 'Hours', labelNote: 'Note', btnAdd: 'Add', emptyHours: 'Empty so far',
+          labelFrom: 'From', labelTo: 'To', labelComment: 'Comment', btnWeekend: 'Submit request',
+          thPeriod: 'Period', thStatus: 'Status', emptyWeekend: 'No requests',
+          msgHint: 'Broadcast to Telegram (stub without bot token).', msgPlaceholder: 'Message text…', btnSend: 'Send',
+          settingsHint: 'Bot secrets and webhook live in Script Properties only. Here: people list and deep-link contract.',
+          thName: 'Name', thRole: 'Role',
+          btnClose: 'Close', btnOpenFiles: 'Files & links', btnBackLog: 'Back to log',
+          filesTitle: 'Files and links for the job',
+          filesLead: 'Add a list and files of any format. PNG and JPG also appear in the PDF. The bot sends only new files.',
+          labelEquipment: 'Equipment list (optional separate text)', phEquipment: 'What to bring…',
+          labelFiles: 'Files and schemes (up to 10 per job)', labelSheets: 'Google Sheets links',
+          sheetsHint: 'One link per line, up to 10. New/replaced links notify teammates; deletions are silent.',
+          filesLimits: 'Each file up to 8 MB; new files together up to 10 MB.',
+          btnSaveSend: 'Save and send', btnBack: 'Back', btnDelete: 'Delete',
+          badgeScreen: 'SCREEN', badgeStage: 'STAGE', badgeBoth: 'SCREEN+STAGE',
+          schReadyBadge: 'SCHEMES READY', schNeededBadge: 'SCHEMES NEEDED', schNoneBadge: 'SCHEMES NOT NEEDED',
+          untitled: 'Untitled', placePrefix: 'place',
+          months: ['January','February','March','April','May','June','July','August','September','October','November','December'],
+          dow: ['SU','MO','TU','WE','TH','FR','SA'],
+          creating: 'Creating…', created: 'Created · notify stub', loading: 'Loading…', updating: 'Updating…',
+          saving: 'Saving…', saved: 'Saved', savedFiles: 'Saved · new files: ',
+          weekendCreated: 'Request created', sent: 'Sent', sentStub: 'Sent (Telegram stub)',
+          maxFiles: 'No more than 10 files', pdfStub: 'Stub PDF: ',
+          settingsMeta: 'Deep-link: tripId ↔ orderId. Warehouse base: {base}. Telegram: {tg}',
+          tgOn: 'configured', tgOff: 'stub', baseNone: '(not set)'
+        },
+        he: {
+          brandKicker: 'צוות LED',
+          appTitle: 'יציאות · צוות LED',
+          appSub: 'צור יציאה — כל עובד יקבל הודעה אישית בטלגרם.',
+          labelLang: 'שפה', themeLight: 'בהיר', themeDark: 'כהה', themeTitle: 'ערכת נושא',
+          tabNew: 'יציאה חדשה', tabLog: 'יומן', tabHours: 'שעות',
+          tabWeekend: 'סופ״ש', tabMessage: 'הודעה', tabSettings: 'הגדרות',
+          newHint: 'לאחר השמירה העובדים יקבלו הודעה אישית (Telegram stub אם אין בוט).',
+          labelDate: 'תאריך', labelTime: 'שעה', labelCategory: 'קטגוריה', labelPlace: 'מקום / שם',
+          labelSchemes: 'סכמות', labelAssignees: 'עובדים (אימייל)',
+          catScreen: 'מסך', catStage: 'במה', catBoth: 'שניהם',
+          schNone: 'לא נדרש', schReady: 'מוכן', schNeeded: 'נדרש',
+          btnCreateTrip: 'צור יציאה',
+          logHint: 'בחר חודש ולחץ על עבודה לפרטים או לשמירה ב-PDF.',
+          labelMonth: 'חודש', labelYear: 'שנה', labelPerson: 'חיפוש לפי עובד',
+          allPeople: 'כל העובדים',
+          logColors: 'מסך — כחול · במה — ורוד · שניהם — שני צבעים.',
+          btnMonthPdf: 'PDF לחודש', noTrips: 'אין עבודות לתקופה זו.',
+          labelHours: 'שעות', labelNote: 'הערה', btnAdd: 'הוסף', emptyHours: 'עדיין ריק',
+          labelFrom: 'מ-', labelTo: 'עד', labelComment: 'הערה', btnWeekend: 'שלח בקשה',
+          thPeriod: 'תקופה', thStatus: 'סטטוס', emptyWeekend: 'אין בקשות',
+          msgHint: 'שידור לטלגרם (stub בלי טוקן בוט).', msgPlaceholder: 'טקסט ההודעה…', btnSend: 'שלח',
+          settingsHint: 'סודות הבוט וה-webhook רק ב-Script Properties. כאן: אנשים וחוזה deep-link.',
+          thName: 'שם', thRole: 'תפקיד',
+          btnClose: 'סגור', btnOpenFiles: 'קבצים', btnBackLog: 'חזרה',
+          filesTitle: 'קבצים וקישורים לעבודה',
+          filesLead: 'הוסף רשימה וקבצים בכל פורמט. PNG ו-JPG יופיעו גם ב-PDF. הבוט ישלח רק קבצים חדשים.',
+          labelEquipment: 'רשימת ציוד (טקסט נפרד אם צריך)', phEquipment: 'מה לקחת…',
+          labelFiles: 'קבצים וסכמות (עד 10 לעבודה)', labelSheets: 'קישורי Google Sheets',
+          sheetsHint: 'קישור אחד בשורה, עד 10. חדשים/מוחלפים נשלחים; מחיקות בלי התראה.',
+          filesLimits: 'כל קובץ עד 8MB; קבצים חדשים יחד עד 10MB.',
+          btnSaveSend: 'שמור ושלח', btnBack: 'חזרה', btnDelete: 'מחק',
+          badgeScreen: 'מסך', badgeStage: 'במה', badgeBoth: 'מסך + במה',
+          schReadyBadge: 'סכמות ✓', schNeededBadge: 'סכמות נדרשות', schNoneBadge: 'ללא סכמות',
+          untitled: 'ללא שם', placePrefix: 'מקום',
+          months: ['ינואר','פברואר','מרץ','אפריל','מאי','יוני','יולי','אוגוסט','ספטמבר','אוקטובר','נובמבר','דצמבר'],
+          dow: ['א׳','ב׳','ג׳','ד׳','ה׳','ו׳','ש׳'],
+          creating: 'יוצר…', created: 'נוצר · notify stub', loading: 'טוען…', updating: 'מעדכן…',
+          saving: 'שומר…', saved: 'נשמר', savedFiles: 'נשמר · קבצים חדשים: ',
+          weekendCreated: 'הבקשה נוצרה', sent: 'נשלח', sentStub: 'נשלח (Telegram stub)',
+          maxFiles: 'לא יותר מ-10 קבצים', pdfStub: 'Stub PDF: ',
+          settingsMeta: 'Deep-link: tripId ↔ orderId. Warehouse base: {base}. Telegram: {tg}',
+          tgOn: 'מוגדר', tgOff: 'stub', baseNone: '(לא הוגדר)'
+        }
+      };
+
+      function $(id) { return document.getElementById(id); }
+      function t(key) {
+        var pack = I18N[state.lang] || I18N.ru;
+        return pack[key] != null ? pack[key] : (I18N.ru[key] != null ? I18N.ru[key] : key);
+      }
+      function months() { return t('months'); }
+      function dow() { return t('dow'); }
+
+      function applyTheme(theme) {
+        var mode = theme === 'dark' ? 'dark' : 'light';
+        document.documentElement.setAttribute('data-theme', mode);
+        try { localStorage.setItem(THEME_KEY, mode); } catch (e) {}
+        var bg = mode === 'dark' ? '#04070d' : '#d7e5ef';
+        document.documentElement.style.backgroundColor = bg;
+        document.documentElement.style.background = bg;
+        if (document.body) {
+          document.body.style.backgroundColor = bg;
+        }
+        var btn = $('themeBtn');
+        if (btn) btn.textContent = mode === 'dark' ? t('themeDark') : t('themeLight');
+        document.querySelectorAll('meta[name="theme-color"]').forEach(function (m) {
+          if (!m.media || (mode === 'dark' && m.media.indexOf('dark') >= 0) || (mode === 'light' && m.media.indexOf('light') >= 0)) {
+            m.setAttribute('content', bg);
+          }
+        });
+        ensureBrandFavicon_();
+      }
+      function ensureBrandFavicon_() {
+        var href = 'data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%20viewBox%3D%220%200%2032%2032%22%3E%3Cdefs%3E%3ClinearGradient%20id%3D%22g%22%20x1%3D%223%22%20y1%3D%222%22%20x2%3D%2229%22%20y2%3D%2230%22%20gradientUnits%3D%22userSpaceOnUse%22%3E%3Cstop%20stop-color%3D%22%239af7ff%22/%3E%3Cstop%20offset%3D%22.42%22%20stop-color%3D%22%232fd0e0%22/%3E%3Cstop%20offset%3D%221%22%20stop-color%3D%22%230a6b78%22/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect%20width%3D%2232%22%20height%3D%2232%22%20rx%3D%229%22%20fill%3D%22url%28%23g%29%22/%3E%3Crect%20x%3D%227.5%22%20y%3D%227.5%22%20width%3D%2217%22%20height%3D%2212.5%22%20rx%3D%222.5%22%20fill%3D%22none%22%20stroke%3D%22%23fff%22%20stroke-width%3D%221.5%22/%3E%3Cg%20fill%3D%22%23fff%22%3E%3Ccircle%20cx%3D%2212%22%20cy%3D%2211.5%22%20r%3D%221.1%22/%3E%3Ccircle%20cx%3D%2216%22%20cy%3D%2211.5%22%20r%3D%221.1%22%20opacity%3D%22.85%22/%3E%3Ccircle%20cx%3D%2220%22%20cy%3D%2211.5%22%20r%3D%221.1%22%20opacity%3D%22.7%22/%3E%3Ccircle%20cx%3D%2212%22%20cy%3D%2215%22%20r%3D%221.1%22%20opacity%3D%22.75%22/%3E%3Ccircle%20cx%3D%2216%22%20cy%3D%2215%22%20r%3D%221.1%22/%3E%3Ccircle%20cx%3D%2220%22%20cy%3D%2215%22%20r%3D%221.1%22%20opacity%3D%22.85%22/%3E%3C/g%3E%3Cpath%20d%3D%22M12.5%2023.5h7M16%2019.8v3.7%22%20stroke%3D%22%23fff%22%20stroke-width%3D%221.5%22%20stroke-linecap%3D%22round%22/%3E%3C/svg%3E';
+        var sel = 'link[rel="icon"], link[rel="shortcut icon"], link[rel="apple-touch-icon"]';
+        document.querySelectorAll(sel).forEach(function (n) { n.parentNode.removeChild(n); });
+        ['icon', 'shortcut icon', 'apple-touch-icon'].forEach(function (rel) {
+          var link = document.createElement('link');
+          link.rel = rel;
+          link.type = 'image/svg+xml';
+          link.href = href;
+          document.head.appendChild(link);
+        });
+      }
+      function initTheme() {
+        var q = '';
+        try { q = new URLSearchParams(location.search).get('theme') || ''; } catch (e) {}
+        var saved = '';
+        try { saved = localStorage.getItem(THEME_KEY) || ''; } catch (e) {}
+        var mode = (q === 'dark' || q === 'light') ? q : (saved === 'dark' ? 'dark' : 'light');
+        applyTheme(mode);
+      }
+
+      function applyLang(lang) {
+        if (LANGS.indexOf(lang) < 0) lang = 'ru';
+        state.lang = lang;
+        document.documentElement.lang = lang;
+        document.documentElement.dir = lang === 'he' ? 'rtl' : 'ltr';
+        try { localStorage.setItem(LANG_KEY, lang); } catch (e) {}
+        var sel = $('langSelect');
+        if (sel && sel.value !== lang) sel.value = lang;
+        document.querySelectorAll('[data-i18n]').forEach(function (el) {
+          var key = el.getAttribute('data-i18n');
+          if (key) el.textContent = t(key);
+        });
+        document.querySelectorAll('[data-i18n-placeholder]').forEach(function (el) {
+          var key = el.getAttribute('data-i18n-placeholder');
+          if (key) el.setAttribute('placeholder', t(key));
+        });
+        // options stay native names; keep select value
+        if (sel) sel.value = lang;
+        var themeBtn = $('themeBtn');
+        if (themeBtn) {
+          var mode = document.documentElement.getAttribute('data-theme') === 'dark' ? 'dark' : 'light';
+          themeBtn.textContent = mode === 'dark' ? t('themeDark') : t('themeLight');
+          themeBtn.title = t('themeTitle');
+        }
+        fillMonths();
+        renderPeopleSelects();
+        renderTrips();
+        renderHours();
+        renderWeekend();
+        if (state.config) updateSettingsMeta(state.config);
+        var chip = $('uiBuildChip');
+        if (chip) chip.textContent = 'UI · LEAP-2';
+      }
+      function initLang() {
+        var q = '';
+        try { q = new URLSearchParams(location.search).get('lang') || ''; } catch (e) {}
+        var saved = '';
+        try { saved = localStorage.getItem(LANG_KEY) || ''; } catch (e) {}
+        var lang = LANGS.indexOf(q) >= 0 ? q : (LANGS.indexOf(saved) >= 0 ? saved : 'ru');
+        applyLang(lang);
+      }
+
+      function setStatus(el, text, kind) {
+        el.textContent = text || '';
+        el.className = 'status' + (kind ? ' ' + kind : '');
+      }
+      function api(name) {
+        var args = Array.prototype.slice.call(arguments, 1);
+        return new Promise(function (resolve, reject) {
+          var r = google.script.run.withSuccessHandler(resolve).withFailureHandler(reject);
+          r[name].apply(r, args);
+        });
+      }
+
+      function showTab(name) {
+        state.tab = name;
+        document.querySelectorAll('.tab').forEach(function (el) { el.classList.add('hidden'); });
+        $('tab-' + name).classList.remove('hidden');
+        document.querySelectorAll('#nav button').forEach(function (b) {
+          b.classList.toggle('active', b.getAttribute('data-tab') === name);
+        });
+        $('detailOverlay').classList.add('hidden');
+        if (name !== 'files') $('filesOverlay').classList.add('hidden');
+      }
+
+      function schemesLabel(s) {
+        if (s === 'ready') return t('schReadyBadge');
+        if (s === 'needed') return t('schNeededBadge');
+        return t('schNoneBadge');
+      }
+      function categoryLabel(c) {
+        if (c === 'stage') return t('badgeStage');
+        if (c === 'both') return t('badgeBoth');
+        return t('badgeScreen');
+      }
+
+      function renderTrips() {
+        var person = $('logPerson').value;
+        var list = state.trips.filter(function (trip) {
+          if (!person) return true;
+          return String(trip.assigneeEmails || '').indexOf(person) >= 0;
+        });
+        var html = '';
+        var DOW = dow();
+        list.forEach(function (trip) {
+          var d = new Date(trip.date + 'T12:00:00');
+          var dayName = isNaN(d.getTime()) ? '' : DOW[d.getDay()];
+          var day = trip.date.slice(8) || '';
+          var cardCls = 'trip-card';
+          if (trip.category === 'stage') cardCls += ' stage';
+          else if (trip.category === 'both') cardCls += ' both';
+          html += '<div class="trip-day">' +
+            '<div class="dow"><span class="dnum">' + day + '</span><span class="dname">' + dayName + '</span></div>' +
+            '<div class="' + cardCls + '" data-id="' + trip.id + '">' +
+            '<div class="badge">' + categoryLabel(trip.category) + ' — ' + schemesLabel(trip.schemes) + '</div>' +
+            '<div class="title">' + (trip.title || trip.place || t('untitled')) + '</div>' +
+            '<div class="meta">' + (trip.time || '') + ' · ' + t('placePrefix') + ': ' + (trip.place || '—') + '</div></div></div>';
+        });
+        $('tripList').innerHTML = html || '<p class="hint">' + t('noTrips') + '</p>';
+        $('tripList').querySelectorAll('[data-id]').forEach(function (el) {
+          el.addEventListener('click', function () { openTrip(el.getAttribute('data-id')); });
+        });
+      }
+
+      function renderPeopleSelects() {
+        var opts = '<option value="">' + t('allPeople') + '</option>';
+        state.people.forEach(function (p) {
+          opts += '<option value="' + p.email + '">' + (p.name || p.email) + '</option>';
+        });
+        $('logPerson').innerHTML = opts;
+        var body = '';
+        state.people.forEach(function (p) {
+          body += '<tr><td>' + (p.name || '') + '</td><td>' + p.email + '</td><td>' + p.role + '</td></tr>';
+        });
+        $('peopleBody').innerHTML = body;
+      }
+
+      function renderHours() {
+        var body = '';
+        state.hours.forEach(function (h) {
+          body += '<tr><td>' + h.date + '</td><td>' + h.email + '</td><td>' + h.hours + '</td><td>' + (h.note || '') + '</td></tr>';
+        });
+        $('hrsBody').innerHTML = body || '<tr><td colspan="4">' + t('emptyHours') + '</td></tr>';
+      }
+
+      function renderWeekend() {
+        var body = '';
+        state.weekend.forEach(function (r) {
+          body += '<tr><td>' + r.dateFrom + ' → ' + r.dateTo + '</td><td>' + r.email + '</td><td>' + r.status + '</td></tr>';
+        });
+        $('wkBody').innerHTML = body || '<tr><td colspan="3">' + t('emptyWeekend') + '</td></tr>';
+      }
+
+      function openTrip(id) {
+        setStatus($('logStatus'), t('loading'));
+        api('apiGetTrip', id).then(function (res) {
+          state.trip = res.trip;
+          state.files = res.files || [];
+          state.removeFileIds = [];
+          $('detailChips').innerHTML =
+            '<span class="chip">' + categoryLabel(res.trip.category) + '</span>' +
+            '<span class="chip">' + schemesLabel(res.trip.schemes) + '</span>';
+          $('detailTitle').textContent = res.trip.title || res.trip.place;
+          $('detailMeta').textContent = (res.trip.time || '') + ' · ' + t('placePrefix') + ': ' + (res.trip.place || '—');
+          $('detailOverlay').classList.remove('hidden');
+          setStatus($('logStatus'), '');
+          if (INITIAL_VIEW === 'files' || location.search.indexOf('view=files') >= 0) openFiles();
+        }).catch(function (e) {
+          setStatus($('logStatus'), e.message || String(e), 'err');
+        });
+      }
+
+      function openFiles() {
+        if (!state.trip) return;
+        $('tripLabel').textContent = state.trip.id;
+        $('equipmentList').value = state.trip.equipmentList || '';
+        $('sheetLinks').value = (state.trip.sheetLinks || []).join('\n');
+        state.removeFileIds = [];
+        renderFiles();
+        $('filesOverlay').classList.remove('hidden');
+      }
+
+      function renderFiles() {
+        var ul = $('existingFiles');
+        ul.innerHTML = '';
+        state.files.filter(function (f) { return state.removeFileIds.indexOf(f.id) < 0; }).forEach(function (f) {
+          var li = document.createElement('li');
+          var left = document.createElement('span');
+          if (f.url) {
+            var a = document.createElement('a'); a.href = f.url; a.target = '_blank'; a.textContent = f.name;
+            left.appendChild(a);
+          } else left.textContent = f.name;
+          var btn = document.createElement('button'); btn.type = 'button'; btn.textContent = t('btnDelete');
+          btn.onclick = function () { state.removeFileIds.push(f.id); renderFiles(); };
+          li.appendChild(left); li.appendChild(btn); ul.appendChild(li);
+        });
+      }
+
+      function readFile(file) {
+        return new Promise(function (resolve, reject) {
+          var reader = new FileReader();
+          reader.onload = function () {
+            var s = String(reader.result || '');
+            var i = s.indexOf(',');
+            resolve({ name: file.name, mimeType: file.type || 'application/octet-stream', dataBase64: i >= 0 ? s.slice(i + 1) : s, size: file.size });
+          };
+          reader.onerror = reject;
+          reader.readAsDataURL(file);
+        });
+      }
+
+      function fillMonths() {
+        var sel = $('logMonth');
+        var m = months();
+        sel.innerHTML = m.map(function (name, i) {
+          return '<option value="' + (i + 1) + '">' + name + '</option>';
+        }).join('');
+        sel.value = String(state.month);
+        $('logYear').value = state.year;
+      }
+
+      function reloadLog() {
+        state.month = Number($('logMonth').value);
+        state.year = Number($('logYear').value);
+        setStatus($('logStatus'), t('updating'));
+        return api('apiListTrips', state.month, state.year).then(function (res) {
+          state.trips = res.trips || [];
+          renderTrips();
+          setStatus($('logStatus'), '');
+        }).catch(function (e) {
+          setStatus($('logStatus'), e.message || String(e), 'err');
+        });
+      }
+
+      function updateSettingsMeta(config) {
+        var base = (config && config.warehouseBaseUrl) || t('baseNone');
+        var tg = (config && config.hasTelegram) ? t('tgOn') : t('tgOff');
+        $('settingsMeta').textContent = t('settingsMeta').replace('{base}', base).replace('{tg}', tg);
+      }
+
+      function boot() {
+        fillMonths();
+        var today = new Date().toISOString().slice(0, 10);
+        $('newDate').value = today;
+        $('hrsDate').value = today;
+        $('wkFrom').value = today;
+        $('wkTo').value = today;
+
+        api('getAppBootstrap', INITIAL_TRIP, INITIAL_VIEW).then(function (boot) {
+          state.config = boot.config;
+          state.people = boot.people || [];
+          state.trips = boot.trips || [];
+          state.hours = boot.hours || [];
+          state.weekend = boot.weekend || [];
+          state.month = boot.month; state.year = boot.year;
+          $('logMonth').value = String(state.month);
+          $('logYear').value = state.year;
+          renderPeopleSelects();
+          renderTrips();
+          renderHours();
+          renderWeekend();
+          updateSettingsMeta(boot.config);
+
+          if (boot.trip) {
+            state.trip = boot.trip;
+            state.files = boot.files || [];
+            state.removeFileIds = [];
+            $('detailChips').innerHTML =
+              '<span class="chip">' + categoryLabel(boot.trip.category) + '</span>' +
+              '<span class="chip">' + schemesLabel(boot.trip.schemes) + '</span>';
+            $('detailTitle').textContent = boot.trip.title || boot.trip.place;
+            $('detailMeta').textContent = (boot.trip.time || '') + ' · ' + t('placePrefix') + ': ' + (boot.trip.place || '—');
+            $('detailOverlay').classList.remove('hidden');
+            if (boot.view === 'files' || INITIAL_VIEW === 'files') openFiles();
+          }
+        }).catch(function (e) {
+          setStatus($('logStatus'), e.message || String(e), 'err');
+        });
+      }
+
+      document.querySelectorAll('#nav button').forEach(function (b) {
+        b.addEventListener('click', function () { showTab(b.getAttribute('data-tab')); });
+      });
+      $('themeBtn').addEventListener('click', function () {
+        var cur = document.documentElement.getAttribute('data-theme') === 'dark' ? 'dark' : 'light';
+        applyTheme(cur === 'dark' ? 'light' : 'dark');
+      });
+      $('langSelect').addEventListener('change', function () {
+        applyLang($('langSelect').value);
+      });
+      $('logMonth').addEventListener('change', reloadLog);
+      $('logYear').addEventListener('change', reloadLog);
+      $('logPerson').addEventListener('change', renderTrips);
+
+      $('btnCreateTrip').addEventListener('click', function () {
+        setStatus($('newStatus'), t('creating'));
+        api('apiCreateTrip', {
+          date: $('newDate').value, time: $('newTime').value,
+          place: $('newPlace').value, title: $('newPlace').value,
+          category: $('newCategory').value, schemes: $('newSchemes').value,
+          assigneeEmails: $('newAssignees').value
+        }).then(function () {
+          setStatus($('newStatus'), t('created'), 'ok');
+          showTab('log');
+          return reloadLog();
+        }).catch(function (e) { setStatus($('newStatus'), e.message || String(e), 'err'); });
+      });
+
+      $('btnMonthPdf').addEventListener('click', function () {
+        setStatus($('logStatus'), 'PDF…');
+        api('apiBuildMonthPdf', state.month, state.year).then(function (r) {
+          setStatus($('logStatus'), t('pdfStub') + r.name + ' (' + r.count + ')', 'ok');
+          if (r.url) window.open(r.url, '_blank');
+        }).catch(function (e) { setStatus($('logStatus'), e.message || String(e), 'err'); });
+      });
+
+      $('btnAddHours').addEventListener('click', function () {
+        api('apiAddHours', {
+          email: $('hrsEmail').value || (state.people[0] && state.people[0].email) || '',
+          date: $('hrsDate').value, hours: Number($('hrsValue').value), note: $('hrsNote').value
+        }).then(function () { return api('apiListHours', state.month, state.year); })
+          .then(function (res) {
+            state.hours = res.hours || [];
+            renderHours();
+            setStatus($('hrsStatus'), t('saved'), 'ok');
+          }).catch(function (e) { setStatus($('hrsStatus'), e.message || String(e), 'err'); });
+      });
+
+      $('btnWeekend').addEventListener('click', function () {
+        api('apiCreateWeekend', {
+          email: $('wkEmail').value || (state.people[0] && state.people[0].email) || '',
+          dateFrom: $('wkFrom').value, dateTo: $('wkTo').value, note: $('wkNote').value
+        }).then(function () { return api('apiListWeekend'); })
+          .then(function (res) {
+            state.weekend = res.weekend || [];
+            renderWeekend();
+            setStatus($('wkStatus'), t('weekendCreated'), 'ok');
+          }).catch(function (e) { setStatus($('wkStatus'), e.message || String(e), 'err'); });
+      });
+
+      $('btnMsg').addEventListener('click', function () {
+        api('apiSendTeamMessage', $('msgText').value).then(function (r) {
+          setStatus($('msgStatus'), r.stub ? t('sentStub') : t('sent'), 'ok');
+        }).catch(function (e) { setStatus($('msgStatus'), e.message || String(e), 'err'); });
+      });
+
+      $('btnOpenFiles').addEventListener('click', openFiles);
+      $('detailClose').addEventListener('click', function () { $('detailOverlay').classList.add('hidden'); });
+      $('detailBack').addEventListener('click', function () {
+        $('detailOverlay').classList.add('hidden');
+        showTab('log');
+      });
+      $('filesClose').addEventListener('click', function () { $('filesOverlay').classList.add('hidden'); });
+      $('filesBack').addEventListener('click', function () { $('filesOverlay').classList.add('hidden'); });
+
+      $('btnSaveFiles').addEventListener('click', function () {
+        var input = $('fileInput');
+        var kept = state.files.filter(function (f) { return state.removeFileIds.indexOf(f.id) < 0; }).length;
+        var files = Array.prototype.slice.call(input.files || [], 0);
+        if (kept + files.length > 10) {
+          setStatus($('filesStatus'), t('maxFiles'), 'err');
+          return;
+        }
+        $('btnSaveFiles').disabled = true;
+        setStatus($('filesStatus'), t('saving'));
+        Promise.all(files.map(readFile)).then(function (payloads) {
+          return api('saveAndSendTripFiles', state.trip.id, {
+            equipmentList: $('equipmentList').value,
+            sheetLinksText: $('sheetLinks').value,
+            newFiles: payloads,
+            removeFileIds: state.removeFileIds.slice(),
+            notifyStaff: true
+          });
+        }).then(function (res) {
+          state.files = res.bundle.files || [];
+          state.trip = res.trip || state.trip;
+          state.removeFileIds = [];
+          $('fileInput').value = '';
+          renderFiles();
+          setStatus($('filesStatus'), t('savedFiles') + (res.notifiedFileIds || []).length, 'ok');
+        }).catch(function (e) {
+          setStatus($('filesStatus'), e.message || String(e), 'err');
+        }).then(function () { $('btnSaveFiles').disabled = false; });
+      });
+
+      initTheme();
+      initLang();
+      showTab('log');
+      boot();
+    </script>
+  </body>
+</html>
