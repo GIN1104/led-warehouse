@@ -54,9 +54,16 @@ export default function AccessRequestsPage() {
   const [remoteDecided, setRemoteDecided] = useState<AccessRequestRow[] | null>(null);
   void revision;
 
-  const localPending = listAccessRequests(db, { status: "pending" });
+  const [listTick, setListTick] = useState(0);
+  const localPending = useMemo(
+    () => listAccessRequests(db, { status: "pending" }),
+    [db, revision, listTick],
+  );
   const pending = useMemo(() => mergePending(localPending, remotePending), [localPending, remotePending]);
-  const localDecided = listAccessRequests(db).filter((row) => row.status !== "pending").slice(0, 20);
+  const localDecided = useMemo(
+    () => listAccessRequests(db).filter((row) => row.status !== "pending").slice(0, 20),
+    [db, revision, listTick],
+  );
   const decided = useMemo(() => {
     if (remoteDecided !== null) {
       return [...remoteDecided]
@@ -66,7 +73,10 @@ export default function AccessRequestsPage() {
     }
     return localDecided;
   }, [remoteDecided, localDecided]);
-  const allowlist = listAllowedEmails(db, { includeExpired: true });
+  const allowlist = useMemo(
+    () => listAllowedEmails(db, { includeExpired: true }),
+    [db, revision, listTick],
+  );
 
   const pullRemote = useCallback(async () => {
     if (!apiOn) {
@@ -92,11 +102,16 @@ export default function AccessRequestsPage() {
   }, [apiOn, pullRemote, revision]);
 
   async function afterSharedMutation() {
+    setListTick((n) => n + 1);
     if (apiOn && shared && !offline) {
       // Decide/revoke уже в Turso через access API — не пушим старый revision поверх.
-      reloadShared();
-      await new Promise((resolve) => setTimeout(resolve, 500));
-    } else {
+      // Ждём сеть: иначе UI остаётся на stale snapshot и email «не уходит».
+      try {
+        await reloadShared();
+      } catch {
+        /* remote уже ок; listTick + pullRemote обновят список */
+      }
+    } else if (!apiOn) {
       await refresh();
     }
     await pullRemote();

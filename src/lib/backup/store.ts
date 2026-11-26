@@ -1,6 +1,11 @@
 import { mkdirSync, readdirSync, readFileSync, unlinkSync, writeFileSync, statSync } from "node:fs";
 import { join } from "node:path";
-import { getDriveBackupConfig, hasDriveBackupConfig } from "@/lib/backup/config";
+import {
+  allowBackupMock,
+  assertDriveBackupConfigured,
+  getDriveBackupConfig,
+  hasDriveBackupConfig,
+} from "@/lib/backup/config";
 import { driveDeleteFile, driveDownloadFile, driveListBackupFiles, driveUploadFile } from "@/lib/backup/drive-client";
 import { backupDumpFileName, isBackupDumpName } from "@/lib/backup/naming";
 import { keysToDeleteForRetention } from "@/lib/backup/retention";
@@ -78,7 +83,11 @@ export function targetStatus(env: Record<string, string | undefined> = process.e
 
 export async function listBackups(): Promise<BackupEntry[]> {
   const cfg = getDriveBackupConfig();
-  if (!cfg) return listMock();
+  if (!cfg) {
+    // Shared host без secrets: пустой список + badge mock в UI (create/restore упадут).
+    if (!allowBackupMock()) return [];
+    return listMock();
+  }
   const files = await driveListBackupFiles(cfg);
   return files
     .filter((file) => isBackupDumpName(file.name))
@@ -114,6 +123,7 @@ export type UploadResult = {
 };
 
 export async function uploadBackup(bytes: Uint8Array, opts?: { fileName?: string }): Promise<UploadResult> {
+  assertDriveBackupConfigured();
   const name = opts?.fileName ?? backupDumpFileName();
   const cfg = getDriveBackupConfig();
   if (!cfg) {
@@ -134,6 +144,7 @@ export async function uploadBackup(bytes: Uint8Array, opts?: { fileName?: string
 }
 
 export async function downloadBackup(key: string): Promise<{ bytes: Uint8Array; name: string }> {
+  assertDriveBackupConfigured();
   const cfg = getDriveBackupConfig();
   if (!cfg) {
     const bytes = readMock(key);

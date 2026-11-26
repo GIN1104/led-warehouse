@@ -17,8 +17,8 @@ import type { BackupEntry } from "@/lib/backup/store";
 import { translateError } from "@/lib/i18n/messages";
 
 /**
- * Owner-only блок на /me. ledvision2026 и остальные не рендерят этот компонент.
- * Один путь restore: Google Drive.
+ * Owner-only блок на /me (кнопки только starchenkogin).
+ * Целевая папка dump — Google Drive ledvision2026.il@gmail.com (не personal starchenkogin).
  */
 export function OwnerBackupRestore() {
   const { session: auth } = useEmailAuth();
@@ -125,13 +125,24 @@ export function OwnerBackupRestore() {
       ) : (
         <>
           <div className="mb-4 flex flex-wrap gap-2 text-xs">
-            <Badge tone={status.configured ? "ok" : "neutral"}>
+            <Badge tone={status.configured ? "ok" : "warn"}>
               Google Drive: {status.configured ? t("me.backup.live") : t("me.backup.mock")}
             </Badge>
           </div>
 
+          {!status.configured ? (
+            <p className="mb-4 rounded-md border border-rose-300 bg-rose-50 px-3 py-2 text-sm text-rose-950" role="status">
+              {t("me.backup.needDriveSecrets")}
+            </p>
+          ) : null}
+
           <div className="mb-4 flex flex-wrap gap-2">
-            <button type="button" className={buttonClass("ghost")} disabled={busy} onClick={() => void onCreate()}>
+            <button
+              type="button"
+              className={buttonClass("ghost")}
+              disabled={busy || !status.configured}
+              onClick={() => void onCreate()}
+            >
               {t("me.backup.createNow")}
             </button>
             <button type="button" className={buttonClass("ghost")} disabled={busy} onClick={() => void load()}>
@@ -140,7 +151,7 @@ export function OwnerBackupRestore() {
             <button
               type="button"
               className={buttonClass(panelOpen ? "primary" : "ghost")}
-              disabled={busy}
+              disabled={busy || !status.configured}
               onClick={() => openPanel()}
             >
               {t("me.backup.restoreDrive")}

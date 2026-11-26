@@ -1,6 +1,6 @@
 import { corsPreflight, withCors } from "@/lib/api/cors";
 import { DomainError } from "@/lib/domain/errors";
-import { enqueueLedger } from "@/lib/db/file-store";
+import { bumpRevision, enqueueLedger } from "@/lib/db/file-store";
 import { isValidEmailShape, normalizeEmail } from "@/lib/email-auth/normalize";
 import {
   createAccessRequest,
@@ -82,12 +82,15 @@ export async function POST(request: Request) {
   try {
     const result = await enqueueLedger((db) => {
       if (isEmailActivelyAllowed(db, email)) {
-        return { mode: "allowed" as const, request: null as AccessRequestRow | null };
+        return { mode: "allowed" as const, request: null as AccessRequestRow | null, revision: undefined as number | undefined };
       }
       const existing = findPendingRequest(db, email);
-      if (existing) return { mode: "existing" as const, request: existing };
+      if (existing) {
+        return { mode: "existing" as const, request: existing, revision: undefined as number | undefined };
+      }
       const created = createAccessRequest(db, email);
-      return { mode: "created" as const, request: created };
+      const revision = bumpRevision(db);
+      return { mode: "created" as const, request: created, revision };
     });
 
     const telegram =

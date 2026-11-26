@@ -10,7 +10,7 @@ export type BackupJobResult = {
   upload: UploadResult;
 };
 
-/** Daily / on-demand: dump текущего ledger → Google Drive (mock если secrets нет). */
+/** Daily / on-demand: dump текущего ledger → Google Drive ledvision2026 (mock только если ALLOW_BACKUP_MOCK / не shared). */
 export async function runBackupJob(): Promise<BackupJobResult> {
   const snapshot = await exportLedger();
   const fileName = backupDumpFileName();
