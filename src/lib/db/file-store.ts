@@ -41,7 +41,26 @@ async function ensureCloud(): Promise<void> {
   try {
     const current = openLive();
     const direction = await alignWithRemote(current.handle, userCount(current.handle), readRevision(current.handle));
-    if (direction === "pull") current.revision = readRevision(current.handle);
+    if (direction === "pull") {
+      // pullSnapshot затирает таблицы — после него снова migrate (backfill family_id / product_families).
+      const familiesBefore = Number(
+        current.handle.get<{ c: number }>(`SELECT COUNT(*) AS c FROM product_families`)?.c ?? 0,
+      );
+      migrate(current.handle);
+      current.revision = readRevision(current.handle);
+      const familiesAfter = Number(
+        current.handle.get<{ c: number }>(`SELECT COUNT(*) AS c FROM product_families`)?.c ?? 0,
+      );
+      if (familiesAfter > familiesBefore) {
+        current.revision += 1;
+        current.handle.run(`UPDATE ledger_meta SET value = ? WHERE key = 'revision'`, [String(current.revision)]);
+        try {
+          await pushSnapshot(current.handle);
+        } catch {
+          /* локально исправлено; следующий успешный push догонит Turso */
+        }
+      }
+    }
     if (userCount(current.handle) === 0) {
       seedIfEmpty(current.handle);
       if (userCount(current.handle) > 0) {
@@ -95,21 +114,14 @@ export function enqueueLedger<T>(fn: (db: Sql) => T): Promise<T> {
     const journal: SqlStmt[] = [];
     replaceNeedsPush = false;
     const result = fn(journaled(current.handle, journal));
+    // Fail-closed: успешный ответ API только если Turso принял снимок / journal.
     if (tursoEnabled() && replaceNeedsPush) {
-      try {
-        await pushSnapshot(openLive().handle);
-      } catch {
-        // Local ledger already replaced; Turso catch-up on next write/align.
-      }
+      await pushSnapshot(openLive().handle);
     } else if (tursoEnabled() && journal.length > 0) {
       try {
         await replayStatements(journal);
       } catch {
-        try {
-          await pushSnapshot(current.handle);
-        } catch {
-          // keep local success
-        }
+        await pushSnapshot(current.handle);
       }
     }
     return result;

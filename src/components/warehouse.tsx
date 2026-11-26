@@ -25,14 +25,15 @@ type ReadyWarehouse = {
   session: UserRow;
   revision: number;
   shared: boolean;
-  /** Shared ledger недоступен — UI на last-known snapshot или local IndexedDB. */
+  /** Shared ledger недоступен — UI на last-known snapshot (только чтение). */
   offline: boolean;
   snapshotSavedAt: string | null;
-  /** Запись в общий ledger запрещена (offline snapshot). Local fallback пишет в IndexedDB. */
+  /** Запись в общий ledger запрещена (offline / нет связи). Shared mode fail-closed — без IndexedDB. */
   writesBlocked: boolean;
   notice: string | null;
   refresh: () => Promise<void>;
-  reloadShared: () => void;
+  /** Перечитать ledger с API (сеть). Reject при ошибке сети. */
+  reloadShared: () => Promise<void>;
   switchUser: (userId: string) => void;
 };
 
@@ -73,7 +74,7 @@ function buildReady(
     writesBlocked: opts.shared && opts.offline,
     notice: opts.notice,
     refresh: () => Promise.resolve(),
-    reloadShared: () => undefined,
+    reloadShared: () => Promise.resolve(),
     switchUser: () => undefined,
   };
 }
@@ -335,32 +336,32 @@ export function WarehouseProvider({ children }: { children: ReactNode }) {
         })();
       },
       reloadShared: () => {
-        if (!sharedLedger) return;
-        void openSharedDbPreferSnapshot()
+        if (!sharedLedger) return Promise.resolve();
+        // После decide/revoke нужен именно сеть (не stale snapshot) — иначе email «остаётся».
+        return openSharedDbFromNetwork()
           .then((opened) => {
             setState((current) => {
               if (!current.ready) return current;
               return applyOpenedDb(current, opened.db, {
                 shared: true,
-                offline: opened.source === "snapshot",
+                offline: false,
                 snapshotSavedAt: opened.snapshotSavedAt,
-                notice: opened.source === "snapshot" ? "offline" : null,
+                notice: null,
               });
             });
           })
-          .catch(() => {
-            void openSharedBrowseOnly().then((local) => {
-              if (local.ready) {
-                setState((current) => {
-                  if (!current.ready) return local;
-                  const session =
-                    listUsers(local.db).find((user) => user.id === current.session.id) ?? local.session;
-                  return { ...local, session };
-                });
-              } else {
-                setState(local);
-              }
-            });
+          .catch(async (error) => {
+            setState((current) =>
+              current.ready
+                ? {
+                    ...current,
+                    offline: true,
+                    writesBlocked: true,
+                    notice: "offline",
+                  }
+                : current,
+            );
+            throw error;
           });
       },
       switchUser: (userId: string) => {

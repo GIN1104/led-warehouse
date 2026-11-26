@@ -59,7 +59,8 @@ curl -fsS "https://led-warehouse-api.onrender.com/api/v1/health/"
 # ожидаем: "backups":{"drive":true}
 ```
 
-На `/me` (owner) badge: **Google Drive настроено**, сообщение после бэкапа — «Бэкап записан на Google Drive.» без «или mock».
+На `/me` (owner) badge: **Drive ledvision2026 настроено**, сообщение после бэкапа — «Бэкап записан на Google Drive ledvision2026.il@gmail.com.»  
+На shared host **без** secrets create/restore **падают** (mock отключён) — не тихий dump на диск Render.
 
 ### Fly / Oracle (когда снова основной host)
 
@@ -95,8 +96,9 @@ Restore: download → проверка SQLite header → `forceReplaceLedger` (b
 
 `/me` → блок «Бэкап и восстановление» **только** для owner:
 
-- live: «Бэкап записан на Google Drive.»
-- mock (dev / нет secrets): «Бэкап записан локально (mock)…»
+- live: «Бэкап записан на Google Drive ledvision2026.il@gmail.com.»
+- shared без secrets: кнопки disabled + «задайте Drive secrets…» (не mock)
+- mock только local/dev или `ALLOW_BACKUP_MOCK=1`
 
 ## Scripts
 

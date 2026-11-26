@@ -69,7 +69,7 @@ export default function OrdersPage() {
         const response = await fetch(apiUrl("/api/v1/integrations/mapper/orders"), { method: "POST", body });
         const payload = (await response.json()) as { error?: string; idempotent?: boolean };
         if (!response.ok) throw new Error(payload.error ?? t("common.saveFailed"));
-        reloadShared();
+        void reloadShared();
         setFlash({ ok: payload.idempotent ? t("orders.mapperSame") : t("orders.mapperOk") });
         return;
       }
